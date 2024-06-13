@@ -25,10 +25,10 @@ Operations with instances, including create, delete, start, stop, reboot and oth
 ### Optional
 
 - `availability_zone` (String)
-- `delete_public_ip` (Boolean)
+- `delete_public_ip` (Boolean) We specify that when this VM is deleted, the public IP should be deleted as well.
 - `network` (Attributes) (see [below for nested schema](#nestedatt--network))
 - `state` (String)
-- `user_data` (String)
+- `user_data` (String) 
 
 ### Read-Only
 
