@@ -1,6 +1,6 @@
 ---
 page_title: "mgc_object-storage_buckets Resource - terraform-provider-mgc"
-subcategory: "Storage"
+subcategory: ""
 description: |-
   Object Storage Buckets
 ---
@@ -14,7 +14,8 @@ Object Storage Buckets
 
 ### Required
 
-- `bucket` (String)
+- `bucket` (String) Name of the bucket to be created
+- `bucket_is_prefix` (Boolean) Use bucket name as prefix value to generate a unique bucket name
 
 ### Optional
 
