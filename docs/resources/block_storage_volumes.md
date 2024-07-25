@@ -11,8 +11,7 @@ description: |-
 Operations with volumes, including create, delete, extend, retype, list and other actions.
 
 ```hcl
-resource "mgc_block-storage_volumes" "example_volume" {
-  provider = mgc.nordeste
+resource "mgc_block_storage_volumes" "example_volume" {
   name = "example-volume"
   size = 10
   type = {

@@ -11,8 +11,7 @@ description: |-
 Operations with instances, including create, delete, start, stop, reboot and other actions.
 
 ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance_nordeste" {
-  provider = mgc.nordeste # We specify the provider region here to indicate that this VM should be created in the Nordeste region.
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name     = "basic-instance-nordeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -129,8 +128,7 @@ Optional:
 ## Create a VM at Nordeste br-ne1
 
 ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance_nordeste" {
-  provider = mgc.nordeste # We specify the provider region here to indicate that this VM should be created in the Nordeste region.
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name     = "basic-instance-nordeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -150,9 +148,8 @@ resource "mgc_virtual-machine_instances" "basic_instance_nordeste" {
 ## Create a VM at Sudeste br-se1
 
   
-  ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance" {
-  provider = mgc.sudeste
+```hcl
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name     = "basic-instance-sudeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -172,8 +169,7 @@ resource "mgc_virtual-machine_instances" "basic_instance" {
 ## Create a VM at Sudeste br-se1 with public IP
 
 ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance" {
-  provider = mgc.sudeste
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name     = "basic-instance-sudeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -193,8 +189,7 @@ resource "mgc_virtual-machine_instances" "basic_instance" {
 ## Create a VM at Sudeste br-se1 with public IP and delete its public when the VM is destroyed
 
 ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance" {
-  provider = mgc.sudeste
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name     = "basic-instance-sudeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -214,7 +209,7 @@ resource "mgc_virtual-machine_instances" "basic_instance" {
 ## Create a VM and associate with specific Security Group
 
 ```hcl
-resource "mgc_virtual-machine_instances" "basic_instance_with_SG" {
+resource "mgc_virtual_machine_instances" "basic_instance_with_SG" {
   name = "basic-instance-nordeste"
   machine_type = {
     name = "cloud-bs1.xsmall"
@@ -224,10 +219,10 @@ resource "mgc_virtual-machine_instances" "basic_instance_with_SG" {
   }
   network = {
     associate_public_ip = false # If true, will create a public IP
+    delete_public_ip = false
     interface = {
       security_groups = [{ id = "aa622bcb-6861-4251-9cdb-aaadf3" }]
     }
-    delete_public_ip = false
   }
   ssh_key_name = "ssh_key"
 }
