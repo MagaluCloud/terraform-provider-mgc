@@ -11,7 +11,7 @@ description: |-
 Bucket operations for Object Storage API
 
 ```hcl
-resource "mgc_object-storage_buckets" "my-bucket" {
+resource "mgc_object_storage_buckets" "my-bucket" {
   bucket = "bucket-name"
   enable_versioning = true
   recursive = true # If true, any configuration or operation specified in the resource will be applied not only to the bucket itself but also to all the objects contained within that bucket.
