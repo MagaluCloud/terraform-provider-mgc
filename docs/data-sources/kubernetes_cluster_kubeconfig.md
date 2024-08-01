@@ -25,6 +25,24 @@ Retrieves the kubeconfig for a specified Kubernetes cluster using its unique ide
 The following example demonstrates how to use this data source to retrieve the kubeconfig for a Kubernetes cluster and then save it as a local file. This is particularly useful for configuring Kubernetes clients or CI/CD pipelines that need to interact with your cluster.
 
 ```hcl
+terraform {
+  required_providers {
+    mgc = {
+      source = "registry.terraform.io/magalucloud/mgc"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "2.5.1"
+    }
+  }
+}
+
+provider "mgc" {
+  alias = "sudeste"
+  region = "br-se1"
+  api_key = "YOUR_API_KEY"
+}
+
 # Fetch the kubeconfig for the specified Kubernetes cluster
 data "mgc_kubernetes_cluster_kubeconfig" "cluster" {
   cluster_id = "a132d346-cfe9-4f0e-bf88-4688437ee8fe"
