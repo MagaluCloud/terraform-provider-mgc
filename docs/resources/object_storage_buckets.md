@@ -8,14 +8,14 @@ description: |-
 
 # mgc_object_storage_buckets (Resource)
 
-Bucket operations for Object Storage API
+An object storage bucket.
 
-```hcl
+## Example Usage
+
+```terraform
 resource "mgc_object_storage_buckets" "my-bucket" {
   bucket = "bucket-name"
   enable_versioning = true
-  recursive = true # If true, any configuration or operation specified in the resource will be applied not only to the bucket itself but also to all the objects contained within that bucket.
-  bucket_is_prefix = false # Indicates whether the bucket name will be used as a prefix for objects.
 }
 ```
 
