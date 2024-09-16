@@ -3,17 +3,19 @@
 page_title: "mgc_block_storage_volume_attachment Resource - terraform-provider-mgc"
 subcategory: "Block Storage"
 description: |-
-  Block Storage Volume Attachment
+  A block storage volume attachment.
 ---
 
 # mgc_block_storage_volume_attachment (Resource)
 
-Block Storage Volume Attachment
+A block storage volume attachment.
 
-```hcl
+## Example Usage
+
+```terraform
 resource "mgc_block_storage_volume_attachment" "attach_example" {
-  block_storage_id = "addccc0a-dff6-4e2e-a6da-a9463eb5f73c"
-  virtual_machine_id = "addccc0a-dff6-4e2e-a6da-a9463eb5f73c"
+  block_storage_id = mgc_block_storage_volumes.my_storage.id
+  virtual_machine_id = mgc_virtual_machine_instances.my_vm.id
 }
 ```
 
