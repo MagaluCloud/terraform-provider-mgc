@@ -10,10 +10,12 @@ description: |-
 
 Kubernetes cluster resource in MGC
 
-```hcl
+## Example Usage
+
+```terraform
 resource "mgc_kubernetes_cluster" "cluster" {
-  name                 = "cluster-example"
-  version              = "v1.30.2"
+  name                 = "my_cluster"
+  version              = mgc_kubernetes_version.versions[0].version
   enabled_server_group = false
   description          = "Cluster Example"
 }
@@ -40,3 +42,11 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 - `created_at` (String) Creation date of the Kubernetes cluster.
 - `id` (String) Cluster's UUID.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import mgc_kubernetes_cluster.clsuter 123
+```
