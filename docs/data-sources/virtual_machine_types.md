@@ -10,9 +10,10 @@ description: |-
 
 Get the available virtual-machine types.
 
-```hcl
-data "mgc_virtual_machine_types" "types" {
+## Example Usage
 
+```terraform
+data "mgc_virtual_machine_types" "types" {
 }
 
 output "vm_types" {
@@ -34,7 +35,7 @@ Read-Only:
 
 - `disk` (Number) Disk
 - `gpu` (Number) GPU
-- `id` (Boolean) ID of machine-type.
+- `id` (String) ID of machine-type.
 - `name` (String) Name of type.
 - `ram` (Number) Ram
 - `vcpu` (Number) VCpu
