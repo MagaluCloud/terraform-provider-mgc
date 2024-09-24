@@ -8,9 +8,11 @@ description: |-
 
 # mgc_virtual_machine_snapshots (Resource)
 
-Create a snapshot of a virtual machine instance.
+Operations with snapshots for instances.
 
-```hcl
+## Example Usage
+
+```terraform
 resource "mgc_virtual_machine_snapshots" "basic_snapshot" {
   name = "basic-snapshot"
   virtual_machine_id = "a132d346-cfe9-4f0e-bf88-4688437ee8fe"
