@@ -17,6 +17,7 @@ The provider is currently under development, so new Magalu Cloud resources will 
 - You can contribute to an [open issue](https://github.com/MagaluCloud/terraform-provider-mgc/issues) to report a bug or suggest improvements and new features
 - You can open tópic in our [Dicussions Forum](https://github.com/MagaluCloud/terraform-provider-mgc/discussions)
 - See our roadmap in [projects](https://github.com/orgs/MagaluCloud/projects/2/views/7)
+- For the time being, the source code is on our [monorepo](https://github.com/MagaluCloud/magalu) (separation in progress).
 
 
 # References
