@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.1.7
         with:
-          token: ${{ secrets.GH_PAT2 }}
+          token: ${{ secrets.MAGALUBOT_GH_PAT }}
           fetch-depth: 1
       - uses: actions/setup-python@v5.2.0   
         with:
