@@ -1,4 +1,4 @@
-name: Release CLI and Terraform
+name: Release Terraform
 
 on:
   workflow_dispatch:

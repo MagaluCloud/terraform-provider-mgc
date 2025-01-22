@@ -13,7 +13,7 @@ builds:
       - -s -w -X github.com/MagaluCloud/magalu/sdk.Version={{.Version}}"
     flags:
       - -tags=embed release
-    main: mgc/terraform-provider-mgc/main.go
+    main: main.go
   - env: [CGO_ENABLED=0]
     id: "terraform"
     goos:
