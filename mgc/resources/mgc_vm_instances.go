@@ -285,6 +285,12 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		},
 	}
 
+	if state.VpcId.ValueString() != "" {
+		createParams.Network.Vpc = &sdkVmInstances.CreateParametersNetworkVpc{
+			Id: state.VpcId.ValueString(),
+		}
+	}
+
 	createdId, err := r.vmInstances.CreateContext(ctx, createParams, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.CreateConfigs{}))
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating VM", err.Error())

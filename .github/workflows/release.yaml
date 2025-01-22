@@ -1,0 +1,59 @@
+name: Release CLI and Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      runTerraform:
+        description: "Run deploy of Terraform"
+        type: boolean
+        required: false
+
+concurrency:
+  group: ci-check-${{ github.ref }}
+
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER_RUNS_ON }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.MAGALUBOT_GH_PAT }}
+      - name: Set up Go
+        uses: actions/setup-go@v5.0.2
+        with:
+          cache-dependency-path: "**/go.sum"
+          go-version: stable
+
+  terraform-release:
+    needs: build
+    runs-on: ${{ vars.RUNNER_RUNS_ON }}
+    timeout-minutes: 20
+    if: ${{ inputs.runTerraform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.MAGALUBOT_GH_PAT }}
+      - name: Set up Go
+        uses: actions/setup-go@v5.0.2
+        with:
+          cache-dependency-path: "**/go.sum"
+          go-version: stable
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}" | gpg --batch --yes --passphrase "${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}" --import
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: 2
+          args: release --clean --config="goreleaser_terraform.yaml"
+        env:
+          VERSION: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.MAGALUBOT_GH_PAT }}
+          GPG_FINGERPRINT: ${{ secrets.MAGALUBOT_GPG_FINGERPRINT }}
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
