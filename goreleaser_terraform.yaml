@@ -28,7 +28,7 @@ builds:
       - -s -w -X github.com/MagaluCloud/magalu/sdk.Version={{.Version}}"
     flags:
       - -tags=embed release
-    main: /main.go
+    main: main.go
 archives:
   - id: terraform
     name_template: "terraform-provider-mgc_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
