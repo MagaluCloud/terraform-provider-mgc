@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           fetch-depth: 1
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.MAGALUBOT_GH_PAT }}
       - name: Set up Go
         uses: actions/setup-go@v5.0.2
         with:
@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           fetch-depth: 1
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.MAGALUBOT_GH_PAT }}
       - name: Set up Go
         uses: actions/setup-go@v5.0.2
         with:
@@ -45,7 +45,7 @@ jobs:
           go-version: stable
       - name: Import GPG key
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import
+          echo "${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}" | gpg --batch --yes --passphrase "${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}" --import
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -54,6 +54,6 @@ jobs:
           args: release --clean --config="goreleaser_terraform.yaml"
         env:
           VERSION: ${{ github.ref_name }}
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GITHUB_TOKEN: ${{ secrets.MAGALUBOT_GH_PAT }}
+          GPG_FINGERPRINT: ${{ secrets.MAGALUBOT_GPG_FINGERPRINT }}
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
