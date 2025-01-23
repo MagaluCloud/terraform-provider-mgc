@@ -9,13 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
-var (
-	// these will be set by the goreleaser configuration
-	// to appropriate values for the compiled binary.
-	version string = "dev"
-	commit  string = "none"
-	date    string = "unknown"
-)
+var Version string = "dev"
 
 func main() {
 	var debug bool
@@ -28,7 +22,7 @@ func main() {
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), mgc.New(version, commit, date), opts)
+	err := providerserver.Serve(context.Background(), mgc.New(Version), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())

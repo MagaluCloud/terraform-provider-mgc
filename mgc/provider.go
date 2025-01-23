@@ -23,8 +23,6 @@ const providerTypeName = "mgc"
 
 type mgcProvider struct {
 	version string
-	commit  string
-	date    string
 	sdk     *mgcSdk.Sdk
 }
 
@@ -187,16 +185,14 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	}
 }
 
-func New(version string, commit string, date string) func() provider.Provider {
+func New(version string) func() provider.Provider {
 	sdk := mgcSdk.NewSdk()
-	mgcSdk.SetUserAgent("MgcTF")
+	mgcSdk.SetUserAgent("MgcTF/" + version)
 
 	return func() provider.Provider {
 		return &mgcProvider{
 			sdk:     sdk,
 			version: version,
-			commit:  commit,
-			date:    date,
 		}
 	}
 }
