@@ -10,7 +10,7 @@ builds:
       - arm64
     binary: terraform-provider-mgc
     ldflags:
-      - -s -w -X github.com/MagaluCloud/magalu/sdk.Version={{.Version}}"
+      - -s -w -X main.Version={{.Version}}"
     flags:
       - -tags=embed release
     main: main.go
@@ -25,7 +25,7 @@ builds:
       - arm64
     binary: terraform-provider-mgc
     ldflags:
-      - -s -w -X github.com/MagaluCloud/magalu/sdk.Version={{.Version}}"
+      - -s -w -X main.Version={{.Version}}"
     flags:
       - -tags=embed release
     main: main.go
@@ -53,8 +53,8 @@ archives:
 checksum:
   extra_files:
     - glob: "terraform-registry-manifest.json"
-      name_template: "terraform-provider-{{ .ProjectName }}_{{ .Version }}_manifest.json"
-  name_template: "terraform-provider-{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+      name_template: "terraform-provider-mgc_{{ .Version }}_manifest.json"
+  name_template: "terraform-provider-mgc_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
 signs:
   - artifacts: checksum
@@ -74,7 +74,7 @@ signs:
 release:
   extra_files:
     - glob: "terraform-registry-manifest.json"
-      name_template: "terraform-provider-{{ .ProjectName }}_{{ .Version }}_manifest.json"
+      name_template: "terraform-provider-mgc_{{ .Version }}_manifest.json"
   draft: true
   prerelease: true
   header: |
