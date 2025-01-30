@@ -16,18 +16,8 @@ SUBCATEGORY_JSON := $(SCRIPT_DIR)/subcategory.json
 
 # External tools and paths
 TF_PLUGIN_DOCS := github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@v0.19.4
-ABSOLUTE_PATH_OAPI := $(realpath $(SCRIPT_DIR)/../cli/openapis)
-ABSOLUTE_PATH_BLUEPRINTS := $(realpath $(SCRIPT_DIR)/../cli/blueprints)
-
-# Colors for output
-CYAN := \033[0;36m
-NC := \033[0m # No Color
 
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs setup-config
-
-help: ## Display this help message
-	@echo "Available targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(CYAN)%-30s$(NC) %s\n", $$1, $$2}'
 
 update-subcategory: ## Update subcategories in documentation files
 	@echo "Updating subcategories..."
@@ -62,6 +52,7 @@ check-example-usage: ## Check for missing example usage in documentation files
 	done; \
 	echo "Found $$error_count file(s) missing '## Example Usage'."; \
 	[ $$error_count -eq 0 ]
+
 check-empty-subcategory: ## Check for empty subcategories in documentation files
 	@echo "Checking for empty subcategories..."
 	@error_count=0; \
@@ -80,31 +71,15 @@ check-empty-subcategory: ## Check for empty subcategories in documentation files
 generate-docs: ## Generate documentation
 	@echo "Generating documentation..."
 	@mkdir -p $(DOCS_DIR)
-	@MGC_SDK_OPENAPI_DIR=$(ABSOLUTE_PATH_OAPI) MGC_SDK_BLUEPRINTS_DIR=$(ABSOLUTE_PATH_BLUEPRINTS) \
-		go run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@go run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
 	@echo "Adding subcategories..."
 	$(MAKE) update-subcategory
 	@echo "Moving extra docs..."
 	@cp -r $(DOCS_EXTRA_DIR)/. $(DOCS_DIR)
 	@echo "Documentation generated successfully."
 
-setup-config: ## Setup configuration file for Terraform or OpenTofu
-	@echo "Setting up configuration file..."
-	@config_file=~/.terraformrc; \
-	registry=registry.terraform.io; \
-	if [[ "$$MGC_OPENTF" ]]; then \
-		config_file=~/.tofurc; \
-		registry=registry.opentofu.org; \
-	fi; \
-	cat > $$config_file <<- EOM
-	provider_installation {
-	 dev_overrides {
-	 "$$registry/magalucloud/mgc" = "$$PWD"
-	 }
-	 direct {}
-	}
-	EOM
-	@echo "File $$config_file written to $$HOME:"
-	@cat $$config_file
+go-fmt:
+	gofmt -s -l -w .
 
-all: update-subcategory check-example-usage check-empty-subcategory generate-docs setup-config ## Run all tasks
+go-vet:
+	go vet ./...

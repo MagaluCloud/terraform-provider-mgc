@@ -1,0 +1,81 @@
+name: Documentation Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Check subcategory update
+        id: subcategory
+        continue-on-error: true
+        run: make update-subcategory
+
+      - name: Check example usage
+        id: example
+        continue-on-error: true
+        run: |
+          make check-example-usage 2>&1 | tee example_errors.txt
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "example_errors<<EOF" >> $GITHUB_OUTPUT
+            cat example_errors.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Check empty subcategories
+        id: empty
+        continue-on-error: true
+        run: |
+          make check-empty-subcategory 2>&1 | tee empty_errors.txt
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "empty_errors<<EOF" >> $GITHUB_OUTPUT
+            cat empty_errors.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Post PR comment with errors
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
+        env:
+          EXAMPLE_ERRORS: ${{ steps.example.outputs.example_errors }}
+          EMPTY_ERRORS: ${{ steps.empty.outputs.empty_errors }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let commentBody = '';
+
+            if (process.env.EXAMPLE_ERRORS) {
+              commentBody += `### 📝 Missing Example Usage\n\n\`\`\`\n${process.env.EXAMPLE_ERRORS}\n\`\`\`\n\n`;
+            }
+
+            if (process.env.EMPTY_ERRORS) {
+              commentBody += `### ❌ Empty Subcategories Found\n\n\`\`\`\n${process.env.EMPTY_ERRORS}\n\`\`\`\n\n`;
+            }
+
+            if (commentBody) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody,
+              });
+            }
+
+      - name: Fail workflow if errors exist
+        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure'
+        run: exit 1
