@@ -1,0 +1,88 @@
+name: Go Checks
+
+on:
+  pull_request:
+    branches:
+      - main  
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+        with:
+          go-version: '1.23'  
+
+      - name: Run go fmt
+        id: fmt
+        continue-on-error: true  
+        run: |
+          # Capture unformatted files and set as output
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "unformatted_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$unformatted" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1  # Fail the step (but continue workflow)
+          else
+            echo "unformatted_files=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run go vet
+        id: vet
+        continue-on-error: true  
+        run: |
+          # Capture vet errors and set as output
+          vet_errors=$(go vet ./... 2>&1 | tee /dev/stderr)
+          if [ $? -ne 0 ]; then
+            echo "vet_errors<<EOF" >> $GITHUB_OUTPUT
+            echo "$vet_errors" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1  # Fail the step (but continue workflow)
+          else
+            echo "vet_errors=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post PR comment with errors
+        if: always()  
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
+        env:
+          FMT_ERRORS: ${{ steps.fmt.outputs.unformatted_files }}
+          VET_ERRORS: ${{ steps.vet.outputs.vet_errors }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Build the comment body
+            let commentBody = '';
+
+            // Add gofmt errors if present
+            if (process.env.FMT_ERRORS) {
+              commentBody += `### 🛠️ gofmt Issues\n\nThe following files are not formatted:\n\`\`\`\n${process.env.FMT_ERRORS}\n\`\`\`\nRun \`make go-fmt\` to fix.\n\n`;
+            }
+
+            // Add govet errors if present
+            if (process.env.VET_ERRORS) {
+              commentBody += `### 🔍 go vet Issues\n\n\`\`\`\n${process.env.VET_ERRORS}\n\`\`\`\n`;
+            }
+
+            // Post comment if there are errors
+            if (commentBody) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody,
+              });
+            }
+
+      - name: Fail workflow if errors exist
+        if: steps.fmt.outcome == 'failure' || steps.vet.outcome == 'failure'
+        run: exit 1
