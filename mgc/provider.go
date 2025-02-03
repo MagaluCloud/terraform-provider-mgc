@@ -36,21 +36,21 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 		Description: "Terraform Provider for Magalu Cloud",
 		Attributes: map[string]schema.Attribute{
 			"region": schema.StringAttribute{
-				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1. Can be set with environment variable MGC_REGION.",
+				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1"),
 				},
 			},
 			"env": schema.StringAttribute{
-				Description: "The environment to use. Options: prod / pre-prod. Default is prod. Can be set with environment variable MGC_ENV.",
+				Description: "The environment to use. Options: prod / pre-prod. Default is prod.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("prod", "pre-prod"),
 				},
 			},
 			"api_key": schema.StringAttribute{
-				Description: "The Magalu API Key for authentication. Can be set with environment variable MGC_API_KEY.",
+				Description: "The Magalu API Key for authentication.",
 				Optional:    true,
 			},
 			"object_storage": schema.SingleNestedAttribute{
@@ -62,11 +62,11 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"key_id": schema.StringAttribute{
-								Description: "The API Key ID. Can be set with environment variable MGC_OBJ_KEY_ID.",
+								Description: "The API Key ID.",
 								Required:    true,
 							},
 							"key_secret": schema.StringAttribute{
-								Description: "The API Key Secret. Can be set with environment variable MGC_OBJ_KEY_SECRET.",
+								Description: "The API Key Secret.",
 								Required:    true,
 							},
 						},
@@ -86,6 +86,7 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if data.ApiKey.ValueString() == "" {
 		if apiKeyFromOS := os.Getenv("MGC_API_KEY"); apiKeyFromOS != "" {
+			resp.Diagnostics.AddWarning("The ´MGC_API_KEY´ environment variable is deprecated. Please use the ´api_key´ provider configuration instead.", "The environment variable ´MGC_API_KEY´ is deprecated. Please use the ´api_key´ provider configuration instead. This environment variable will be removed in a future release.")
 			data.ApiKey = types.StringValue(apiKeyFromOS)
 		} else {
 			data.ApiKey = types.StringValue("")
@@ -94,6 +95,7 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if data.Env.ValueString() == "" {
 		if envFromOS := os.Getenv("MGC_ENV"); envFromOS != "" {
+			resp.Diagnostics.AddWarning("The ´MGC_ENV´ environment variable is deprecated. Please use the ´env´ provider configuration instead.", "The environment variable ´MGC_ENV´ is deprecated. Please use the ´env´ provider configuration instead. This environment variable will be removed in a future release.")
 			data.Env = types.StringValue(envFromOS)
 		} else {
 			data.Env = types.StringValue("prod")
@@ -102,6 +104,7 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if data.Region.ValueString() == "" {
 		if regionFromOS := os.Getenv("MGC_REGION"); regionFromOS != "" {
+			resp.Diagnostics.AddWarning("The ´MGC_REGION´ environment variable is deprecated. Please use the ´region´ provider configuration instead.", "The environment variable ´MGC_REGION´ is deprecated. Please use the ´region´ provider configuration instead. This environment variable will be removed in a future release.")
 			data.Region = types.StringValue(regionFromOS)
 		} else {
 			data.Region = types.StringValue("br-se1")
@@ -109,6 +112,7 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	}
 
 	if data.ObjectStorage == nil || (os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "") {
+		resp.Diagnostics.AddWarning("The ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ environment variables are deprecated. Please use the ´object_storage´ provider configuration instead.", "The environment variables ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ are deprecated. Please use the ´object_storage´ provider configuration instead. These environment variables will be removed in a future release.")
 		data.ObjectStorage = &tfutil.ObjectStorageConfig{
 			ObjectKeyPair: &tfutil.KeyPair{
 				KeyID:     types.StringValue(os.Getenv("MGC_OBJ_KEY_ID")),
