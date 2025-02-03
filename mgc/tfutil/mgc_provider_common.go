@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -16,6 +17,7 @@ type ProviderConfig struct {
 	Env           types.String         `tfsdk:"env"`
 	ApiKey        types.String         `tfsdk:"api_key"`
 	ObjectStorage *ObjectStorageConfig `tfsdk:"object_storage"`
+	Sdk           *client.CoreClient   `tfsdk:"sdk"`
 }
 
 type KeyPair struct {

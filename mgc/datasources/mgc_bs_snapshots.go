@@ -2,22 +2,20 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 )
 
 var _ datasource.DataSource = &DataSourceBsSnapshots{}
 
 type DataSourceBsSnapshots struct {
-	sdkClient   *mgcSdk.Client
-	bsSnapshots sdkBlockStorageSnapshots.Service
+	bsSnapshots *blockstorage.BlockStorageClient
 }
 
 func NewDataSourceBSSnapshots() datasource.DataSource {
@@ -37,18 +35,9 @@ func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
-		return
-	}
+	sdk := req.ProviderData.(*tfutil.ProviderConfig).Sdk
+	r.bsSnapshots = blockstorage.New(sdk)
 
-	r.bsSnapshots = sdkBlockStorageSnapshots.NewService(ctx, r.sdkClient)
 }
 
 func (r *DataSourceBsSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -70,27 +59,26 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutputList, err := r.bsSnapshots.ListContext(ctx, sdkBlockStorageSnapshots.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.ListConfigs{}))
+	sdkOutputList, err := r.bsSnapshots.Snapshots().List(ctx, blockstorage.ListOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError("Failed to get snapshots", err.Error())
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Snapshots {
+	for _, sdkOutput := range sdkOutputList {
 		list, diags := types.ListValueFrom(ctx, types.StringType, sdkOutput.AvailabilityZones)
 		resp.Diagnostics.Append(diags...)
 
 		var item bsSnapshotsResourceModel
 
-		item.ID = types.StringValue(sdkOutput.Id)
+		item.ID = types.StringValue(sdkOutput.ID)
 		item.Name = types.StringValue(sdkOutput.Name)
-		item.Description = types.StringPointerValue(sdkOutput.Description)
-		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
-		item.VolumeId = types.StringPointerValue(sdkOutput.Volume.Id)
-		item.State = types.StringValue(sdkOutput.State)
-		item.Status = types.StringValue(sdkOutput.Status)
+		item.Description = types.StringValue(sdkOutput.Description)
+		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
+		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
+		item.VolumeId = types.StringPointerValue(sdkOutput.Volume.ID)
+		item.State = types.StringValue(string(sdkOutput.State))
+		item.Status = types.StringValue(string(sdkOutput.Status))
 		item.Size = types.Int64Value(int64(sdkOutput.Size))
 		item.Type = types.StringValue(sdkOutput.Type)
 		item.AvailabilityZones = list

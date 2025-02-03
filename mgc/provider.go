@@ -3,6 +3,7 @@ package mgc
 import (
 	"context"
 	"os"
+	"time"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
 	resources "github.com/MagaluCloud/terraform-provider-mgc/mgc/resources"
@@ -17,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	mgcSdk "github.com/MagaluCloud/magalu/mgc/sdk"
+	"github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
 const providerTypeName = "mgc"
@@ -24,6 +26,7 @@ const providerTypeName = "mgc"
 type mgcProvider struct {
 	version string
 	sdk     *mgcSdk.Sdk
+	mgcSdk  *client.CoreClient
 }
 
 func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -121,6 +124,21 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		}
 	}
 
+	// Remove this comment - New SDK
+	if data.ApiKey.ValueString() == "" {
+		resp.Diagnostics.AddError("ApiKey is required", "ApiKey is required")
+	}
+	regionUrl, err := tfutil.RegionToUrl(data.Region.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid region", err.Error())
+	}
+	mgcSdkClient := client.NewMgcClient(
+		data.ApiKey.ValueString(),
+		client.WithBaseURL(client.MgcUrl(regionUrl)),
+		client.WithRetryConfig(10, 5*time.Second, 60*time.Second, 2.0),
+	)
+	data.Sdk = mgcSdkClient
+
 	resp.DataSourceData = data
 	resp.ResourceData = data
 }
@@ -190,6 +208,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 }
 
 func New(version string) func() provider.Provider {
+	//deprecated
 	sdk := mgcSdk.NewSdk()
 	mgcSdk.SetUserAgent("MgcTF/" + version)
 
@@ -197,6 +216,7 @@ func New(version string) func() provider.Provider {
 		return &mgcProvider{
 			sdk:     sdk,
 			version: version,
+			mgcSdk:  nil,
 		}
 	}
 }
