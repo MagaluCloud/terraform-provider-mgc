@@ -2,12 +2,14 @@
 page_title: "Configure your Terraform Region"
 subcategory: "Guides"
 description: |-
-    How to configure the region in Terraform for Magalu Cloud.
+  How to configure the region in Terraform for Magalu Cloud.
 ---
 
-# Configurar região
+# Region Configuration
 
-Para configurar a região do provedor, utilize o seguinte código:
+## Basic Configuration
+
+To configure the provider's region, use the following code in your Terraform configuration:
 
 ```hcl
 provider "mgc" {
@@ -15,12 +17,22 @@ provider "mgc" {
 }
 ```
 
-Parâmetros
+## Available Regions
 
-region: Define a região para o provedor MGC. No exemplo acima, br-se1 indica a região Sudeste.
-Exemplo
+| Region Code | Description | Default |
+| ----------- | ----------- | ------- |
+| br-se1      | Southeast   | Yes     |
+| br-ne1      | Northeast   | No      |
 
-No exemplo abaixo utilizamos 2 regiões br-se1 e br-ne1 e criamos um provider para cada, adicionando um alias para facilitar o controle dos recursos de block-storage:
+## Provider Parameters
+
+| Parameter | Required | Description                                                                         |
+| --------- | -------- | ----------------------------------------------------------------------------------- |
+| region    | no       | The region code where resources will be created. See Available Regions table above. |
+
+## Multi-Region Example
+
+The following example demonstrates how to configure multiple regions using provider aliases. This is useful when you need to manage resources across different regions in the same Terraform configuration:
 
 ```hcl
 terraform {
@@ -31,31 +43,29 @@ terraform {
   }
 }
 
+# Southeast region provider
 provider "mgc" {
-  alias = "sudeste"
+  alias = "southeast"
   region = "br-se1"
 }
 
+# Northeast region provider
 provider "mgc" {
-  alias  = "nordeste"
+  alias  = "northeast"
   region = "br-ne1"
 }
 
-resource "mgc_block-storage_volumes" "block_storage" {
-    provider = mgc.nordeste
-    name = "volume-via-terraform"
-    size = 30
-    type = {
-        name = "cloud_nvme20k"
-    }
+# Create a VPC in Northeast region
+resource "mgc_network_vpcs" "main_vpc_ne" {
+    provider = mgc.northeast
+    name = "main-vpc-test-tf-tests"
 }
 
-resource "mgc_block-storage_volumes" "block_storage-sudeste" {
-    provider = mgc.sudeste
-    name = "volume-via-terraform"
-    size = 30
-    type = {
-        name = "cloud_nvme20k"
-    }
+# Create a VPC in Southeast region
+resource "mgc_network_vpcs" "main_vpc_se" {
+    provider = mgc.southeast
+    name = "main-vpc-test-tf-tests"
 }
 ```
+
+~> **Note:** When using multiple providers, make sure to specify the provider using the `provider` argument in your resource blocks.

@@ -88,7 +88,7 @@ jobs:
             }
 
             if (process.env.DOCS_CHANGED === 'true') {
-              commentBody += `### 🔄 Documentation Changes Detected\n\nThe following changes were detected after generating documentation:\n\n\`\`\`diff\n${process.env.DOCS_CHANGES}\n\`\`\`\n\nPlease regenerate documentation locally and commit the changes.\n\n`;
+              commentBody += `### 🔄 Documentation Changes Detected\n\nThe following changes were detected after generating documentation:\n\n\`\`\`diff\n${process.env.DOCS_CHANGES}\n\`\`\`\n\nPlease regenerate documentation locally ($ make generate-docs) and commit the changes.\n\n`;
             }
 
             if (commentBody) {
@@ -103,4 +103,4 @@ jobs:
       - name: Fail workflow if errors exist
         if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.gendocs.outputs.docs_changed == 'true'
         run: exit 1
-        
+
