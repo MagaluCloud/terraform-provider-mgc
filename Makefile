@@ -68,6 +68,13 @@ check-empty-subcategory: ## Check for empty subcategories in documentation files
 	echo "Found $$error_count file(s) with empty subcategory."; \
 	[ $$error_count -eq 0 ]
 
+tf-docs-setup: ## Setup terraform-docs
+	@go install github.com/terraform-docs/terraform-docs@v0.15.0
+
+tf-gen-docs: ## Generate terraform docs
+	@mkdir -p $(DOCS_DIR)
+	@go run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+
 generate-docs: ## Generate documentation
 	@echo "Generating documentation..."
 	@mkdir -p $(DOCS_DIR)
