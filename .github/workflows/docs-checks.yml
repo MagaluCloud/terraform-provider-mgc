@@ -16,6 +16,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Setup Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: 'go.mod'
+
       - name: Install jq
         run: sudo apt-get install -y jq
 
@@ -48,12 +53,27 @@ jobs:
             exit 1
           fi
 
+      - name: Generate docs
+        id: gendocs
+        continue-on-error: true
+        run: |
+          make generate-docs
+          if [[ -n $(git status --porcelain docs/) ]]; then
+            echo "docs_changed=true" >> $GITHUB_OUTPUT
+            git diff docs/ > docs_changes.diff
+            echo "changes<<EOF" >> $GITHUB_OUTPUT
+            cat docs_changes.diff >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Post PR comment with errors
         if: always()
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
         env:
           EXAMPLE_ERRORS: ${{ steps.example.outputs.example_errors }}
           EMPTY_ERRORS: ${{ steps.empty.outputs.empty_errors }}
+          DOCS_CHANGES: ${{ steps.gendocs.outputs.changes }}
+          DOCS_CHANGED: ${{ steps.gendocs.outputs.docs_changed }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -67,6 +87,10 @@ jobs:
               commentBody += `### ❌ Empty Subcategories Found\n\n\`\`\`\n${process.env.EMPTY_ERRORS}\n\`\`\`\n\n`;
             }
 
+            if (process.env.DOCS_CHANGED === 'true') {
+              commentBody += `### 🔄 Documentation Changes Detected\n\nThe following changes were detected after generating documentation:\n\n\`\`\`diff\n${process.env.DOCS_CHANGES}\n\`\`\`\n\nPlease regenerate documentation locally ($ make generate-docs) and commit the changes.\n\n`;
+            }
+
             if (commentBody) {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -77,5 +101,6 @@ jobs:
             }
 
       - name: Fail workflow if errors exist
-        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure'
+        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.gendocs.outputs.docs_changed == 'true'
         run: exit 1
+
