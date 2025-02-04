@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	mgcSdk "github.com/MagaluCloud/magalu/mgc/sdk"
+	sdk "github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
 const providerTypeName = "mgc"
@@ -24,6 +25,22 @@ const providerTypeName = "mgc"
 type mgcProvider struct {
 	version string
 	sdk     *mgcSdk.Sdk
+}
+
+type ProviderModel struct {
+	Region        types.String        `tfsdk:"region"`
+	Env           types.String        `tfsdk:"env"`
+	ApiKey        types.String        `tfsdk:"api_key"`
+	ObjectStorage *ObjectStorageModel `tfsdk:"object_storage"`
+}
+
+type ObjectStorageModel struct {
+	ObjectKeyPair *KeyPairModel `tfsdk:"key_pair"`
+}
+
+type KeyPairModel struct {
+	KeyID     types.String `tfsdk:"key_id"`
+	KeySecret types.String `tfsdk:"key_secret"`
 }
 
 func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -51,7 +68,10 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 			},
 			"api_key": schema.StringAttribute{
 				Description: "The Magalu API Key for authentication.",
-				Optional:    true,
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"object_storage": schema.SingleNestedAttribute{
 				Description: "Configuration settings for Object Storage",
@@ -78,51 +98,55 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 }
 
 func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data tfutil.ProviderConfig
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var plan ProviderModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		tflog.Error(ctx, "fail to get configs from provider")
+		return
 	}
 
-	if data.ApiKey.ValueString() == "" {
+	if plan.ApiKey.ValueString() == "" {
 		if apiKeyFromOS := os.Getenv("MGC_API_KEY"); apiKeyFromOS != "" {
 			resp.Diagnostics.AddWarning("The ´MGC_API_KEY´ environment variable is deprecated. Please use the ´api_key´ provider configuration instead.", "The environment variable ´MGC_API_KEY´ is deprecated. Please use the ´api_key´ provider configuration instead. This environment variable will be removed in a future release.")
-			data.ApiKey = types.StringValue(apiKeyFromOS)
-		} else {
-			data.ApiKey = types.StringValue("")
+			plan.ApiKey = types.StringValue(apiKeyFromOS)
 		}
 	}
 
-	if data.Env.ValueString() == "" {
+	if plan.Env.ValueString() == "" {
 		if envFromOS := os.Getenv("MGC_ENV"); envFromOS != "" {
 			resp.Diagnostics.AddWarning("The ´MGC_ENV´ environment variable is deprecated. Please use the ´env´ provider configuration instead.", "The environment variable ´MGC_ENV´ is deprecated. Please use the ´env´ provider configuration instead. This environment variable will be removed in a future release.")
-			data.Env = types.StringValue(envFromOS)
+			plan.Env = types.StringValue(envFromOS)
 		} else {
-			data.Env = types.StringValue("prod")
+			plan.Env = types.StringValue("prod")
 		}
 	}
 
-	if data.Region.ValueString() == "" {
+	if plan.Region.ValueString() == "" {
 		if regionFromOS := os.Getenv("MGC_REGION"); regionFromOS != "" {
 			resp.Diagnostics.AddWarning("The ´MGC_REGION´ environment variable is deprecated. Please use the ´region´ provider configuration instead.", "The environment variable ´MGC_REGION´ is deprecated. Please use the ´region´ provider configuration instead. This environment variable will be removed in a future release.")
-			data.Region = types.StringValue(regionFromOS)
+			plan.Region = types.StringValue(regionFromOS)
 		} else {
-			data.Region = types.StringValue("br-se1")
+			plan.Region = types.StringValue("br-se1")
 		}
 	}
 
-	if data.ObjectStorage == nil || (os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "") {
+	if plan.ObjectStorage == nil || (os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "") {
 		resp.Diagnostics.AddWarning("The ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ environment variables are deprecated. Please use the ´object_storage´ provider configuration instead.", "The environment variables ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ are deprecated. Please use the ´object_storage´ provider configuration instead. These environment variables will be removed in a future release.")
-		data.ObjectStorage = &tfutil.ObjectStorageConfig{
-			ObjectKeyPair: &tfutil.KeyPair{
+		plan.ObjectStorage = &ObjectStorageModel{
+			ObjectKeyPair: &KeyPairModel{
 				KeyID:     types.StringValue(os.Getenv("MGC_OBJ_KEY_ID")),
 				KeySecret: types.StringValue(os.Getenv("MGC_OBJ_KEY_SECRET")),
 			},
 		}
 	}
 
-	resp.DataSourceData = data
-	resp.ResourceData = data
+	if plan.ApiKey.ValueString() == "" {
+		resp.Diagnostics.AddError("The ´api_key´ provider configuration is required.", "The ´api_key´ provider configuration is required.")
+	}
+
+	resourceOut := NewConfigData(plan, p.version)
+	resp.DataSourceData = resourceOut
+	resp.ResourceData = resourceOut
 }
 
 func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -187,6 +211,34 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceCRRegistries,
 		datasources.NewDataSourceCRCredentials,
 	}
+}
+
+func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
+	output := tfutil.DataConfig{
+		ApiKey: plan.ApiKey.ValueString(),
+		Env:    plan.Env.ValueString(),
+		Region: plan.Region.ValueString(),
+	}
+
+	if plan.ObjectStorage != nil ||
+		plan.ObjectStorage.ObjectKeyPair != nil ||
+		plan.ObjectStorage.ObjectKeyPair.KeyID.IsNull() ||
+		plan.ObjectStorage.ObjectKeyPair.KeySecret.IsNull() {
+		output.Keypair = tfutil.KeyPairData{
+			KeyID:     plan.ObjectStorage.ObjectKeyPair.KeyID.ValueString(),
+			KeySecret: plan.ObjectStorage.ObjectKeyPair.KeySecret.ValueString(),
+		}
+	}
+
+	sdkUrl := sdk.MgcUrl(tfutil.RegionToUrl(output.Region, output.Env))
+	tflog.Info(context.Background(), "Using MGC URL: "+sdkUrl.String())
+
+	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
+		sdk.WithBaseURL(sdkUrl),
+		sdk.WithUserAgent("MgcTF/"+tfVersion),
+	)
+
+	return output
 }
 
 func New(version string) func() provider.Provider {

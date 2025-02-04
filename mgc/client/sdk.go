@@ -16,18 +16,18 @@ type SDKFrom interface {
 }
 
 func NewSDKClient[T SDKFrom, G tfutil.ResponseFrom](req T, resp *G) (*mgcSdk.Client, error, error) {
-	var config tfutil.ProviderConfig
+	var config tfutil.DataConfig
 
 	devErrMsg := "fail to parse provider config"
 	switch tp := any(req).(type) {
 	case resource.ConfigureRequest:
-		if cfg, ok := tp.ProviderData.(tfutil.ProviderConfig); ok {
+		if cfg, ok := tp.ProviderData.(tfutil.DataConfig); ok {
 			config = cfg
 			break
 		}
 		return nil, fmt.Errorf("%s", devErrMsg), fmt.Errorf("unexpected Resource Configure Type")
 	case datasource.ConfigureRequest:
-		if cfg, ok := tp.ProviderData.(tfutil.ProviderConfig); ok {
+		if cfg, ok := tp.ProviderData.(tfutil.DataConfig); ok {
 			config = cfg
 			break
 		}
@@ -39,23 +39,17 @@ func NewSDKClient[T SDKFrom, G tfutil.ResponseFrom](req T, resp *G) (*mgcSdk.Cli
 	local_sdk := sdk.NewSdk()
 	sdkClient := mgcSdk.NewClient(local_sdk)
 
-	if config.Region.ValueString() != "" {
-		_ = sdkClient.Sdk().Config().SetTempConfig("region", config.Region.ValueString())
+	if config.Region != "" {
+		_ = sdkClient.Sdk().Config().SetTempConfig("region", config.Region)
 	}
-	if config.Env.ValueString() != "" {
-		_ = sdkClient.Sdk().Config().SetTempConfig("env", config.Env.ValueString())
-	}
-
-	if config.ApiKey.ValueString() != "" {
-		_ = sdkClient.Sdk().Auth().SetAPIKey(config.ApiKey.ValueString())
-	} else {
-		// Remove this block when the provider does not support CLI Auth
-		tfutil.AddCLIAuthWarning(resp)
+	if config.Env != "" {
+		_ = sdkClient.Sdk().Config().SetTempConfig("env", config.Env)
 	}
 
-	if config.ObjectStorage != nil && config.ObjectStorage.ObjectKeyPair != nil {
-		sdkClient.Sdk().Config().AddTempKeyPair("apikey", config.ObjectStorage.ObjectKeyPair.KeyID.ValueString(),
-			config.ObjectStorage.ObjectKeyPair.KeySecret.ValueString())
+	_ = sdkClient.Sdk().Auth().SetAPIKey(config.ApiKey)
+
+	if config.Keypair.KeyID != "" && config.Keypair.KeySecret != "" {
+		sdkClient.Sdk().Config().AddTempKeyPair("apikey", config.Keypair.KeyID, config.Keypair.KeySecret)
 	}
 
 	return sdkClient, nil, nil
