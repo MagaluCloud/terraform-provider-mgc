@@ -54,12 +54,14 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 		Attributes: map[string]schema.Attribute{
 			"region": schema.StringAttribute{
 				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
+				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1"),
 				},
 			},
 			"env": schema.StringAttribute{
+				Description: "The environment to use. Options: prod / pre-prod. Default is prod.",
 				Description: "The environment to use. Options: prod / pre-prod. Default is prod.",
 				Optional:    true,
 				Validators: []validator.String{
@@ -83,9 +85,11 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 						Attributes: map[string]schema.Attribute{
 							"key_id": schema.StringAttribute{
 								Description: "The API Key ID.",
+								Description: "The API Key ID.",
 								Required:    true,
 							},
 							"key_secret": schema.StringAttribute{
+								Description: "The API Key Secret.",
 								Description: "The API Key Secret.",
 								Required:    true,
 							},
