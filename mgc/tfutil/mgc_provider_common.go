@@ -6,26 +6,23 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	sdk "github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
+type DataConfig struct {
+	ApiKey     string
+	Env        string
+	Region     string
+	Keypair    KeyPairData
+	CoreConfig sdk.CoreClient
+}
+
+type KeyPairData struct {
+	KeyID     string
+	KeySecret string
+}
+
 type findKey func(key string, out any) error
-
-type ProviderConfig struct {
-	Region        types.String         `tfsdk:"region"`
-	Env           types.String         `tfsdk:"env"`
-	ApiKey        types.String         `tfsdk:"api_key"`
-	ObjectStorage *ObjectStorageConfig `tfsdk:"object_storage"`
-}
-
-type KeyPair struct {
-	KeyID     types.String `tfsdk:"key_id"`
-	KeySecret types.String `tfsdk:"key_secret"`
-}
-
-type ObjectStorageConfig struct {
-	ObjectKeyPair *KeyPair `tfsdk:"key_pair"`
-}
 
 type MgcApiKey struct {
 	ApiKey string

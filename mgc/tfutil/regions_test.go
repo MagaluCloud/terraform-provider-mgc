@@ -1,42 +1,88 @@
 package tfutil
 
-import "testing"
+import (
+	"fmt"
+	"testing"
 
-func TestRegions(t *testing.T) {
+	"github.com/MagaluCloud/mgc-sdk-go/client"
+)
+
+func TestRegionToUrl(t *testing.T) {
 	type testArgs struct {
-		inputRegion   string
-		expectedUrl   string
-		expectedError bool
+		inputRegion string
+		inputEnv    string
+		expectedUrl string
 	}
-	ts := []testArgs{
+
+	tests := []testArgs{
 		{
 			inputRegion: "br-ne1",
-			expectedUrl: "https://api.magalu.cloud/br-ne1",
+			inputEnv:    "prod",
+			expectedUrl: client.BrNe1.String(),
 		},
 		{
 			inputRegion: "br-se1",
-			expectedUrl: "https://api.magalu.cloud/br-se1",
+			inputEnv:    "prod",
+			expectedUrl: client.BrSe1.String(),
 		},
 		{
 			inputRegion: "br-mgl1",
-			expectedUrl: "https://api.magalu.cloud/br-se-1",
+			inputEnv:    "prod",
+			expectedUrl: client.BrMgl1.String(),
 		},
 		{
-			inputRegion:   "br-se2",
-			expectedError: true,
+			inputRegion: "br-ne1",
+			inputEnv:    "pre-prod",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-ne1",
+		},
+		{
+			inputRegion: "br-se1",
+			inputEnv:    "pre-prod",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-se1",
+		},
+		{
+			inputRegion: "invalid-region",
+			inputEnv:    "prod",
+			expectedUrl: client.BrSe1.String(),
+		},
+		{
+			inputRegion: "invalid-region",
+			inputEnv:    "pre-prod",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-se1",
+		},
+		{
+			inputRegion: "br-ne1",
+			inputEnv:    "invalid-env",
+			expectedUrl: client.BrNe1.String(),
+		},
+		{
+			inputRegion: "invalid-region",
+			inputEnv:    "invalid-env",
+			expectedUrl: client.BrSe1.String(),
+		},
+		{
+			inputRegion: "",
+			inputEnv:    "",
+			expectedUrl: client.BrSe1.String(),
+		},
+		{
+			inputRegion: "",
+			inputEnv:    "pre-prod",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-se1",
+		},
+		{
+			inputRegion: "br-ne1",
+			inputEnv:    "",
+			expectedUrl: client.BrNe1.String(),
 		},
 	}
 
-	for _, tt := range ts {
-		url, err := RegionToUrl(tt.inputRegion)
-		if tt.expectedError && err == nil {
-			t.Errorf("Expected error but got nil")
-		}
-		if !tt.expectedError && err != nil {
-			t.Errorf("Expected no error but got %v", err)
-		}
-		if url != tt.expectedUrl {
-			t.Errorf("Expected url %s but got %s", tt.expectedUrl, url)
-		}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("Region:%s,Env:%s", tt.inputRegion, tt.inputEnv), func(t *testing.T) {
+			url := RegionToUrl(tt.inputRegion, tt.inputEnv)
+			if url != tt.expectedUrl {
+				t.Errorf("Expected URL %q, got %q", tt.expectedUrl, url)
+			}
+		})
 	}
 }
