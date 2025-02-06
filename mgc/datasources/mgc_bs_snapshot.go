@@ -124,7 +124,7 @@ func (r *DataSourceBsSnapshot) Read(ctx context.Context, req datasource.ReadRequ
 
 	sdkOutput, err := r.bsSnapshotService.Get(ctx, data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get snapshot", tfutil.ParseSDKError(err))
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

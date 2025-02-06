@@ -27,7 +27,7 @@ func (r *DataSourceBsSnapshots) Metadata(_ context.Context, req datasource.Metad
 }
 
 type bsSnapshotsResourceListModel struct {
-	snapshots []bsSnapshotsResourceModel `tfsdk:"snapshots"`
+	Snapshots []bsSnapshotsResourceModel `tfsdk:"snapshots"`
 }
 
 func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -69,7 +69,7 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 
 	sdkOutputList, err := r.bsSnapshotService.List(ctx, bsSDK.ListOptions{ /*todo*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get snapshots", tfutil.ParseSDKError(err))
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -91,7 +91,7 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		item.Type = types.StringValue(sdkOutput.Type)
 		item.AvailabilityZones = list
 
-		data.snapshots = append(data.snapshots, item)
+		data.Snapshots = append(data.Snapshots, item)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
