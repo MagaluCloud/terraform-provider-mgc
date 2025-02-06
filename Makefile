@@ -90,3 +90,8 @@ go-fmt:
 
 go-vet:
 	go vet ./...
+
+go-test:
+	go test -v ./...
+
+before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory 

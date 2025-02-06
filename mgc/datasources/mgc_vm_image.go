@@ -6,9 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVMImages "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/images"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceVmImages{}
 
 type DataSourceVmImages struct {
-	sdkClient *mgcSdk.Client
-	vmImages  sdkVMImages.Service
+	vmImageService vmSDK.ImageService
 }
 
 type ImageModel struct {
@@ -46,19 +43,13 @@ func (r *DataSourceVmImages) Configure(ctx context.Context, req datasource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.vmImages = sdkVMImages.NewService(ctx, r.sdkClient)
+	r.vmImageService = vmSDK.New(&dataConfig.CoreConfig).Images()
 }
 
 func (r *DataSourceVmImages) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -106,22 +97,21 @@ func (r *DataSourceVmImages) Schema(_ context.Context, req datasource.SchemaRequ
 	resp.Schema.Description = "Get the available virtual-machine images."
 }
 
-const imageActive string = "active"
-
 func (r *DataSourceVmImages) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data ImagesModel
-
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
-	sdkOutput, err := r.vmImages.ListContext(ctx, sdkVMImages.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVMImages.ListConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	for _, image := range sdkOutput.Images {
-		if image.Status != imageActive {
+	sdkOutput, err := r.vmImageService.List(ctx, vmSDK.ImageListOptions{})
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	for _, image := range sdkOutput {
+		if image.Status != vmSDK.ImageStatusActive {
 			continue
 		}
 
@@ -131,20 +121,18 @@ func (r *DataSourceVmImages) Read(ctx context.Context, req datasource.ReadReques
 		}
 
 		var azs []types.String
-		if image.AvailabilityZones != nil {
-			for _, az := range *image.AvailabilityZones {
-				azs = append(azs, types.StringValue(az))
-			}
+		for _, az := range image.AvailabilityZones {
+			azs = append(azs, types.StringValue(az))
 		}
 
 		data.Images = append(data.Images, ImageModel{
-			ID:                types.StringValue(image.Id),
+			ID:                types.StringValue(image.ID),
 			Name:              types.StringValue(image.Name),
 			Platform:          types.StringValue(platform),
 			AvailabilityZones: azs,
 			MinimumDiskSize:   types.Int64Value(int64(image.MinimumRequirements.Disk)),
-			MinimumMemorySize: types.Int64Value(int64(image.MinimumRequirements.Ram)),
-			MinimumVCPU:       types.Int64Value(int64(image.MinimumRequirements.Vcpu)),
+			MinimumMemorySize: types.Int64Value(int64(image.MinimumRequirements.RAM)),
+			MinimumVCPU:       types.Int64Value(int64(image.MinimumRequirements.VCPU)),
 		})
 
 	}
