@@ -2,13 +2,12 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +15,7 @@ import (
 var _ datasource.DataSource = &DataSourceBsSnapshots{}
 
 type DataSourceBsSnapshots struct {
-	sdkClient   *mgcSdk.Client
-	bsSnapshots sdkBlockStorageSnapshots.Service
+	bsSnapshotService bsSDK.SnapshotService
 }
 
 func NewDataSourceBSSnapshots() datasource.DataSource {
@@ -29,7 +27,7 @@ func (r *DataSourceBsSnapshots) Metadata(_ context.Context, req datasource.Metad
 }
 
 type bsSnapshotsResourceListModel struct {
-	snapshots []bsSnapshotsResourceModel `tfsdk:"snapshots"`
+	Snapshots []bsSnapshotsResourceModel `tfsdk:"snapshots"`
 }
 
 func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -37,18 +35,14 @@ func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.bsSnapshots = sdkBlockStorageSnapshots.NewService(ctx, r.sdkClient)
+	r.bsSnapshotService = bsSDK.New(&dataConfig.CoreConfig).Snapshots()
 }
 
 func (r *DataSourceBsSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -69,33 +63,35 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 	var data bsSnapshotsResourceListModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
-	sdkOutputList, err := r.bsSnapshots.ListContext(ctx, sdkBlockStorageSnapshots.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.ListConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Snapshots {
+	sdkOutputList, err := r.bsSnapshotService.List(ctx, bsSDK.ListOptions{ /*todo*/ })
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	for _, sdkOutput := range sdkOutputList {
 		list, diags := types.ListValueFrom(ctx, types.StringType, sdkOutput.AvailabilityZones)
 		resp.Diagnostics.Append(diags...)
 
 		var item bsSnapshotsResourceModel
 
-		item.ID = types.StringValue(sdkOutput.Id)
+		item.ID = types.StringValue(sdkOutput.ID)
 		item.Name = types.StringValue(sdkOutput.Name)
-		item.Description = types.StringPointerValue(sdkOutput.Description)
-		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
-		item.VolumeId = types.StringPointerValue(sdkOutput.Volume.Id)
-		item.State = types.StringValue(sdkOutput.State)
-		item.Status = types.StringValue(sdkOutput.Status)
+		item.Description = types.StringValue(sdkOutput.Description)
+		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
+		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
+		item.VolumeId = types.StringPointerValue(sdkOutput.Volume.ID)
+		item.State = types.StringValue(string(sdkOutput.State))
+		item.Status = types.StringValue(string(sdkOutput.Status))
 		item.Size = types.Int64Value(int64(sdkOutput.Size))
 		item.Type = types.StringValue(sdkOutput.Type)
 		item.AvailabilityZones = list
 
-		data.snapshots = append(data.snapshots, item)
+		data.Snapshots = append(data.Snapshots, item)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

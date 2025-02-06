@@ -2,13 +2,12 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +15,7 @@ import (
 var _ datasource.DataSource = &DataSourceBsSnapshot{}
 
 type DataSourceBsSnapshot struct {
-	sdkClient   *mgcSdk.Client
-	bsSnapshots sdkBlockStorageSnapshots.Service
+	bsSnapshotService bsSDK.SnapshotService
 }
 
 func NewDataSourceBSSnapshot() datasource.DataSource {
@@ -47,18 +45,14 @@ func (r *DataSourceBsSnapshot) Configure(ctx context.Context, req datasource.Con
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.bsSnapshots = sdkBlockStorageSnapshots.NewService(ctx, r.sdkClient)
+	r.bsSnapshotService = bsSDK.New(&dataConfig.CoreConfig).Snapshots()
 }
 
 func GetBsSnapshotAttributes(idRequired bool) map[string]schema.Attribute {
@@ -128,24 +122,23 @@ func (r *DataSourceBsSnapshot) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	sdkOutput, err := r.bsSnapshots.GetContext(ctx, sdkBlockStorageSnapshots.GetParameters{Id: data.ID.ValueString()},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.GetConfigs{}))
+	sdkOutput, err := r.bsSnapshotService.Get(ctx, data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	list, diags := types.ListValueFrom(ctx, types.StringType, sdkOutput.AvailabilityZones)
 	resp.Diagnostics.Append(diags...)
 
-	data.ID = types.StringValue(sdkOutput.Id)
+	data.ID = types.StringValue(sdkOutput.ID)
 	data.Name = types.StringValue(sdkOutput.Name)
-	data.Description = types.StringPointerValue(sdkOutput.Description)
-	data.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-	data.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
-	data.VolumeId = types.StringPointerValue(sdkOutput.Volume.Id)
-	data.State = types.StringValue(sdkOutput.State)
-	data.Status = types.StringValue(sdkOutput.Status)
+	data.Description = types.StringValue(sdkOutput.Description)
+	data.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
+	data.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
+	data.VolumeId = types.StringPointerValue(sdkOutput.Volume.ID)
+	data.State = types.StringValue(string(sdkOutput.State))
+	data.Status = types.StringValue(string(sdkOutput.Status))
 	data.Size = types.Int64Value(int64(sdkOutput.Size))
 	data.Type = types.StringValue(sdkOutput.Type)
 	data.AvailabilityZones = list
