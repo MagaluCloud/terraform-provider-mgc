@@ -6,9 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkSSHKeys "github.com/MagaluCloud/magalu/mgc/lib/products/profile/ssh_keys"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sshSDK "github.com/MagaluCloud/mgc-sdk-go/sshkeys"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceSSH{}
 
 type DataSourceSSH struct {
-	sdkClient *mgcSdk.Client
-	sshKeys   sdkSSHKeys.Service
+	sshKeys sshSDK.KeyService
 }
 
 type SshKeyModel struct {
@@ -42,19 +39,15 @@ func (r *DataSourceSSH) Configure(ctx context.Context, req datasource.ConfigureR
 	if req.ProviderData == nil {
 		return
 	}
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.sshKeys = sdkSSHKeys.NewService(ctx, r.sdkClient)
+	r.sshKeys = sshSDK.New(&dataConfig.CoreConfig).Keys()
+
 }
 
 func (r *DataSourceSSH) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -82,7 +75,7 @@ func (r *DataSourceSSH) Schema(_ context.Context, req datasource.SchemaRequest, 
 			},
 		},
 	}
-	resp.Schema.Description = "Get the available virtual-machine images."
+	resp.Schema.Description = "Get the available ssh keys."
 }
 
 func (r *DataSourceSSH) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -90,16 +83,15 @@ func (r *DataSourceSSH) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.sshKeys.ListContext(ctx, sdkSSHKeys.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkSSHKeys.ListConfigs{}))
+	sdkOutput, err := r.sshKeys.List(ctx, sshSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError("Failed to get ssh keys", err.Error())
 		return
 	}
 
-	for _, key := range sdkOutput.Results {
+	for _, key := range sdkOutput {
 		data.SSHKeys = append(data.SSHKeys, SshKeyModel{
-			ID:       types.StringValue(key.Id),
+			ID:       types.StringValue(key.ID),
 			Name:     types.StringValue(key.Name),
 			Key_Type: types.StringValue(key.KeyType),
 		})
