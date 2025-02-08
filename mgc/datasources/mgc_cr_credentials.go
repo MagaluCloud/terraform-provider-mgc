@@ -6,17 +6,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkCRCredentials "github.com/MagaluCloud/magalu/mgc/lib/products/container_registry/credentials"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceCRCredentials{}
 
 type DataSourceCRCredentials struct {
-	sdkClient     *mgcSdk.Client
-	crCredentials sdkCRCredentials.Service
+	crCredentials crSDK.CredentialsService
 }
 
 func NewDataSourceCRCredentials() datasource.DataSource {
@@ -38,18 +36,13 @@ func (r *DataSourceCRCredentials) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.crCredentials = sdkCRCredentials.NewService(ctx, r.sdkClient)
+	r.crCredentials = crSDK.New(&dataConfig.CoreConfig).Credentials()
 }
 
 func (r *DataSourceCRCredentials) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -80,15 +73,15 @@ func (r *DataSourceCRCredentials) Read(ctx context.Context, req datasource.ReadR
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutputList, err := r.crCredentials.ListContext(ctx, sdkCRCredentials.ListConfigs{})
+	sdkOutput, err := r.crCredentials.Get(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get versions", err.Error())
 		return
 	}
 
-	data.Email = types.StringValue(sdkOutputList.Email)
-	data.Password = types.StringValue(sdkOutputList.Password)
-	data.Username = types.StringValue(sdkOutputList.Username)
+	data.Email = types.StringValue(sdkOutput.Email)
+	data.Password = types.StringValue(sdkOutput.Password)
+	data.Username = types.StringValue(sdkOutput.Username)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

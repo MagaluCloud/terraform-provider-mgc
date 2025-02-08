@@ -6,17 +6,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkCRRegistries "github.com/MagaluCloud/magalu/mgc/lib/products/container_registry/registries"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceCRRegistries{}
 
 type DataSourceCRRegistries struct {
-	sdkClient    *mgcSdk.Client
-	crRegistries sdkCRRegistries.Service
+	crRegistries crSDK.RegistriesService
 }
 
 func NewDataSourceCRRegistries() datasource.DataSource {
@@ -44,18 +42,13 @@ func (r *DataSourceCRRegistries) Configure(ctx context.Context, req datasource.C
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.crRegistries = sdkCRRegistries.NewService(ctx, r.sdkClient)
+	r.crRegistries = crSDK.New(&dataConfig.CoreConfig).Registries()
 }
 
 func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -98,18 +91,21 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 	var data crRegistriesList
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	sdkOutputList, err := r.crRegistries.ListContext(ctx, sdkCRRegistries.ListParameters{}, sdkCRRegistries.ListConfigs{})
+	sdkOutputList, err := r.crRegistries.List(ctx, crSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get versions", err.Error())
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Results {
+	for _, sdkOutput := range sdkOutputList.Registries {
 
 		var item crRegistries
 
-		item.ID = types.StringValue(sdkOutput.Id)
+		item.ID = types.StringValue(sdkOutput.ID)
 		item.Name = types.StringValue(sdkOutput.Name)
 		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
 		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)

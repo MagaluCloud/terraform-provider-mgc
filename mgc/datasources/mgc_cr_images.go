@@ -3,28 +3,18 @@ package datasources
 import (
 	"context"
 
+	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkCRImages "github.com/MagaluCloud/magalu/mgc/lib/products/container_registry/images"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceCRImages{}
 
 type DataSourceCRImages struct {
-	sdkClient *mgcSdk.Client
-	crImages  sdkCRImages.Service
-}
-
-func NewDataSourceCRImages() datasource.DataSource {
-	return &DataSourceCRImages{}
-}
-
-func (r *DataSourceCRImages) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_container_images"
+	crImages crSDK.ImagesService
 }
 
 type crImage struct {
@@ -41,24 +31,28 @@ type crImagesList struct {
 	Images         []crImage    `tfsdk:"images"`
 }
 
+func NewDataSourceCRImages() datasource.DataSource {
+	return &DataSourceCRImages{}
+}
+
+func (r *DataSourceCRImages) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_container_images"
+}
+
 func (r *DataSourceCRImages) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.crImages = sdkCRImages.NewService(ctx, r.sdkClient)
+	r.crImages = crSDK.New(&dataConfig.CoreConfig).Images()
 }
+
 func (r *DataSourceCRImages) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Data source for Container Registry Images",
@@ -108,11 +102,11 @@ func (r *DataSourceCRImages) Read(ctx context.Context, req datasource.ReadReques
 	var data crImagesList
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	sdkOutputList, err := r.crImages.ListContext(ctx, sdkCRImages.ListParameters{
-		RegistryId:     data.RegistryID.ValueString(),
-		RepositoryName: data.RepositoryName.ValueString(),
-	}, sdkCRImages.ListConfigs{})
+	sdkOutputList, err := r.crImages.List(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
 
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get versions", err.Error())
