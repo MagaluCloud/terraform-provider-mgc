@@ -2,13 +2,12 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageVolumes "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/volumes"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +15,7 @@ import (
 var _ datasource.DataSource = &DataSourceBsVolumes{}
 
 type DataSourceBsVolumes struct {
-	sdkClient *mgcSdk.Client
-	bsVolumes sdkBlockStorageVolumes.Service
+	bsVolumes bsSDK.VolumeService
 }
 
 type bsVolumesResourceItemModel struct {
@@ -50,18 +48,13 @@ func (r *DataSourceBsVolumes) Configure(ctx context.Context, req datasource.Conf
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.bsVolumes = sdkBlockStorageVolumes.NewService(ctx, r.sdkClient)
+	r.bsVolumes = bsSDK.New(&dataConfig.CoreConfig).Volumes()
 }
 
 func (r *DataSourceBsVolumes) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -127,26 +120,25 @@ func (r *DataSourceBsVolumes) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	sdkOutputList, err := r.bsVolumes.ListContext(ctx, sdkBlockStorageVolumes.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.ListConfigs{}))
+	sdkOutputList, err := r.bsVolumes.List(ctx, bsSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Volumes {
+	for _, sdkOutput := range sdkOutputList {
 
 		var item bsVolumesResourceItemModel
-		item.ID = types.StringValue(sdkOutput.Id)
+		item.ID = types.StringValue(sdkOutput.ID)
 		item.Name = types.StringValue(sdkOutput.Name)
 		item.AvailabilityZone = types.StringValue(sdkOutput.AvailabilityZone)
-		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
+		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
+		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
 		item.Size = types.Int64Value(int64(sdkOutput.Size))
-		item.TypeId = types.StringPointerValue(sdkOutput.Type.Id)
+		item.TypeId = types.StringValue(sdkOutput.Type.ID)
 		item.State = types.StringValue(sdkOutput.State)
 		item.Status = types.StringValue(sdkOutput.Status)
-		item.Encrepted = types.BoolPointerValue(sdkOutput.Encrypted)
+		item.Encrepted = types.BoolValue(sdkOutput.Encrypted)
 
 		data.Volumes = append(data.Volumes, item)
 	}

@@ -6,9 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageVolumeTypes "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/volume_types"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceBsVolumeTypes{}
 
 type DataSourceBsVolumeTypes struct {
-	sdkClient     *mgcSdk.Client
-	bsVolumeTypes sdkBlockStorageVolumeTypes.Service
+	bsVolumeTypes bsSDK.VolumeTypeService
 }
 
 func NewDataSourceBsVolumeTypes() datasource.DataSource {
@@ -46,18 +43,14 @@ func (r *DataSourceBsVolumeTypes) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.bsVolumeTypes = sdkBlockStorageVolumeTypes.NewService(ctx, r.sdkClient)
+	r.bsVolumeTypes = bsSDK.New(&dataConfig.CoreConfig).VolumeTypes()
 }
 
 func (r *DataSourceBsVolumeTypes) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -105,23 +98,25 @@ func (r *DataSourceBsVolumeTypes) Read(ctx context.Context, req datasource.ReadR
 	var data volumeTypes
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
-	sdkOutput, err := r.bsVolumeTypes.ListContext(ctx, sdkBlockStorageVolumeTypes.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumeTypes.ListConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	for _, stype := range sdkOutput.Types {
+	sdkOutput, err := r.bsVolumeTypes.List(ctx, bsSDK.ListVolumeTypesOptions{ /*todo*/ })
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	for _, stype := range sdkOutput {
 		list, diags := types.ListValueFrom(ctx, types.StringType, stype.AvailabilityZones)
 		resp.Diagnostics.Append(diags...)
 
 		data.VolumeTypes = append(data.VolumeTypes, volumeType{
 			AvailabilityZones: list,
 			DiskType:          types.StringValue(stype.DiskType),
-			Id:                types.StringValue(stype.Id),
-			Iops:              types.Int64Value(int64(stype.Iops.Total)),
+			Id:                types.StringValue(stype.ID),
+			Iops:              types.Int64Value(int64(stype.IOPS.Total)),
 			Name:              types.StringValue(stype.Name),
 			Status:            types.StringValue(stype.Status),
 		})
