@@ -85,7 +85,7 @@ func (r *DataSourceSSH) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	sdkOutput, err := r.sshKeys.List(ctx, sshSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get ssh keys", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
