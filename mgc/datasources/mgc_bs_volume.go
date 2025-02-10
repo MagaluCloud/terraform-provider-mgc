@@ -2,13 +2,12 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBlockStorageVolumes "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/volumes"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +15,7 @@ import (
 var _ datasource.DataSource = &DataSourceBsVolume{}
 
 type DataSourceBsVolume struct {
-	sdkClient *mgcSdk.Client
-	bsVolumes sdkBlockStorageVolumes.Service
+	bsVolume bsSDK.VolumeService
 }
 
 func NewDataSourceBsVolume() datasource.DataSource {
@@ -53,18 +51,13 @@ func (r *DataSourceBsVolume) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.bsVolumes = sdkBlockStorageVolumes.NewService(ctx, r.sdkClient)
+	r.bsVolume = bsSDK.New(&dataConfig.CoreConfig).Volumes()
 }
 
 func (r *DataSourceBsVolume) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -150,33 +143,30 @@ func (r *DataSourceBsVolume) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	sdkOutput, err := r.bsVolumes.GetContext(ctx, sdkBlockStorageVolumes.GetParameters{
-		Id:     data.ID.ValueString(),
-		Expand: &sdkBlockStorageVolumes.GetParametersExpand{"volume_type", "attachment"}},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.GetConfigs{}))
+	sdkOutput, err := r.bsVolume.Get(ctx, data.ID.ValueString(), []string{"volume_type", "attachment"})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.ID = types.StringValue(sdkOutput.Id)
+	data.ID = types.StringValue(sdkOutput.ID)
 	data.Name = types.StringValue(sdkOutput.Name)
 	data.AvailabilityZone = types.StringValue(sdkOutput.AvailabilityZone)
-	data.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-	data.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
+	data.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
+	data.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
 	data.Size = types.Int64Value(int64(sdkOutput.Size))
 	data.TypeName = types.StringPointerValue(sdkOutput.Type.Name)
 	data.DiskType = types.StringPointerValue(sdkOutput.Type.DiskType)
-	data.TypeId = types.StringPointerValue(sdkOutput.Type.Id)
+	data.TypeId = types.StringValue(sdkOutput.Type.ID)
 	data.TypeStatus = types.StringPointerValue(sdkOutput.Type.Status)
 	data.State = types.StringValue(sdkOutput.State)
 	data.Status = types.StringValue(sdkOutput.Status)
-	data.Encrypted = types.BoolPointerValue(sdkOutput.Encrypted)
+	data.Encrypted = types.BoolValue(sdkOutput.Encrypted)
 	if sdkOutput.Attachment != nil {
-		data.AttachedAt = types.StringValue(sdkOutput.Attachment.AttachedAt)
+		data.AttachedAt = types.StringValue(sdkOutput.Attachment.AttachedAt.Format(time.RFC3339))
 		data.AttachedDevice = types.StringPointerValue(sdkOutput.Attachment.Device)
-		data.AttachedInstanceId = types.StringPointerValue(sdkOutput.Attachment.Instance.Id)
-		data.AttachedInstanceName = types.StringPointerValue(sdkOutput.Attachment.Instance.Name)
+		data.AttachedInstanceId = types.StringValue(sdkOutput.Attachment.Instance.ID)
+		data.AttachedInstanceName = types.StringValue(sdkOutput.Attachment.Instance.Name)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
