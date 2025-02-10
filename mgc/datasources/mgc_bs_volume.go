@@ -145,7 +145,7 @@ func (r *DataSourceBsVolume) Read(ctx context.Context, req datasource.ReadReques
 
 	sdkOutput, err := r.bsVolume.Get(ctx, data.ID.ValueString(), []string{"volume_type", "attachment"})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

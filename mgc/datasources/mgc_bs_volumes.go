@@ -122,7 +122,7 @@ func (r *DataSourceBsVolumes) Read(ctx context.Context, req datasource.ReadReque
 
 	sdkOutputList, err := r.bsVolumes.List(ctx, bsSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
