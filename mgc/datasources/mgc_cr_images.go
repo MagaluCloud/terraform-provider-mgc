@@ -109,7 +109,7 @@ func (r *DataSourceCRImages) Read(ctx context.Context, req datasource.ReadReques
 	sdkOutputList, err := r.crImages.List(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
 
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

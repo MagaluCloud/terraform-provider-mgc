@@ -72,10 +72,13 @@ func (r *DataSourceCRCredentials) Read(ctx context.Context, req datasource.ReadR
 	var data crCredentials
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	sdkOutput, err := r.crCredentials.Get(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

@@ -2,6 +2,7 @@ package tfutil
 
 import (
 	"fmt"
+	"strings"
 
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 )
@@ -45,8 +46,10 @@ func buildFromSDKError(err *clientSDK.HTTPError) (HttpErrorResponse, error) {
 
 	if err.Response != nil && err.Response.Request != nil {
 		e.URL = err.Response.Request.URL.String()
-		if len(err.Response.Header[string(clientSDK.RequestIDKey)]) >= 1 {
-			e.RequestID = err.Response.Header[string(clientSDK.RequestIDKey)][0]
+		for key, value := range err.Response.Header {
+			if strings.ToLower(key) == string(clientSDK.RequestIDKey) {
+				e.RequestID = value[0]
+			}
 		}
 	}
 

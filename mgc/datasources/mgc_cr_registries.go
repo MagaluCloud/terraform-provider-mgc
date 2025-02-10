@@ -97,7 +97,7 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 
 	sdkOutputList, err := r.crRegistries.List(ctx, crSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
