@@ -210,6 +210,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceCRRepositories,
 		datasources.NewDataSourceCRRegistries,
 		datasources.NewDataSourceCRCredentials,
+		datasources.NewDataSourceSSH,
 	}
 }
 
