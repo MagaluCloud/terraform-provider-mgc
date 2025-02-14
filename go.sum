@@ -12,8 +12,8 @@ github.com/MagaluCloud/magalu/mgc/lib v0.33.3 h1:283h0A6GMxkyOSipG5n7SNQt06SmsTr
 github.com/MagaluCloud/magalu/mgc/lib v0.33.3/go.mod h1:6ZrWG4JZNTU+0bW6VZnMAd1teKf4ggnDLxBaHb5QxzY=
 github.com/MagaluCloud/magalu/mgc/sdk v0.33.3 h1:gbCHM3P0s+yr8eyyzdKq01nGmWbghB2YT0hro1njD0k=
 github.com/MagaluCloud/magalu/mgc/sdk v0.33.3/go.mod h1:XHyD9dr46r6oQxPq5dUV6pQYxaLvioTaxka7yUhB9Ms=
-github.com/MagaluCloud/mgc-sdk-go v0.3.6 h1:6xk+B7R/qBWlnmtJBp++O8IEooO/xCi1C60cgurLz5o=
-github.com/MagaluCloud/mgc-sdk-go v0.3.6/go.mod h1:R6hHDzFCftVihrP5fnft07WS9m8cQbgswNaq03jh5eU=
+github.com/MagaluCloud/mgc-sdk-go v0.3.7 h1:iC6wdsPydaCMSbMXowW8fFenTvUkRbg1gXu8w9g6Pj0=
+github.com/MagaluCloud/mgc-sdk-go v0.3.7/go.mod h1:R6hHDzFCftVihrP5fnft07WS9m8cQbgswNaq03jh5eU=
 github.com/MarvinJWendt/testza v0.1.0/go.mod h1:7AxNvlfeHP7Z/hDQ5JtE3OKYT3XFUeLCDE2DQninSqs=
 github.com/MarvinJWendt/testza v0.2.1/go.mod h1:God7bhG8n6uQxwdScay+gjm9/LnO4D3kkcZX4hv9Rp8=
 github.com/MarvinJWendt/testza v0.2.8/go.mod h1:nwIcjmr0Zz+Rcwfh3/4UhBp7ePKVhuBExvZqnKYWlII=
