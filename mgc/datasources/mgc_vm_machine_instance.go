@@ -2,13 +2,12 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVMInstances "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/instances"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +15,7 @@ import (
 var _ datasource.DataSource = &DataSourceVmInstance{}
 
 type DataSourceVmInstance struct {
-	sdkClient   *mgcSdk.Client
-	vmInstances sdkVMInstances.Service
+	vmInstance vmSDK.InstanceService
 }
 
 func NewDataSourceVmInstance() datasource.DataSource {
@@ -32,19 +30,13 @@ func (r *DataSourceVmInstance) Configure(ctx context.Context, req datasource.Con
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.vmInstances = sdkVMInstances.NewService(ctx, r.sdkClient)
+	r.vmInstance = vmSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceVmInstance) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -224,12 +216,9 @@ func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	instance, err := r.vmInstances.GetContext(ctx, sdkVMInstances.GetParameters{Id: data.ID.ValueString(),
-		Expand: &sdkVMInstances.GetParametersExpand{"network", "image", "machine-type"}},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVMInstances.GetConfigs{}))
-
+	instance, err := r.vmInstance.Get(ctx, data.ID.ValueString(), []string{vmSDK.InstanceNetworkExpand, vmSDK.InstanceImageExpand, vmSDK.InstanceMachineTypeExpand})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -237,12 +226,12 @@ func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequ
 	if instance.Network != nil && instance.Network.Interfaces != nil {
 		for _, iface := range *instance.Network.Interfaces {
 			networkInterface := NetworkInterfaceModel{
-				ID:         types.StringValue(iface.Id),
+				ID:         types.StringValue(iface.ID),
 				Name:       types.StringValue(iface.Name),
 				Primary:    types.BoolPointerValue(iface.Primary),
 				PublicIPv4: types.StringPointerValue(iface.AssociatedPublicIpv4),
 				LocalIPv4:  types.StringValue(iface.IpAddresses.PrivateIpv4),
-				IPv6:       types.StringPointerValue(iface.IpAddresses.PublicIpv6),
+				IPv6:       types.StringValue(iface.IpAddresses.PublicIpv6),
 			}
 			if iface.SecurityGroups != nil {
 				var secGroups []types.String
@@ -263,27 +252,30 @@ func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequ
 	}
 
 	data = VMInstanceModel{
-		ID:               types.StringValue(instance.Id),
+		ID:               types.StringValue(instance.ID),
 		Name:             types.StringValue(*instance.Name),
-		CreatedAt:        types.StringValue(instance.CreatedAt),
-		UpdatedAt:        types.StringPointerValue(instance.UpdatedAt),
-		ImageID:          types.StringValue(instance.Image.Id),
+		CreatedAt:        types.StringValue(instance.CreatedAt.Format(time.RFC3339)),
+		ImageID:          types.StringValue(instance.Image.ID),
 		ImageName:        types.StringPointerValue(instance.Image.Name),
 		ImagePlatform:    types.StringPointerValue(instance.Image.Platform),
-		MachineTypeID:    types.StringValue(instance.MachineType.Id),
+		MachineTypeID:    types.StringValue(instance.MachineType.ID),
 		MachineTypeName:  types.StringPointerValue(instance.MachineType.Name),
 		MachineTypeDisk:  types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(instance.MachineType.Disk)),
 		MachineTypeRAM:   types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(instance.MachineType.Ram)),
 		MachineTypeVCPUs: types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(instance.MachineType.Vcpus)),
-		VPCID:            types.StringValue(instance.Network.Vpc.Id),
-		VPCName:          types.StringValue(instance.Network.Vpc.Name),
-		SshKeyName:       types.StringValue(*instance.SshKeyName),
+		VPCID:            types.StringPointerValue(instance.Network.Vpc.ID),
+		VPCName:          types.StringPointerValue(instance.Network.Vpc.Name),
+		SshKeyName:       types.StringPointerValue(instance.SSHKeyName),
 		Status:           types.StringValue(instance.Status),
 		State:            types.StringValue(instance.State),
 		UserData:         types.StringPointerValue(instance.UserData),
 		AvailabilityZone: types.StringPointerValue(instance.AvailabilityZone),
 		Labels:           labels,
 		Interfaces:       interfaces,
+	}
+
+	if instance.UpdatedAt != nil {
+		data.UpdatedAt = types.StringValue(instance.UpdatedAt.Format(time.RFC3339))
 	}
 
 	if instance.Error != nil {
