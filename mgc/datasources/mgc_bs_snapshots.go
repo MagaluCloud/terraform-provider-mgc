@@ -81,7 +81,7 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 
 		item.ID = types.StringValue(sdkOutput.ID)
 		item.Name = types.StringValue(sdkOutput.Name)
-		item.Description = types.StringValue(sdkOutput.Description)
+		item.Description = types.StringPointerValue(sdkOutput.Description)
 		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt.Format(time.RFC3339))
 		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt.Format(time.RFC3339))
 		item.VolumeId = types.StringPointerValue(sdkOutput.Volume.ID)

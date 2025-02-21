@@ -1,8 +1,6 @@
 package tfutil
 
 import (
-	"time"
-
 	"github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/cluster"
 	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/nodepool"
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
@@ -37,20 +35,21 @@ func ConvertToNodePoolSDK(np sdkK8s.NodePool) NodePool {
 	nodePool := NodePool{
 		Name:      types.StringValue(np.Name),
 		Replicas:  types.Int64Value(int64(np.Replicas)),
-		CreatedAt: types.StringValue(np.CreatedAt.Format(time.RFC3339)),
-		UpdatedAt: types.StringValue(np.UpdatedAt.Format(time.RFC3339)),
+		CreatedAt: types.StringPointerValue(ConvertTimeToRFC3339(&np.CreatedAt)),
+		UpdatedAt: types.StringPointerValue(ConvertTimeToRFC3339(np.UpdatedAt)),
 		ID:        types.StringValue(np.ID),
 	}
 
 	if np.AutoScale != nil {
 		nodePool.MaxReplicas = types.Int64Value(int64(np.AutoScale.MaxReplicas))
-
 		nodePool.MinReplicas = types.Int64Value(int64(np.AutoScale.MinReplicas))
 	}
 
-	nodePool.Flavor = types.StringValue(np.Flavor)
+	if np.IntanceTemplate.Flavor.Name != "" {
+		nodePool.Flavor = types.StringValue(np.IntanceTemplate.Flavor.Name)
+	}
 
-	if np.Tags != nil {
+	if len(np.Tags) > 0 {
 		tags := make([]types.String, len(np.Tags))
 		for i, tag := range np.Tags {
 			tags[i] = types.StringValue(tag)
@@ -60,7 +59,7 @@ func ConvertToNodePoolSDK(np sdkK8s.NodePool) NodePool {
 		}
 	}
 
-	if np.Taints != nil {
+	if len(np.Taints) > 0 {
 		var taints []Taint
 		for _, taint := range np.Taints {
 			taints = append(taints, Taint{

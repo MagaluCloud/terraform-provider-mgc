@@ -2,6 +2,7 @@ package tfutil
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,6 +16,15 @@ type GenericIDNameModel struct {
 
 type GenericIDModel struct {
 	ID types.String `tfsdk:"id"`
+}
+
+func ConvertTimeToRFC3339(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	result := new(string)
+	*result = t.Format(time.RFC3339)
+	return result
 }
 
 func ConvertInt64PointerToIntPointer(int64Ptr *int64) *int {

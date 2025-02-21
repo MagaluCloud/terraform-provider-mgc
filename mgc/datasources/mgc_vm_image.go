@@ -121,8 +121,10 @@ func (r *DataSourceVmImages) Read(ctx context.Context, req datasource.ReadReques
 		}
 
 		var azs []types.String
-		for _, az := range image.AvailabilityZones {
-			azs = append(azs, types.StringValue(az))
+		if image.AvailabilityZones != nil {
+			for _, az := range *image.AvailabilityZones {
+				azs = append(azs, types.StringValue(az))
+			}
 		}
 
 		data.Images = append(data.Images, ImageModel{

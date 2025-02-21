@@ -2,7 +2,6 @@ package datasources
 
 import (
 	"context"
-	"time"
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
@@ -391,24 +390,23 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 		// Zone is not directly available in GetResult, set to nil
 		Zone:        types.StringNull(),
 		Description: types.StringPointerValue(getResult.Description),
-		CreatedAt:   types.StringValue(getResult.CreatedAt.Format(time.RFC3339)),
-		Region:      types.StringValue(getResult.Region),
-		UpdatedAt:   types.StringValue(getResult.UpdatedAt.Format(time.RFC3339)),
+		CreatedAt:   types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&getResult.CreatedAt)),
+		Region:      types.StringValue(*getResult.Region),
+		UpdatedAt:   types.StringPointerValue(tfutil.ConvertTimeToRFC3339(getResult.UpdatedAt)),
 	}
 
 	// Convert AllowedCIDRs
-	if getResult.AllowedCIDRs != nil {
-		kubernetesCluster.AllowedCIDRs = make([]types.String, len(getResult.AllowedCIDRs))
-		for i, cidr := range getResult.AllowedCIDRs {
-			kubernetesCluster.AllowedCIDRs[i] = types.StringValue(cidr)
-		}
+
+	kubernetesCluster.AllowedCIDRs = make([]types.String, len(getResult.AllowedCIDRs))
+	for i, cidr := range getResult.AllowedCIDRs {
+		kubernetesCluster.AllowedCIDRs[i] = types.StringPointerValue(&cidr)
 	}
 
 	// Convert Addons
 	if getResult.Addons != nil {
-		kubernetesCluster.AddonsLoadbalance = types.StringValue(getResult.Addons.Loadbalance)
-		kubernetesCluster.AddonsSecrets = types.StringValue(getResult.Addons.Secrets)
-		kubernetesCluster.AddonsVolume = types.StringValue(getResult.Addons.Volume)
+		kubernetesCluster.AddonsLoadbalance = types.StringPointerValue(getResult.Addons.Loadbalance)
+		kubernetesCluster.AddonsSecrets = types.StringPointerValue(getResult.Addons.Secrets)
+		kubernetesCluster.AddonsVolume = types.StringPointerValue(getResult.Addons.Volume)
 	}
 
 	// Convert KubeApiServer
@@ -424,7 +422,7 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 	// Convert Network
 	if getResult.Network != nil {
 		kubernetesCluster.CIDR = types.StringValue(getResult.Network.CIDR)
-		kubernetesCluster.ClusterName = types.StringValue(getResult.Network.Name)
+		kubernetesCluster.ClusterName = types.StringValue(*getResult.Network.Name)
 		kubernetesCluster.SubnetID = types.StringValue(getResult.Network.SubnetID)
 	}
 
@@ -433,15 +431,15 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 	kubernetesCluster.State = types.StringValue(getResult.Status.State)
 
 	// Convert NodePools
-	if getResult.NodePools != nil {
-		kubernetesCluster.NodePools = make([]tfutil.NodePool, len(getResult.NodePools))
-		for i, np := range getResult.NodePools {
-			kubernetesCluster.NodePools[i] = tfutil.ConvertToNodePoolSDK(np)
-		}
+	kubernetesCluster.NodePools = make([]tfutil.NodePool, len(getResult.NodePools))
+	for i, np := range getResult.NodePools {
+		kubernetesCluster.NodePools[i] = tfutil.ConvertToNodePoolSDK(np)
 	}
 
 	// Convert Controlplane
-	kubernetesCluster.Controlplane = convertToControlplane(getResult.ControlPlane)
+	if getResult.ControlPlane != nil {
+		kubernetesCluster.Controlplane = convertToControlplane(getResult.ControlPlane)
+	}
 
 	return kubernetesCluster
 }
@@ -452,7 +450,7 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	controlplane := &Controlplane{
-		CreatedAt:  types.StringValue(cp.CreatedAt.Format(time.RFC3339)),
+		CreatedAt:  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&cp.CreatedAt)),
 		ID:         types.StringValue(cp.ID),
 		DiskSize:   types.Int64Value(int64(cp.IntanceTemplate.DiskSize)),
 		DiskType:   types.StringValue(cp.IntanceTemplate.DiskType),
@@ -462,9 +460,8 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 		Name:       types.StringValue(cp.Name),
 		Replicas:   types.Int64Value(int64(cp.Replicas)),
 		State:      types.StringValue(cp.Status.State),
-		UpdatedAt:  types.StringValue(cp.UpdatedAt.Format(time.RFC3339)),
+		UpdatedAt:  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(cp.UpdatedAt)),
 	}
-
 	if cp.AutoScale != nil {
 		controlplane.MaxReplicas = types.Int64Value(int64(cp.AutoScale.MaxReplicas))
 		controlplane.MinReplicas = types.Int64Value(int64(cp.AutoScale.MinReplicas))
@@ -474,7 +471,7 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	controlplane.Labels = types.MapNull(types.StringType)
 
 	// Convert SecurityGroups
-	if cp.SecurityGroups != nil {
+	if len(cp.SecurityGroups) > 0 {
 		controlplane.SecurityGroups = make([]types.String, len(cp.SecurityGroups))
 		for i, sg := range cp.SecurityGroups {
 			controlplane.SecurityGroups[i] = types.StringPointerValue(&sg)
@@ -482,20 +479,19 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	// Convert StatusMessages
-
 	controlplane.StatusMessages = make([]types.String, 1)
-	controlplane.StatusMessages[0] = types.StringPointerValue(&cp.Status.Message)
+	controlplane.StatusMessages[0] = types.StringValue(cp.Status.Message)
 
 	// Convert Tags
-	if cp.Tags != nil {
+	if len(cp.Tags) > 0 {
 		controlplane.Tags = make([]types.String, len(cp.Tags))
 		for i, tag := range cp.Tags {
-			controlplane.Tags[i] = types.StringValue(tag)
+			controlplane.Tags[i] = types.StringPointerValue(&tag)
 		}
 	}
 
 	// Convert Taints
-	if cp.Taints != nil {
+	if len(cp.Taints) > 0 {
 		controlplane.Taints = make([]tfutil.Taint, len(cp.Taints))
 		for i, taint := range cp.Taints {
 			controlplane.Taints[i] = tfutil.Taint{
@@ -507,10 +503,10 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	// Convert Zone
-	if cp.Zone != nil {
+	if len(cp.Zone) > 0 {
 		controlplane.Zone = make([]types.String, len(cp.Zone))
 		for i, zone := range cp.Zone {
-			controlplane.Zone[i] = types.StringValue(zone)
+			controlplane.Zone[i] = types.StringPointerValue(&zone)
 		}
 	}
 
