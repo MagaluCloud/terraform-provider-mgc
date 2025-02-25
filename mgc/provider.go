@@ -210,6 +210,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceCRRepositories,
 		datasources.NewDataSourceCRRegistries,
 		datasources.NewDataSourceCRCredentials,
+		datasources.NewDataSourceSSH,
 	}
 }
 
@@ -235,7 +236,7 @@ func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
 
 	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
 		sdk.WithBaseURL(sdkUrl),
-		sdk.WithUserAgent("MgcTF/"+tfVersion),
+		sdk.WithUserAgent("MgcTF/"+tfVersion+"-mgc-sdk-go"),
 	)
 
 	return output

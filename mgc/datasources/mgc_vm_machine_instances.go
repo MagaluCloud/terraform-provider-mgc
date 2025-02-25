@@ -6,9 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVMInstances "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/instances"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceVmInstances{}
 
 type DataSourceVmInstances struct {
-	sdkClient   *mgcSdk.Client
-	vmInstances sdkVMInstances.Service
+	vmInstance vmSDK.InstanceService
 }
 
 type VMInstancesItemModel struct {
@@ -47,19 +44,13 @@ func (r *DataSourceVmInstances) Configure(ctx context.Context, req datasource.Co
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.vmInstances = sdkVMInstances.NewService(ctx, r.sdkClient)
+	r.vmInstance = vmSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceVmInstances) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -117,24 +108,24 @@ func (r *DataSourceVmInstances) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	instances, err := r.vmInstances.ListContext(ctx, sdkVMInstances.ListParameters{},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVMInstances.ListConfigs{}))
+	instances, err := r.vmInstance.List(ctx, vmSDK.ListOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get instances", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	for _, instance := range instances.Instances {
+	for _, instance := range instances {
 		data.Instances = append(data.Instances, VMInstancesItemModel{
-			ID:               types.StringValue(instance.Id),
+			ID:               types.StringValue(instance.ID),
 			Name:             types.StringPointerValue(instance.Name),
-			SshKeyName:       types.StringPointerValue(instance.SshKeyName),
+			SshKeyName:       types.StringPointerValue(instance.SSHKeyName),
 			Status:           types.StringValue(instance.Status),
 			State:            types.StringValue(instance.State),
-			ImageID:          types.StringValue(instance.Image.Id),
-			MachineTypeID:    types.StringValue(instance.MachineType.Id),
+			ImageID:          types.StringValue(instance.Image.ID),
+			MachineTypeID:    types.StringValue(instance.MachineType.ID),
 			AvailabilityZone: types.StringPointerValue(instance.AvailabilityZone),
 		})
 	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

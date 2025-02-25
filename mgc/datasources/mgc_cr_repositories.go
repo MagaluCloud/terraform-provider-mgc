@@ -6,17 +6,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkCRRepositories "github.com/MagaluCloud/magalu/mgc/lib/products/container_registry/repositories"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceCRRepositories{}
 
 type DataSourceCRRepositories struct {
-	sdkClient      *mgcSdk.Client
-	crRepositories sdkCRRepositories.Service
+	crRepositories crSDK.RepositoriesService
 }
 
 func NewDataSourceCRRepositories() datasource.DataSource {
@@ -45,18 +43,13 @@ func (r *DataSourceCRRepositories) Configure(ctx context.Context, req datasource
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.crRepositories = sdkCRRepositories.NewService(ctx, r.sdkClient)
+	r.crRepositories = crSDK.New(&dataConfig.CoreConfig).Repositories()
 }
 func (r *DataSourceCRRepositories) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
@@ -102,12 +95,13 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 	var data crRepositoriesList
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	sdkOutputList, err := r.crRepositories.ListContext(ctx, sdkCRRepositories.ListParameters{
-		RegistryId: data.RegistryID.ValueString(),
-	}, sdkCRRepositories.ListConfigs{})
+	sdkOutputList, err := r.crRepositories.List(ctx, data.RegistryID.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
