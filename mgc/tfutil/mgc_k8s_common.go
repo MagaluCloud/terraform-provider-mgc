@@ -45,8 +45,8 @@ func ConvertToNodePoolSDK(np sdkK8s.NodePool) NodePool {
 		nodePool.MinReplicas = types.Int64Value(int64(np.AutoScale.MinReplicas))
 	}
 
-	if np.IntanceTemplate.Flavor.Name != "" {
-		nodePool.Flavor = types.StringValue(np.IntanceTemplate.Flavor.Name)
+	if np.InstanceTemplate.Flavor.Name != "" {
+		nodePool.Flavor = types.StringValue(np.InstanceTemplate.Flavor.Name)
 	}
 
 	if len(np.Tags) > 0 {
