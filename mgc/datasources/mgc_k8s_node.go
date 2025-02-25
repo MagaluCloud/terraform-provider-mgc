@@ -3,9 +3,7 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/nodepool"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -59,8 +57,7 @@ type AddressItem struct {
 }
 
 type DataSourceKubernetesNode struct {
-	sdkClient *mgcSdk.Client
-	nodepool  sdkNodepool.Service
+	sdkClient sdkK8s.NodePoolService
 }
 
 func NewDataSourceKubernetesNode() datasource.DataSource {
@@ -256,18 +253,15 @@ func (d *DataSourceKubernetesNode) Configure(ctx context.Context, req datasource
 		return
 	}
 
-	var err error
-	var errDetail error
-	d.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	d.nodepool = sdkNodepool.NewService(ctx, d.sdkClient)
+	d.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
+
 }
 
 func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -275,17 +269,14 @@ func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.Read
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	node, err := d.nodepool.NodesContext(ctx, sdkNodepool.NodesParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: data.NodepoolID.ValueString(),
-	}, tfutil.GetConfigsFromTags(d.sdkClient.Sdk().Config().Get, sdkNodepool.NodesConfigs{}))
+	node, err := d.sdkClient.Get(ctx, data.ClusterID.ValueString(), data.NodepoolID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get node", err.Error())
 		return
 	}
 
-	data.Nodes = make([]NodesResultFlat, len(node.Results))
-	for i, n := range node.Results {
+	data.Nodes = make([]NodesResultFlat, len(node.Nodes))
+	for i, n := range node.Nodes {
 		data.Nodes[i] = *convertToTerraformKubernetesCluster(&n)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

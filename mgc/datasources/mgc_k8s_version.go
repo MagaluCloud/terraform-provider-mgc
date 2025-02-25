@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVersion "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/version"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -22,8 +21,7 @@ type VersionModel struct {
 }
 
 type DataSourceKubernetesVersion struct {
-	sdkClient *mgcSdk.Client
-	nodepool  sdkVersion.Service
+	sdkClient sdkK8s.VersionService
 }
 
 func NewDataSourceKubernetesVersion() datasource.DataSource {
@@ -39,18 +37,14 @@ func (r *DataSourceKubernetesVersion) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.nodepool = sdkVersion.NewService(ctx, r.sdkClient)
+	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Versions()
 }
 
 func (r *DataSourceKubernetesVersion) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -80,13 +74,13 @@ func (r *DataSourceKubernetesVersion) Schema(_ context.Context, req datasource.S
 func (r *DataSourceKubernetesVersion) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data VersionsModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	sdkOutput, err := r.nodepool.ListContext(ctx, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVersion.ListConfigs{}))
+	sdkOutput, err := r.sdkClient.List(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get versions", err.Error())
 		return
 	}
 
-	for _, version := range sdkOutput.Results {
+	for _, version := range sdkOutput {
 		data.Versions = append(data.Versions, VersionModel{
 			Deprecated: types.BoolValue(version.Deprecated),
 			Version:    types.StringValue(version.Version),

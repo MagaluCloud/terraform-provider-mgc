@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/nodepool"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -33,14 +32,13 @@ type FlattenedGetResult struct {
 	SecurityGroups             []types.String `tfsdk:"security_groups"`
 	StatusState                types.String   `tfsdk:"status_state"`
 	StatusMessages             []types.String `tfsdk:"status_messages"`
-	Tags                       types.List     `tfsdk:"tags"`
+	Tags                       []types.String `tfsdk:"tags"`
 	Taints                     []tfutil.Taint `tfsdk:"taints"`
-	Zone                       types.List     `tfsdk:"zone"`
+	Zone                       []types.String `tfsdk:"zone"`
 }
 
 type DataSourceKubernetesNodepool struct {
-	sdkClient *mgcSdk.Client
-	nodepool  sdkNodepool.Service
+	sdkClient sdkK8s.NodePoolService
 }
 
 func NewDataSourceKubernetesNodepool() datasource.DataSource {
@@ -56,18 +54,14 @@ func (r *DataSourceKubernetesNodepool) Configure(ctx context.Context, req dataso
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.nodepool = sdkNodepool.NewService(ctx, r.sdkClient)
+	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
 }
 
 func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -196,16 +190,13 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.nodepool.GetContext(ctx, sdkNodepool.GetParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.GetConfigs{}))
+	sdkOutput, err := r.sdkClient.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get nodepool", err.Error())
 		return
 	}
 
-	flattened, err := ConvertGetResultToFlattened(ctx, &sdkOutput, data.ClusterID.ValueString())
+	flattened, err := ConvertGetResultToFlattened(ctx, sdkOutput, data.ClusterID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to convert nodepool", err.Error())
 		return
@@ -216,63 +207,58 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func ConvertGetResultToFlattened(ctx context.Context, original *sdkNodepool.GetResult, clusterID string) (*FlattenedGetResult, error) {
+func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID string) (*FlattenedGetResult, error) {
 	if original == nil {
 		return nil, nil
 	}
 
 	flattened := &FlattenedGetResult{
-		ID:                         types.StringValue(original.Id),
+		ID:                         types.StringValue(original.ID),
 		ClusterID:                  types.StringValue(clusterID),
 		Name:                       types.StringValue(original.Name),
-		CreatedAt:                  types.StringPointerValue(original.CreatedAt),
-		UpdatedAt:                  types.StringPointerValue(original.UpdatedAt),
+		CreatedAt:                  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&original.CreatedAt)),
+		UpdatedAt:                  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(original.UpdatedAt)),
 		Replicas:                   types.Int64Value(int64(original.Replicas)),
-		InstanceTemplateDiskSize:   types.Int64Value(int64(original.InstanceTemplate.DiskSize)),
-		InstanceTemplateDiskType:   types.StringValue(original.InstanceTemplate.DiskType),
-		InstanceTemplateNodeImage:  types.StringValue(original.InstanceTemplate.NodeImage),
-		InstanceTemplateFlavorID:   types.StringValue(original.InstanceTemplate.Flavor.Id),
-		InstanceTemplateFlavorName: types.StringValue(original.InstanceTemplate.Flavor.Name),
-		InstanceTemplateFlavorRam:  types.Int64Value(int64(original.InstanceTemplate.Flavor.Ram)),
-		InstanceTemplateFlavorSize: types.Int64Value(int64(original.InstanceTemplate.Flavor.Size)),
-		InstanceTemplateFlavorVcpu: types.Int64Value(int64(original.InstanceTemplate.Flavor.Vcpu)),
+		InstanceTemplateDiskSize:   types.Int64Value(int64(original.IntanceTemplate.DiskSize)),
+		InstanceTemplateDiskType:   types.StringValue(original.IntanceTemplate.DiskType),
+		InstanceTemplateNodeImage:  types.StringValue(original.IntanceTemplate.NodeImage),
+		InstanceTemplateFlavorID:   types.StringValue(original.IntanceTemplate.Flavor.ID),
+		InstanceTemplateFlavorName: types.StringValue(original.IntanceTemplate.Flavor.Name),
+		InstanceTemplateFlavorRam:  types.Int64Value(int64(original.IntanceTemplate.Flavor.RAM)),
+		InstanceTemplateFlavorSize: types.Int64Value(int64(original.IntanceTemplate.Flavor.Size)),
+		InstanceTemplateFlavorVcpu: types.Int64Value(int64(original.IntanceTemplate.Flavor.VCPU)),
 		StatusState:                types.StringValue(original.Status.State),
 	}
 
-	if original.AutoScale.MinReplicas != nil {
-		flattened.AutoScaleMaxReplicas = types.Int64Value(int64(*original.AutoScale.MaxReplicas))
-	}
-	if original.AutoScale.MinReplicas != nil {
-		flattened.AutoScaleMinReplicas = types.Int64Value(int64(*original.AutoScale.MinReplicas))
+	if original.AutoScale != nil {
+		flattened.AutoScaleMaxReplicas = types.Int64Value(int64(original.AutoScale.MaxReplicas))
+		flattened.AutoScaleMinReplicas = types.Int64Value(int64(original.AutoScale.MinReplicas))
 	}
 
 	labelsMap, _ := types.MapValueFrom(ctx, types.StringType, original.Labels)
 	flattened.Labels = labelsMap
 
-	if original.SecurityGroups != nil {
-		flattened.SecurityGroups = make([]types.String, len(*original.SecurityGroups))
-		for i, sg := range *original.SecurityGroups {
+	if len(original.SecurityGroups) > 0 {
+		flattened.SecurityGroups = make([]types.String, len(original.SecurityGroups))
+		for i, sg := range original.SecurityGroups {
 			strVal := types.StringValue(sg)
 			flattened.SecurityGroups[i] = strVal
 		}
 	}
 
-	if original.Status.Messages != nil {
-		flattened.StatusMessages = make([]types.String, len(original.Status.Messages))
-		for i, msg := range original.Status.Messages {
-			strVal := types.StringValue(msg)
-			flattened.StatusMessages[i] = strVal
+	flattened.StatusMessages = make([]types.String, 1)
+	flattened.StatusMessages[0] = types.StringValue(original.Status.Message)
+
+	if len(original.Tags) > 0 {
+		flattened.Tags = make([]types.String, len(original.Tags))
+		for i, tag := range original.Tags {
+			flattened.Tags[i] = types.StringValue(tag)
 		}
 	}
 
-	if original.Tags != nil {
-		tags, _ := types.ListValueFrom(ctx, types.StringType, *original.Tags)
-		flattened.Tags = tags
-	}
-
-	if original.Taints != nil {
-		flattened.Taints = make([]tfutil.Taint, len(*original.Taints))
-		for i, taint := range *original.Taints {
+	if len(original.Taints) > 0 {
+		flattened.Taints = make([]tfutil.Taint, len(original.Taints))
+		for i, taint := range original.Taints {
 			flattened.Taints[i] = tfutil.Taint{
 				Effect: types.StringValue(taint.Effect),
 				Key:    types.StringValue(taint.Key),
@@ -281,9 +267,11 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkNodepool.GetR
 		}
 	}
 
-	if original.Zone != nil {
-		zone, _ := types.ListValueFrom(ctx, types.StringType, *original.Zone)
-		flattened.Zone = zone
+	if len(original.Zone) > 0 {
+		flattened.Zone = make([]types.String, len(original.Zone))
+		for i, zone := range original.Zone {
+			flattened.Zone[i] = types.StringValue(zone)
+		}
 	}
 
 	return flattened, nil
