@@ -106,7 +106,7 @@ func (r *DataSourceKubernetesFlavor) Read(ctx context.Context, req datasource.Re
 	result, err := r.nodepool.ListContext(ctx, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.ListConfigs{}))
 
 	if err != nil || result.Results == nil {
-		resp.Diagnostics.AddError("Failed to list flavors", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

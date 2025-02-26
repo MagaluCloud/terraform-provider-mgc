@@ -57,7 +57,7 @@ func (d *DataSourceKubernetesClusterKubeConfig) Read(ctx context.Context, req da
 		ClusterId: data.ClusterID.ValueString(),
 	}, tfutil.GetConfigsFromTags(d.sdkClient.Sdk().Config().Get, cluster.KubeconfigConfigs{}))
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get kubeconfig", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

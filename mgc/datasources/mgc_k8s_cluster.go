@@ -367,7 +367,7 @@ func (d *DataSourceKubernetesCluster) Read(ctx context.Context, req datasource.R
 
 	cluster, err := d.sdkClient.Get(ctx, data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get cluster", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 	converted := convertToKubernetesCluster(cluster)
@@ -491,9 +491,9 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	// Convert Taints
-	if len(cp.Taints) > 0 {
-		controlplane.Taints = make([]tfutil.Taint, len(cp.Taints))
-		for i, taint := range cp.Taints {
+	if cp.Taints != nil && len(*cp.Taints) > 0 {
+		controlplane.Taints = make([]tfutil.Taint, len(*cp.Taints))
+		for i, taint := range *cp.Taints {
 			controlplane.Taints[i] = tfutil.Taint{
 				Effect: types.StringValue(taint.Effect),
 				Key:    types.StringValue(taint.Key),

@@ -272,7 +272,7 @@ func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.Read
 
 	nodes, err := d.sdkClient.Nodes(ctx, data.ClusterID.ValueString(), data.NodepoolID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get node", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -299,7 +299,7 @@ func convertToTerraformKubernetesCluster(original *sdkK8s.Node) *NodesResultFlat
 		NodepoolName: types.StringValue(original.NodepoolName),
 		Zone:         types.StringValue(stringPtrToString(original.Zone)),
 		Addresses:    convertAddresses(original.Addresses),
-		Taints:       convertTaints(original.Taints),
+		Taints:       convertTaints(*original.Taints),
 	}
 
 	// Convert Status

@@ -192,7 +192,7 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 
 	sdkOutput, err := r.sdkClient.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get nodepool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -256,9 +256,9 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	if len(original.Taints) > 0 {
-		flattened.Taints = make([]tfutil.Taint, len(original.Taints))
-		for i, taint := range original.Taints {
+	if original.Taints != nil && len(*original.Taints) > 0 {
+		flattened.Taints = make([]tfutil.Taint, len(*original.Taints))
+		for i, taint := range *original.Taints {
 			flattened.Taints[i] = tfutil.Taint{
 				Effect: types.StringValue(taint.Effect),
 				Key:    types.StringValue(taint.Key),

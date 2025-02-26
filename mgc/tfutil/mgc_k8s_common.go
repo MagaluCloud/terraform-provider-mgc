@@ -59,9 +59,9 @@ func ConvertToNodePoolSDK(np sdkK8s.NodePool) NodePool {
 		}
 	}
 
-	if len(np.Taints) > 0 {
+	if np.Taints != nil && len(*np.Taints) > 0 {
 		var taints []Taint
-		for _, taint := range np.Taints {
+		for _, taint := range *np.Taints {
 			taints = append(taints, Taint{
 				Effect: types.StringValue(taint.Effect),
 				Key:    types.StringValue(taint.Key),
