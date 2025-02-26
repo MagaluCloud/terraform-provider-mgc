@@ -3,9 +3,7 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/flavor"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -26,8 +24,7 @@ type ListResultResultsItemBastionItem struct {
 }
 
 type DataSourceKubernetesFlavor struct {
-	sdkClient *mgcSdk.Client
-	nodepool  sdkNodepool.Service
+	sdkClient sdkK8s.FlavorService
 }
 
 func NewDataSourceKubernetesFlavor() datasource.DataSource {
@@ -43,18 +40,14 @@ func (r *DataSourceKubernetesFlavor) Configure(ctx context.Context, req datasour
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.nodepool = sdkNodepool.NewService(ctx, r.sdkClient)
+	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Flavors()
 }
 
 func (r *DataSourceKubernetesFlavor) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -103,31 +96,32 @@ func resourceListResultResultsItemBastionItemSchema() schema.NestedAttributeObje
 }
 
 func (r *DataSourceKubernetesFlavor) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	result, err := r.nodepool.ListContext(ctx, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.ListConfigs{}))
-
-	if err != nil || result.Results == nil {
+	result, err := r.sdkClient.List(ctx, sdkK8s.ListOptions{ /*todo*/ })
+	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	f := result.Results[0]
+	controlplane := resourceListResultResultsItemBastionItem(result.ControlPlane)
+	nodepool := resourceListResultResultsItemBastionItem(result.NodePool)
+
 	output := &ListResultResultsItem{
-		Controlplane: resourceListResultResultsItemBastionItem(f.Controlplane),
-		Nodepool:     resourceListResultResultsItemBastionItem(f.Nodepool),
+		Controlplane: controlplane,
+		Nodepool:     nodepool,
 	}
 
 	resp.Diagnostics = resp.State.Set(ctx, &output)
 }
 
-func resourceListResultResultsItemBastionItem(items []sdkNodepool.ListResultResultsItemControlplaneItem) []ListResultResultsItemBastionItem {
+func resourceListResultResultsItemBastionItem(items []sdkK8s.Flavor) []ListResultResultsItemBastionItem {
 	var result []ListResultResultsItemBastionItem
 	for _, item := range items {
 		result = append(result, ListResultResultsItemBastionItem{
-			Id:   types.StringValue(item.Id),
+			Id:   types.StringValue(item.ID),
 			Name: types.StringValue(item.Name),
-			Ram:  types.Int64Value(int64(item.Ram)),
+			Ram:  types.Int64Value(int64(item.RAM)),
 			Size: types.Int64Value(int64(item.Size)),
-			Vcpu: types.Int64Value(int64(item.Vcpu)),
+			Vcpu: types.Int64Value(int64(item.VCPU)),
 		})
 	}
 	return result

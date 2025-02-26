@@ -3,13 +3,12 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	"github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/cluster"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"gopkg.in/yaml.v3"
 )
 
 var _ datasource.DataSource = &DataSourceKubernetesClusterKubeConfig{}
@@ -19,8 +18,7 @@ func NewDataSourceKubernetesClusterKubeConfig() datasource.DataSource {
 }
 
 type DataSourceKubernetesClusterKubeConfig struct {
-	sdkClient *mgcSdk.Client
-	cluster   cluster.Service
+	sdkClient sdkK8s.ClusterService
 }
 
 type DataSourceKubernetesClusterKubeConfigModel struct {
@@ -53,15 +51,19 @@ func (d *DataSourceKubernetesClusterKubeConfig) Read(ctx context.Context, req da
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOuput, err := d.cluster.Kubeconfig(cluster.KubeconfigParameters{
-		ClusterId: data.ClusterID.ValueString(),
-	}, tfutil.GetConfigsFromTags(d.sdkClient.Sdk().Config().Get, cluster.KubeconfigConfigs{}))
+	sdkOuput, err := d.sdkClient.GetKubeConfig(ctx, data.ClusterID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.RawConfig = types.StringValue(sdkOuput)
+	rawConfig, err := yaml.Marshal(sdkOuput)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	data.RawConfig = types.StringValue(string(rawConfig))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -70,16 +72,13 @@ func (r *DataSourceKubernetesClusterKubeConfig) Configure(ctx context.Context, r
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.cluster = cluster.NewService(ctx, r.sdkClient)
+	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Clusters()
+
 }
