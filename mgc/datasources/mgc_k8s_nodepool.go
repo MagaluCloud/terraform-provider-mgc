@@ -202,14 +202,12 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	flattened.ClusterID = data.ClusterID
-	flattened.ID = data.ID
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &flattened)...)
 }
 
-func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID string) (*FlattenedGetResult, error) {
+func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID string) (FlattenedGetResult, error) {
 	if original == nil {
-		return nil, nil
+		return FlattenedGetResult{}, nil
 	}
 
 	flattened := &FlattenedGetResult{
@@ -274,5 +272,5 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	return flattened, nil
+	return *flattened, nil
 }
