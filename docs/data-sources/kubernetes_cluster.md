@@ -49,7 +49,6 @@ output "cluster" {
 - `message` (String) Detailed message about the status of the cluster or node.
 - `name` (String) Kubernetes cluster name.
 - `node_pools` (Attributes List) An array representing a set of nodes within a Kubernetes cluster. (see [below for nested schema](#nestedatt--node_pools))
-- `project_id` (String, Deprecated) (Deprecated) Unique identifier of the project where the cluster was provisioned.
 - `region` (String) Identifier of the region where the Kubernetes cluster is located.
 - `state` (String) Current state of the cluster or node.
 - `subnet_id` (String) Identifier of the internal subnet where the cluster will be provisioned.

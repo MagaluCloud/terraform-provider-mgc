@@ -2,10 +2,9 @@ package datasources
 
 import (
 	"context"
+	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/nodepool"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -59,8 +58,7 @@ type AddressItem struct {
 }
 
 type DataSourceKubernetesNode struct {
-	sdkClient *mgcSdk.Client
-	nodepool  sdkNodepool.Service
+	sdkClient sdkK8s.NodePoolService
 }
 
 func NewDataSourceKubernetesNode() datasource.DataSource {
@@ -256,18 +254,15 @@ func (d *DataSourceKubernetesNode) Configure(ctx context.Context, req datasource
 		return
 	}
 
-	var err error
-	var errDetail error
-	d.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	d.nodepool = sdkNodepool.NewService(ctx, d.sdkClient)
+	d.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
+
 }
 
 func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -275,31 +270,28 @@ func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.Read
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	node, err := d.nodepool.NodesContext(ctx, sdkNodepool.NodesParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: data.NodepoolID.ValueString(),
-	}, tfutil.GetConfigsFromTags(d.sdkClient.Sdk().Config().Get, sdkNodepool.NodesConfigs{}))
+	nodes, err := d.sdkClient.Nodes(ctx, data.ClusterID.ValueString(), data.NodepoolID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get node", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Nodes = make([]NodesResultFlat, len(node.Results))
-	for i, n := range node.Results {
+	data.Nodes = make([]NodesResultFlat, len(nodes))
+	for i, n := range nodes {
 		data.Nodes[i] = *convertToTerraformKubernetesCluster(&n)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func convertToTerraformKubernetesCluster(original *sdkNodepool.NodesResultResultsItem) *NodesResultFlat {
+func convertToTerraformKubernetesCluster(original *sdkK8s.Node) *NodesResultFlat {
 	if original == nil {
 		return nil
 	}
 
 	result := &NodesResultFlat{
-		ID:           types.StringValue(original.Id),
+		ID:           types.StringValue(original.ID),
 		ClusterName:  types.StringValue(original.ClusterName),
-		CreatedAt:    types.StringValue(original.CreatedAt),
+		CreatedAt:    types.StringValue(original.CreatedAt.Format(time.RFC3339)),
 		Flavor:       types.StringValue(original.Flavor),
 		Name:         types.StringValue(original.Name),
 		Namespace:    types.StringValue(original.Namespace),
@@ -307,7 +299,7 @@ func convertToTerraformKubernetesCluster(original *sdkNodepool.NodesResultResult
 		NodepoolName: types.StringValue(original.NodepoolName),
 		Zone:         types.StringValue(stringPtrToString(original.Zone)),
 		Addresses:    convertAddresses(original.Addresses),
-		Taints:       convertTaints(original.Taints),
+		Taints:       convertTaints(*original.Taints),
 	}
 
 	// Convert Status
@@ -324,18 +316,18 @@ func convertToTerraformKubernetesCluster(original *sdkNodepool.NodesResultResult
 	result.InfrastructureOsImage = types.StringValue(original.Infrastructure.OsImage)
 
 	// Convert Allocatable
-	result.AllocatableCPU = types.StringValue(original.Infrastructure.Allocatable.Cpu)
+	result.AllocatableCPU = types.StringValue(original.Infrastructure.Allocatable.CPU)
 	result.AllocatableEphemeralStorage = types.StringValue(original.Infrastructure.Allocatable.EphemeralStorage)
-	result.AllocatableHugepages1Gi = types.StringValue(original.Infrastructure.Allocatable.Hugepages1gi)
-	result.AllocatableHugepages2Mi = types.StringValue(original.Infrastructure.Allocatable.Hugepages2mi)
+	result.AllocatableHugepages1Gi = types.StringValue(original.Infrastructure.Allocatable.Hugepages1Gi)
+	result.AllocatableHugepages2Mi = types.StringValue(original.Infrastructure.Allocatable.Hugepages2Mi)
 	result.AllocatableMemory = types.StringValue(original.Infrastructure.Allocatable.Memory)
 	result.AllocatablePods = types.StringValue(original.Infrastructure.Allocatable.Pods)
 
 	// Convert Capacity
-	result.CapacityCPU = types.StringValue(original.Infrastructure.Capacity.Cpu)
+	result.CapacityCPU = types.StringValue(original.Infrastructure.Capacity.CPU)
 	result.CapacityEphemeralStorage = types.StringValue(original.Infrastructure.Capacity.EphemeralStorage)
-	result.CapacityHugepages1Gi = types.StringValue(original.Infrastructure.Capacity.Hugepages1gi)
-	result.CapacityHugepages2Mi = types.StringValue(original.Infrastructure.Capacity.Hugepages2mi)
+	result.CapacityHugepages1Gi = types.StringValue(original.Infrastructure.Capacity.Hugepages1Gi)
+	result.CapacityHugepages2Mi = types.StringValue(original.Infrastructure.Capacity.Hugepages2Mi)
 	result.CapacityMemory = types.StringValue(original.Infrastructure.Capacity.Memory)
 	result.CapacityPods = types.StringValue(original.Infrastructure.Capacity.Pods)
 
@@ -344,7 +336,7 @@ func convertToTerraformKubernetesCluster(original *sdkNodepool.NodesResultResult
 
 // Helper functions
 
-func convertAddresses(addresses sdkNodepool.NodesResultResultsItemAddresses) []AddressItem {
+func convertAddresses(addresses []sdkK8s.Addresses) []AddressItem {
 	result := make([]AddressItem, len(addresses))
 	for i, addr := range addresses {
 		result[i] = AddressItem{
@@ -355,7 +347,7 @@ func convertAddresses(addresses sdkNodepool.NodesResultResultsItemAddresses) []A
 	return result
 }
 
-func convertTaints(taints sdkNodepool.NodesResultResultsItemTaints) []tfutil.Taint {
+func convertTaints(taints []sdkK8s.Taint) []tfutil.Taint {
 	result := make([]tfutil.Taint, len(taints))
 	for i, taint := range taints {
 		result[i] = tfutil.Taint{
