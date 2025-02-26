@@ -190,7 +190,7 @@ func (r *NetworkVPCInterfaceDatasource) Read(ctx context.Context, req datasource
 	}
 	if vpcInterface.Updated != nil {
 		data.Updated = types.StringValue(vpcInterface.Updated.String())
-	} 
+	}
 	data.Description = types.StringPointerValue(vpcInterface.Description)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
