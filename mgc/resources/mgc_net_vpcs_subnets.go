@@ -11,10 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSubnets "github.com/MagaluCloud/magalu/mgc/lib/products/network/subnets"
-	networkVpcsSubnets "github.com/MagaluCloud/magalu/mgc/lib/products/network/vpcs/subnets"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 )
 
@@ -27,12 +25,12 @@ type mgcNetworkVpcsSubnetsModel struct {
 	Name           types.String   `tfsdk:"name"`
 	SubnetpoolId   types.String   `tfsdk:"subnetpool_id"`
 	VpcId          types.String   `tfsdk:"vpc_id"`
+	// AvailabilityZone types.String   `tfsdk:"availability_zone"`
 }
 
 type mgcNetworkVpcsSubnetsResource struct {
-	sdkClient          *mgcSdk.Client
-	networkVpcsSubnets networkVpcsSubnets.Service
-	networkSubnets     networkSubnets.Service
+	networkVpcsSubnets netSDK.VPCService
+	networkSubnets     netSDK.SubnetService
 }
 
 func NewNetworkVpcsSubnetsResource() resource.Resource {
@@ -108,6 +106,14 @@ func (r *mgcNetworkVpcsSubnetsResource) Schema(_ context.Context, _ resource.Sch
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			// "availability_zone": schema.StringAttribute{
+			// 	Description: "The availability zone of the VPC subnet",
+			// 	Computed:    true,
+			// 	Optional:    true,
+			// 	PlanModifiers: []planmodifier.String{
+			// 		tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+			// 	},
+			// },
 		},
 	}
 }
@@ -116,20 +122,14 @@ func (r *mgcNetworkVpcsSubnetsResource) Configure(ctx context.Context, req resou
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkVpcsSubnets = networkVpcsSubnets.NewService(ctx, r.sdkClient)
-	r.networkSubnets = networkSubnets.NewService(ctx, r.sdkClient)
+	r.networkVpcsSubnets = netSDK.New(&dataConfig.CoreConfig).VPCs()
+	r.networkSubnets = netSDK.New(&dataConfig.CoreConfig).Subnets()
 }
 
 func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -139,29 +139,27 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	dnsCreateParam := networkVpcsSubnets.CreateParametersDnsNameservers{}
+	dnsCreateParam := []string{}
 	for _, dns := range data.DnsNameservers {
 		dnsCreateParam = append(dnsCreateParam, dns.ValueString())
 	}
 
-	createParam := networkVpcsSubnets.CreateParameters{
-		CidrBlock:      data.CidrBlock.ValueString(),
+	createParam := netSDK.SubnetCreateRequest{
+		CIDRBlock:      data.CidrBlock.ValueString(),
 		Description:    data.Description.ValueStringPointer(),
-		DnsNameservers: &dnsCreateParam,
-		IpVersion:      convertIPStringToIPVersion(data.IpVersion.ValueString()),
+		DNSNameservers: &dnsCreateParam,
+		IPVersion:      convertIPStringToIPVersion(data.IpVersion.ValueString()),
 		Name:           data.Name.ValueString(),
-		SubnetpoolId:   data.SubnetpoolId.ValueStringPointer(),
-		VpcId:          data.VpcId.ValueString(),
+		SubnetPoolID:   data.SubnetpoolId.ValueStringPointer(),
 	}
 
-	subnet, err := r.networkVpcsSubnets.CreateContext(ctx, createParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpcsSubnets.CreateConfigs{}))
+	subnetID, err := r.networkVpcsSubnets.CreateSubnet(ctx, data.VpcId.ValueString(), createParam)
 	if err != nil {
-		resp.Diagnostics.AddError("unable to create VPC subnet", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.ID = types.StringPointerValue(&subnet.Id)
+	data.ID = types.StringValue(subnetID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -172,26 +170,24 @@ func (r *mgcNetworkVpcsSubnetsResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	subnet, err := r.networkSubnets.GetContext(ctx, networkSubnets.GetParameters{
-		SubnetId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnets.GetConfigs{}))
+	subnet, err := r.networkSubnets.Get(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get VPC subnet", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	dnsNameServers := []types.String{}
-	for _, dns := range subnet.DnsNameservers {
+	for _, dns := range subnet.DNSNameservers {
 		dnsNameServers = append(dnsNameServers, types.StringPointerValue(&dns))
 	}
 
 	data.DnsNameservers = dnsNameServers
-	data.CidrBlock = types.StringPointerValue(&subnet.CidrBlock)
+	data.CidrBlock = types.StringPointerValue(&subnet.CIDRBlock)
 	data.Description = types.StringPointerValue(subnet.Description)
-	data.IpVersion = types.StringValue(subnet.IpVersion)
+	data.IpVersion = types.StringValue(subnet.IPVersion)
 	data.Name = types.StringPointerValue(subnet.Name)
-	data.SubnetpoolId = types.StringPointerValue(&subnet.SubnetpoolId)
-	data.VpcId = types.StringValue(subnet.VpcId)
+	data.SubnetpoolId = types.StringPointerValue(&subnet.SubnetPoolID)
+	data.VpcId = types.StringValue(subnet.VPCID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -202,20 +198,17 @@ func (r *mgcNetworkVpcsSubnetsResource) Update(ctx context.Context, req resource
 		return
 	}
 
-	dnsServers := networkSubnets.UpdateParametersDnsNameservers{}
+	dnsServers := []string{}
 	for _, dns := range data.DnsNameservers {
 		dnsServers = append(dnsServers, dns.ValueString())
 	}
-	subnetUpdateParams := networkSubnets.UpdateParameters{
-		SubnetId:       data.ID.ValueString(),
-		DnsNameservers: &dnsServers,
+	subnetUpdateParams := netSDK.SubnetPatchRequest{
+		DNSNameservers: &dnsServers,
 	}
 
-	_, err := r.networkSubnets.UpdateContext(ctx, subnetUpdateParams,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnets.UpdateConfigs{}))
-
+	_, err := r.networkSubnets.Update(ctx, data.ID.ValueString(), subnetUpdateParams)
 	if err != nil {
-		resp.Diagnostics.AddError("unable to update VPC subnet", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -229,11 +222,9 @@ func (r *mgcNetworkVpcsSubnetsResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.networkSubnets.DeleteContext(ctx, networkSubnets.DeleteParameters{
-		SubnetId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnets.DeleteConfigs{}))
+	err := r.networkSubnets.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to delete VPC subnet", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -246,30 +237,7 @@ func convertIPStringToIPVersion(ipVersion string) int {
 }
 
 func (r *mgcNetworkVpcsSubnetsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	subnetId := req.ID
-	data := mgcNetworkVpcsSubnetsModel{}
-
-	subnet, err := r.networkSubnets.GetContext(ctx, networkSubnets.GetParameters{
-		SubnetId: subnetId,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnets.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("unable to import VPC subnet", err.Error())
-		return
-	}
-
-	dnsNameServers := []types.String{}
-	for _, dns := range subnet.DnsNameservers {
-		dnsNameServers = append(dnsNameServers, types.StringPointerValue(&dns))
-	}
-
-	data.DnsNameservers = dnsNameServers
-	data.CidrBlock = types.StringPointerValue(&subnet.CidrBlock)
-	data.Description = types.StringPointerValue(subnet.Description)
-	data.IpVersion = types.StringValue(subnet.IpVersion)
-	data.Name = types.StringPointerValue(subnet.Name)
-	// data.SubnetpoolId = types.StringPointerValue(subnet.subnetPoolId)
-	data.VpcId = types.StringValue(subnet.VpcId)
-	data.ID = types.StringPointerValue(&subnet.Id)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &mgcNetworkVpcsSubnetsModel{
+		ID: types.StringValue(req.ID),
+	})...)
 }
