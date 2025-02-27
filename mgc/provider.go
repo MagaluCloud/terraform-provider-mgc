@@ -68,7 +68,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 			},
 			"api_key": schema.StringAttribute{
 				Description: "The Magalu API Key for authentication.",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -130,16 +130,22 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		}
 	}
 
-	if plan.ObjectStorage == nil || (os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "") {
-		resp.Diagnostics.AddWarning("The ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ environment variables are deprecated. Please use the ´object_storage´ provider configuration instead.", "The environment variables ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ are deprecated. Please use the ´object_storage´ provider configuration instead. These environment variables will be removed in a future release.")
+	if plan.ObjectStorage == nil {
 		plan.ObjectStorage = &ObjectStorageModel{
-			ObjectKeyPair: &KeyPairModel{
-				KeyID:     types.StringValue(os.Getenv("MGC_OBJ_KEY_ID")),
-				KeySecret: types.StringValue(os.Getenv("MGC_OBJ_KEY_SECRET")),
-			},
+			ObjectKeyPair: &KeyPairModel{},
+		}
+		if os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "" {
+			resp.Diagnostics.AddWarning("The ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ environment variables are deprecated. Please use the ´object_storage´ provider configuration instead.", "The environment variables ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ are deprecated. Please use the ´object_storage´ provider configuration instead. These environment variables will be removed in a future release.")
+			plan.ObjectStorage = &ObjectStorageModel{
+				ObjectKeyPair: &KeyPairModel{
+					KeyID:     types.StringValue(os.Getenv("MGC_OBJ_KEY_ID")),
+					KeySecret: types.StringValue(os.Getenv("MGC_OBJ_KEY_SECRET")),
+				},
+			}
 		}
 	}
 
+	// remove when deprecating MGC_API_KEY
 	if plan.ApiKey.ValueString() == "" {
 		resp.Diagnostics.AddError("The ´api_key´ provider configuration is required.", "The ´api_key´ provider configuration is required.")
 	}
