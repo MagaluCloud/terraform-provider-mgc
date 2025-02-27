@@ -3,9 +3,7 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSubnetpools "github.com/MagaluCloud/magalu/mgc/lib/products/network/subnetpools"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -24,8 +22,7 @@ type mgcNetworkSubnetpoolsModel struct {
 }
 
 type mgcNetworkSubnetpoolsDatasource struct {
-	sdkClient          *mgcSdk.Client
-	networkSubnetpools networkSubnetpools.Service
+	networkSubnetpools netSDK.SubnetPoolService
 }
 
 func NewDataSourceNetworkSubnetpool() datasource.DataSource {
@@ -80,22 +77,20 @@ func (r *mgcNetworkSubnetpoolsDatasource) Read(ctx context.Context, req datasour
 	data := &mgcNetworkSubnetpoolsModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, data)...)
 
-	getParam := networkSubnetpools.GetParameters{
-		SubnetpoolId: data.Id.ValueString(),
-	}
-	subnetPool, err := r.networkSubnetpools.GetContext(ctx, getParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnetpools.GetConfigs{}))
+	subnetPool, err := r.networkSubnetpools.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get subnetpool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Cidr = types.StringPointerValue(subnetPool.Cidr)
-	data.CreatedAt = types.StringValue(subnetPool.CreatedAt)
+	data.Cidr = types.StringPointerValue(subnetPool.CIDR)
+	if subnetPool.CreatedAt.String() != "" {
+		data.CreatedAt = types.StringValue(subnetPool.CreatedAt.String())
+	}
 	data.Description = types.StringValue(subnetPool.Description)
-	data.IpVersion = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&subnetPool.IpVersion))
+	data.IpVersion = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&subnetPool.IPVersion))
 	data.Name = types.StringValue(subnetPool.Name)
-	data.TenantId = types.StringValue(subnetPool.TenantId)
+	data.TenantId = types.StringValue(subnetPool.TenantID)
 	data.IsDefault = types.BoolValue(subnetPool.IsDefault)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
@@ -105,17 +100,11 @@ func (r *mgcNetworkSubnetpoolsDatasource) Configure(ctx context.Context, req dat
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkSubnetpools = networkSubnetpools.NewService(ctx, r.sdkClient)
+	r.networkSubnetpools = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
 }
