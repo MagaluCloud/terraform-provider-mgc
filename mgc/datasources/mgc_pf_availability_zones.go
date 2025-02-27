@@ -3,20 +3,18 @@ package datasources
 import (
 	"context"
 
+	sdkAzs "github.com/MagaluCloud/mgc-sdk-go/availabilityzones"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkProfileAvailabilityZones "github.com/MagaluCloud/magalu/mgc/lib/products/profile/availability_zones"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceAvailabilityZones{}
 
 type DataSourceAvailabilityZones struct {
-	sdkClient         *mgcSdk.Client
-	profileAvailZones sdkProfileAvailabilityZones.Service
+	sdkClient sdkAzs.Service
 }
 
 func NewDataSourceAvailabilityZones() datasource.DataSource {
@@ -46,18 +44,14 @@ func (r *DataSourceAvailabilityZones) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure data source", "Invalid provider data")
 		return
 	}
 
-	r.profileAvailZones = sdkProfileAvailabilityZones.NewService(ctx, r.sdkClient)
+	r.sdkClient = sdkAzs.New(&dataConfig.CoreConfig).AvailabilityZones()
 }
 
 func (r *DataSourceAvailabilityZones) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -96,19 +90,19 @@ func (r *DataSourceAvailabilityZones) Read(ctx context.Context, req datasource.R
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.profileAvailZones.ListContext(ctx, sdkProfileAvailabilityZones.ListParameters{}, sdkProfileAvailabilityZones.ListConfigs{})
+	sdkOutput, err := r.sdkClient.List(ctx, sdkAzs.ListOptions{ShowBlocked: false})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	for _, region := range sdkOutput.Results {
+	for _, region := range sdkOutput {
 		var regionData Region
-		regionData.Region = types.StringValue(region.RegionId)
+		regionData.Region = types.StringValue(region.ID)
 		for _, az := range region.AvailabilityZones {
 			regionData.AvailabilityZones = append(regionData.AvailabilityZones, AvailabilityZones{
-				AvailabilityZone: types.StringValue(az.AzId),
-				BlockType:        types.StringPointerValue(removeNoneFromString(az.BlockType)),
+				AvailabilityZone: types.StringValue(az.ID),
+				BlockType:        types.StringPointerValue(removeNoneFromString(string(az.BlockType))),
 			})
 		}
 		data.Regions = append(data.Regions, regionData)
