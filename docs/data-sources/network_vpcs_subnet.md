@@ -31,6 +31,7 @@ output "datasource_subnet_id" {
 
 ### Read-Only
 
+- `availability_zone` (String) The availability zone of the subnet
 - `cidr_block` (String) The CIDR block of the subnet
 - `description` (String) The description of the subnet
 - `dhcp_pools` (Attributes List) The DHCP pools of the subnet (see [below for nested schema](#nestedatt--dhcp_pools))

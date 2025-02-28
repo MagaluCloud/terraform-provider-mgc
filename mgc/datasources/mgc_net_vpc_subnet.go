@@ -11,17 +11,18 @@ import (
 )
 
 type mgcNetworkVpcsSubnetModel struct {
-	CidrBlock      types.String     `tfsdk:"cidr_block"`
-	Description    types.String     `tfsdk:"description"`
-	DhcpPools      []DhcpPoolsModel `tfsdk:"dhcp_pools"`
-	DnsNameservers []types.String   `tfsdk:"dns_nameservers"`
-	GatewayIp      types.String     `tfsdk:"gateway_ip"`
-	Id             types.String     `tfsdk:"id"`
-	IpVersion      types.String     `tfsdk:"ip_version"`
-	Name           types.String     `tfsdk:"name"`
-	Updated        types.String     `tfsdk:"updated"`
-	VpcId          types.String     `tfsdk:"vpc_id"`
-	SubnetpoolId   types.String     `tfsdk:"subnetpool_id"`
+	CidrBlock        types.String     `tfsdk:"cidr_block"`
+	Description      types.String     `tfsdk:"description"`
+	DhcpPools        []DhcpPoolsModel `tfsdk:"dhcp_pools"`
+	DnsNameservers   []types.String   `tfsdk:"dns_nameservers"`
+	GatewayIp        types.String     `tfsdk:"gateway_ip"`
+	Id               types.String     `tfsdk:"id"`
+	IpVersion        types.String     `tfsdk:"ip_version"`
+	Name             types.String     `tfsdk:"name"`
+	Updated          types.String     `tfsdk:"updated"`
+	VpcId            types.String     `tfsdk:"vpc_id"`
+	SubnetpoolId     types.String     `tfsdk:"subnetpool_id"`
+	AvailabilityZone types.String     `tfsdk:"availability_zone"`
 }
 
 type DhcpPoolsModel struct {
@@ -31,6 +32,7 @@ type DhcpPoolsModel struct {
 
 type mgcNetworkVpcsSubnetDatasource struct {
 	networkSubnet netSDK.SubnetService
+	region        string
 }
 
 func NewDataSourceNetworkVpcsSubnet() datasource.DataSource {
@@ -102,6 +104,10 @@ func (r *mgcNetworkVpcsSubnetDatasource) Schema(_ context.Context, _ datasource.
 				Description: "The subnet pool ID of the subnet",
 				Computed:    true,
 			},
+			"availability_zone": schema.StringAttribute{
+				Description: "The availability zone of the subnet",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -117,6 +123,7 @@ func (r *mgcNetworkVpcsSubnetDatasource) Configure(ctx context.Context, req data
 	}
 
 	r.networkSubnet = netSDK.New(&dataConfig.CoreConfig).Subnets()
+	r.region = dataConfig.Region
 }
 
 func (r *mgcNetworkVpcsSubnetDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -154,6 +161,6 @@ func (r *mgcNetworkVpcsSubnetDatasource) Read(ctx context.Context, req datasourc
 	}
 	data.VpcId = types.StringValue(subnet.VPCID)
 	data.SubnetpoolId = types.StringValue(subnet.SubnetPoolID)
-
+	data.AvailabilityZone = types.StringValue(tfutil.ConvertXZoneToAvailabilityZone(r.region, subnet.Zone))
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
