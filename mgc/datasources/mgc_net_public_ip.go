@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkPIP "github.com/MagaluCloud/magalu/mgc/lib/products/network/public_ips"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -21,8 +20,7 @@ type NetworkPublicIPModel struct {
 }
 
 type NetworkPublicIPDataSource struct {
-	sdkClient  *mgcSdk.Client
-	networkPIP networkPIP.Service
+	networkPIP netSDK.PublicIPService
 }
 
 func NewDataSourceNetworkPublicIP() datasource.DataSource {
@@ -37,20 +35,13 @@ func (r *NetworkPublicIPDataSource) Configure(ctx context.Context, req datasourc
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkPIP = networkPIP.NewService(ctx, r.sdkClient)
+	r.networkPIP = netSDK.New(&dataConfig.CoreConfig).PublicIPs()
 }
 
 func (r *NetworkPublicIPDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -85,20 +76,17 @@ func (r *NetworkPublicIPDataSource) Read(ctx context.Context, req datasource.Rea
 	data := &NetworkPublicIPModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	pip, err := r.networkPIP.GetContext(ctx, networkPIP.GetParameters{
-		PublicIpId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.GetConfigs{}))
-
+	pip, err := r.networkPIP.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to get public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringPointerValue(pip.Id)
+	data.Id = types.StringPointerValue(pip.ID)
 	data.Description = types.StringPointerValue(pip.Description)
-	data.PublicIP = types.StringPointerValue(pip.PublicIp)
-	data.VPCId = types.StringPointerValue(pip.VpcId)
-	data.PortId = types.StringPointerValue(pip.PortId)
+	data.PublicIP = types.StringPointerValue(pip.PublicIP)
+	data.VPCId = types.StringPointerValue(pip.VPCID)
+	data.PortId = types.StringPointerValue(pip.PortID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

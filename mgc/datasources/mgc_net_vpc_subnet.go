@@ -3,9 +3,7 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSubnets "github.com/MagaluCloud/magalu/mgc/lib/products/network/subnets"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -33,8 +31,7 @@ type DhcpPoolsModel struct {
 }
 
 type mgcNetworkVpcsSubnetDatasource struct {
-	sdkClient  *mgcSdk.Client
-	networkVPC networkSubnets.Service
+	networkSubnet netSDK.SubnetService
 }
 
 func NewDataSourceNetworkVpcsSubnet() datasource.DataSource {
@@ -118,19 +115,13 @@ func (r *mgcNetworkVpcsSubnetDatasource) Configure(ctx context.Context, req data
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkVPC = networkSubnets.NewService(ctx, r.sdkClient)
+	r.networkSubnet = netSDK.New(&dataConfig.CoreConfig).Subnets()
 }
 
 func (r *mgcNetworkVpcsSubnetDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -140,36 +131,35 @@ func (r *mgcNetworkVpcsSubnetDatasource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	subnet, err := r.networkVPC.GetContext(ctx, networkSubnets.GetParameters{
-		SubnetId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnets.GetConfigs{}))
-
+	subnet, err := r.networkSubnet.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get subnet", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.CidrBlock = types.StringValue(subnet.CidrBlock)
+	data.CidrBlock = types.StringValue(subnet.CIDRBlock)
 	data.Description = types.StringPointerValue(subnet.Description)
-	data.DhcpPools = make([]DhcpPoolsModel, len(subnet.DhcpPools))
-	for _, pool := range subnet.DhcpPools {
+	data.DhcpPools = make([]DhcpPoolsModel, len(subnet.DHCPPools))
+	for _, pool := range subnet.DHCPPools {
 		data.DhcpPools = append(data.DhcpPools, DhcpPoolsModel{
 			Start: types.StringValue(pool.Start),
 			End:   types.StringValue(pool.End),
 		})
 	}
 	var dnsNameservers []types.String
-	for _, dns := range subnet.DnsNameservers {
+	for _, dns := range subnet.DNSNameservers {
 		dnsNameservers = append(dnsNameservers, types.StringValue(dns))
 	}
 	data.DnsNameservers = dnsNameservers
-	data.GatewayIp = types.StringValue(subnet.GatewayIp)
-	data.IpVersion = types.StringValue(subnet.IpVersion)
+	data.GatewayIp = types.StringValue(subnet.GatewayIP)
+	data.IpVersion = types.StringValue(subnet.IPVersion)
 	data.Name = types.StringPointerValue(subnet.Name)
-	data.Updated = types.StringPointerValue(subnet.Updated)
-	data.VpcId = types.StringValue(subnet.VpcId)
+	if subnet.Updated != nil {
+		data.Updated = types.StringValue(subnet.Updated.String())
+	}
+	data.VpcId = types.StringValue(subnet.VPCID)
 	data.Zone = types.StringValue(subnet.Zone)
-	data.SubnetpoolId = types.StringValue(subnet.SubnetpoolId)
+	data.SubnetpoolId = types.StringValue(subnet.SubnetPoolID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }

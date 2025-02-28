@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSecurityGroups "github.com/MagaluCloud/magalu/mgc/lib/products/network/security_groups"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -44,8 +43,7 @@ type NetworkSecurityGroupRuleModel struct {
 }
 
 type NetworkSecurityGroupResource struct {
-	sdkClient             *mgcSdk.Client
-	networkSecurityGroups networkSecurityGroups.Service
+	networkSecurityGroups netSDK.SecurityGroupService
 }
 
 func NewDataSourceNetworkSecurityGroup() datasource.DataSource {
@@ -172,58 +170,53 @@ func (r *NetworkSecurityGroupResource) Configure(ctx context.Context, req dataso
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkSecurityGroups = networkSecurityGroups.NewService(ctx, r.sdkClient)
+	r.networkSecurityGroups = netSDK.New(&dataConfig.CoreConfig).SecurityGroups()
 }
 
 func (r *NetworkSecurityGroupResource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data NetworkSecurityGroupModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	securityGroupFound, err := r.networkSecurityGroups.GetContext(ctx,
-		networkSecurityGroups.GetParameters{
-			SecurityGroupId: data.Id.ValueString(),
-		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroups.GetConfigs{}),
-	)
+	securityGroupFound, err := r.networkSecurityGroups.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get security group", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, securityGroupSdkModelToTerraform(securityGroupFound))...)
 }
 
-func securityGroupSdkModelToTerraform(result networkSecurityGroups.GetResult) NetworkSecurityGroupModel {
-	return NetworkSecurityGroupModel{
+func securityGroupSdkModelToTerraform(result *netSDK.SecurityGroupDetailResponse) NetworkSecurityGroupModel {
+	a := NetworkSecurityGroupModel{
 		Rules:       securityGroupRulesSdkModelToTerraform(result.Rules),
-		CreatedAt:   types.StringPointerValue(result.CreatedAt),
 		Description: types.StringPointerValue(result.Description),
 		Error:       types.StringPointerValue(result.Error),
-		ExternalId:  types.StringPointerValue(result.ExternalId),
-		Id:          types.StringPointerValue(result.Id),
+		ExternalId:  types.StringPointerValue(result.ExternalID),
+		Id:          types.StringPointerValue(result.ID),
 		IsDefault:   types.BoolPointerValue(result.IsDefault),
 		Name:        types.StringPointerValue(result.Name),
 		ProjectType: types.StringPointerValue(result.ProjectType),
 		Status:      types.StringValue(result.Status),
-		TenantId:    types.StringPointerValue(result.TenantId),
-		Updated:     types.StringPointerValue(result.Updated),
-		VpcId:       types.StringPointerValue(result.VpcId),
+		TenantId:    types.StringPointerValue(result.TenantID),
+		VpcId:       types.StringPointerValue(result.VPCID),
 	}
+	if result.CreatedAt.String() != "" {
+		a.CreatedAt = types.StringValue(result.CreatedAt.String())
+	}
+	if result.Updated.String() != "" {
+		a.Updated = types.StringValue(result.Updated.String())
+	}
+
+	return a
 }
 
-func securityGroupRulesSdkModelToTerraform(rules *networkSecurityGroups.GetResultRules) []NetworkSecurityGroupRuleModel {
+func securityGroupRulesSdkModelToTerraform(rules *[]netSDK.RuleResponse) []NetworkSecurityGroupRuleModel {
 	if rules == nil {
 		return []NetworkSecurityGroupRuleModel{}
 	}
@@ -231,18 +224,18 @@ func securityGroupRulesSdkModelToTerraform(rules *networkSecurityGroups.GetResul
 	var terraformRules []NetworkSecurityGroupRuleModel
 	for _, rule := range *rules {
 		terraformRules = append(terraformRules, NetworkSecurityGroupRuleModel{
-			CreatedAt:       types.StringPointerValue(rule.CreatedAt),
+			CreatedAt:       types.StringValue(rule.CreatedAt.String()),
 			Direction:       types.StringPointerValue(rule.Direction),
 			Error:           types.StringPointerValue(rule.Error),
-			Ethertype:       types.StringPointerValue(rule.Ethertype),
-			Id:              types.StringPointerValue(rule.Id),
+			Ethertype:       types.StringPointerValue(rule.EtherType),
+			Id:              types.StringPointerValue(rule.ID),
 			PortRangeMax:    types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax)),
 			PortRangeMin:    types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMin)),
 			Protocol:        types.StringPointerValue(rule.Protocol),
-			RemoteGroupId:   types.StringPointerValue(rule.RemoteGroupId),
-			RemoteIpPrefix:  types.StringPointerValue(rule.RemoteIpPrefix),
-			SecurityGroupId: types.StringPointerValue(rule.SecurityGroupId),
-			Status:          types.StringPointerValue(rule.Status),
+			RemoteGroupId:   types.StringPointerValue(rule.RemoteGroupID),
+			RemoteIpPrefix:  types.StringPointerValue(rule.RemoteIPPrefix),
+			SecurityGroupId: types.StringPointerValue(rule.SecurityGroupID),
+			Status:          types.StringValue(rule.Status),
 		})
 	}
 	return terraformRules

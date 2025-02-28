@@ -3,9 +3,7 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkVpc "github.com/MagaluCloud/magalu/mgc/lib/products/network/vpcs"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -19,8 +17,7 @@ type NetworkVPCModel struct {
 }
 
 type NetworkVPCDatasource struct {
-	sdkClient  *mgcSdk.Client
-	networkVPC networkVpc.Service
+	networkVPC netSDK.VPCService
 }
 
 func NewDataSourceNetworkVPC() datasource.DataSource {
@@ -35,19 +32,13 @@ func (r *NetworkVPCDatasource) Configure(ctx context.Context, req datasource.Con
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkVPC = networkVpc.NewService(ctx, r.sdkClient)
+	r.networkVPC = netSDK.New(&dataConfig.CoreConfig).VPCs()
 }
 
 func (r *NetworkVPCDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -74,16 +65,13 @@ func (r *NetworkVPCDatasource) Read(ctx context.Context, req datasource.ReadRequ
 	data := &NetworkVPCModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	vpc, err := r.networkVPC.GetContext(ctx, networkVpc.GetParameters{
-		VpcId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.GetConfigs{}))
-
+	vpc, err := r.networkVPC.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get VPC", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringPointerValue(vpc.Id)
+	data.Id = types.StringPointerValue(vpc.ID)
 	data.Name = types.StringPointerValue(vpc.Name)
 	data.Description = types.StringPointerValue(vpc.Description)
 

@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkInterfaces "github.com/MagaluCloud/magalu/mgc/lib/products/network/ports"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -38,8 +37,7 @@ type NetworkVPCInterfacePublicIpModel struct {
 }
 
 type NetworkVPCInterfaceDatasource struct {
-	sdkClient         *mgcSdk.Client
-	networkInterfaces networkInterfaces.Service
+	networkInterfaces netSDK.PortService
 }
 
 func NewDataSourceNetworkVPCInterface() datasource.DataSource {
@@ -135,19 +133,13 @@ func (r *NetworkVPCInterfaceDatasource) Configure(ctx context.Context, req datas
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkInterfaces = networkInterfaces.NewService(ctx, r.sdkClient)
+	r.networkInterfaces = netSDK.New(&dataConfig.CoreConfig).Ports()
 }
 
 func (r *NetworkVPCInterfaceDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -157,34 +149,32 @@ func (r *NetworkVPCInterfaceDatasource) Read(ctx context.Context, req datasource
 		return
 	}
 
-	vpcInterface, err := r.networkInterfaces.GetContext(ctx, networkInterfaces.GetParameters{
-		PortId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkInterfaces.GetConfigs{}))
+	vpcInterface, err := r.networkInterfaces.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get VPC interface", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	data.Name = types.StringPointerValue(vpcInterface.Name)
-	data.VpcId = types.StringPointerValue(vpcInterface.VpcId)
+	data.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 	data.IpAddress = []NetworkVPCInterfaceIpAddressModel{}
-	if vpcInterface.IpAddress == nil {
-		for _, ipAddress := range *vpcInterface.IpAddress {
+	if vpcInterface.IPAddress == nil {
+		for _, ipAddress := range *vpcInterface.IPAddress {
 			data.IpAddress = append(data.IpAddress, NetworkVPCInterfaceIpAddressModel{
 				Ethertype: types.StringPointerValue(ipAddress.Ethertype),
-				IpAddress: types.StringValue(ipAddress.IpAddress),
-				SubnetId:  types.StringValue(ipAddress.SubnetId),
+				IpAddress: types.StringValue(ipAddress.IPAddress),
+				SubnetId:  types.StringValue(ipAddress.SubnetID),
 			})
 		}
 	}
 	data.IsAdminStateUp = types.BoolPointerValue(vpcInterface.IsAdminStateUp)
 	data.IsPortSecurityEnabled = types.BoolPointerValue(vpcInterface.IsPortSecurityEnabled)
 	data.PublicIp = []NetworkVPCInterfacePublicIpModel{}
-	if vpcInterface.PublicIp == nil {
-		for _, publicIp := range *vpcInterface.PublicIp {
+	if vpcInterface.PublicIP == nil {
+		for _, publicIp := range *vpcInterface.PublicIP {
 			data.PublicIp = append(data.PublicIp, NetworkVPCInterfacePublicIpModel{
-				PublicIp:   types.StringPointerValue(publicIp.PublicIp),
-				PublicIpId: types.StringPointerValue(publicIp.PublicIpId),
+				PublicIp:   types.StringPointerValue(publicIp.PublicIP),
+				PublicIpId: types.StringPointerValue(publicIp.PublicIPID),
 			})
 		}
 	}
@@ -194,8 +184,13 @@ func (r *NetworkVPCInterfaceDatasource) Read(ctx context.Context, req datasource
 			data.SecurityGroups = append(data.SecurityGroups, types.StringValue(securityGroup))
 		}
 	}
-	data.CreatedAt = types.StringPointerValue(vpcInterface.CreatedAt)
-	data.Updated = types.StringPointerValue(vpcInterface.Updated)
+
+	if vpcInterface.CreatedAt != nil {
+		data.CreatedAt = types.StringValue(vpcInterface.CreatedAt.String())
+	}
+	if vpcInterface.Updated != nil {
+		data.Updated = types.StringValue(vpcInterface.Updated.String())
+	}
 	data.Description = types.StringPointerValue(vpcInterface.Description)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
