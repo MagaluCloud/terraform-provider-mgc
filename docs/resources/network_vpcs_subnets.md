@@ -37,6 +37,7 @@ resource "mgc_network_vpcs_subnets" "example" {
 
 ### Optional
 
+- `availability_zone` (String) The availability zone of the VPC subnet
 - `description` (String) The description of the VPC subnet
 - `dns_nameservers` (List of String) The DNS nameservers of the VPC subnet
 
