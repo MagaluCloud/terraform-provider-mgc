@@ -3,10 +3,8 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkInterfaces "github.com/MagaluCloud/magalu/mgc/lib/products/network/ports"
-	networkVpcInterfaces "github.com/MagaluCloud/magalu/mgc/lib/products/network/vpcs/ports"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,9 +18,9 @@ type NetworkVPCInterfaceModel struct {
 }
 
 type NetworkVPCInterfaceResource struct {
-	sdkClient           *mgcSdk.Client
-	networkInterfaces   networkInterfaces.Service
-	networkVPCInterface networkVpcInterfaces.Service
+	networkVpcsPorts netSDK.VPCService
+	networkPorts     netSDK.PortService
+	region           string
 }
 
 func NewNetworkVPCInterfaceResource() resource.Resource {
@@ -37,20 +35,15 @@ func (r *NetworkVPCInterfaceResource) Configure(ctx context.Context, req resourc
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkInterfaces = networkInterfaces.NewService(ctx, r.sdkClient)
-	r.networkVPCInterface = networkVpcInterfaces.NewService(ctx, r.sdkClient)
+	r.networkVpcsPorts = netSDK.New(&dataConfig.CoreConfig).VPCs()
+	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
+	r.region = dataConfig.Region
 }
 
 func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -80,16 +73,14 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	vpcInterface, err := r.networkInterfaces.GetContext(ctx, networkInterfaces.GetParameters{
-		PortId: model.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkInterfaces.GetConfigs{}))
+	vpcInterface, err := r.networkPorts.Get(ctx, model.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get VPC Interface", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	model.Name = types.StringPointerValue(vpcInterface.Name)
-	model.VpcId = types.StringPointerValue(vpcInterface.VpcId)
+	model.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
@@ -101,19 +92,18 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	disableDefaultRules := false
-	createdVPCInterface, err := r.networkVPCInterface.CreateContext(ctx, networkVpcInterfaces.CreateParameters{
-		VpcId:  model.VpcId.ValueString(),
+	defaultRules := false
+	createdVPCInterface, err := r.networkVpcsPorts.CreatePort(ctx, model.VpcId.ValueString(), netSDK.PortCreateRequest{
 		Name:   model.Name.ValueString(),
-		HasPip: &disableDefaultRules,
-		HasSg:  &disableDefaultRules,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpcInterfaces.CreateConfigs{}))
+		HasPIP: &defaultRules,
+		HasSG:  &defaultRules,
+	}, netSDK.PortCreateOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create VPC Interface", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	model.Id = types.StringValue(createdVPCInterface.Id)
+	model.Id = types.StringValue(createdVPCInterface)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
@@ -128,30 +118,15 @@ func (r *NetworkVPCInterfaceResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	err := r.networkInterfaces.DeleteContext(ctx, networkInterfaces.DeleteParameters{
-		PortId: model.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkInterfaces.DeleteConfigs{}))
+	err := r.networkPorts.Delete(ctx, model.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete VPC Interface", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
 
 func (r *NetworkVPCInterfaceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	vpcInterfaceId := req.ID
-	model := NetworkVPCInterfaceModel{}
-
-	vpcInterface, err := r.networkInterfaces.GetContext(ctx, networkInterfaces.GetParameters{
-		PortId: vpcInterfaceId,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkInterfaces.GetConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import VPC Interface", err.Error())
-		return
-	}
-
-	model.Id = types.StringPointerValue(vpcInterface.Id)
-	model.Name = types.StringPointerValue(vpcInterface.Name)
-	model.VpcId = types.StringPointerValue(vpcInterface.VpcId)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &NetworkVPCInterfaceModel{
+		Id: types.StringValue(req.ID),
+	})...)
 }
