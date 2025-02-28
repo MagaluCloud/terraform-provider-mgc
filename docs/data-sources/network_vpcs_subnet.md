@@ -41,7 +41,6 @@ output "datasource_subnet_id" {
 - `subnetpool_id` (String) The subnet pool ID of the subnet
 - `updated` (String) The updated timestamp of the subnet
 - `vpc_id` (String) The VPC ID of the subnet
-- `zone` (String) The zone of the subnet
 
 <a id="nestedatt--dhcp_pools"></a>
 ### Nested Schema for `dhcp_pools`
