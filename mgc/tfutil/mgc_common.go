@@ -2,12 +2,16 @@ package tfutil
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+var azRegex = regexp.MustCompile(`^([a-z]{2})-([a-z]{2})([1-9])[-]([a-z])$`)
 
 type GenericIDNameModel struct {
 	Name types.String `tfsdk:"name"`
@@ -92,4 +96,16 @@ func SdkParamValueToString(v any) string {
 	}
 
 	return ""
+}
+
+func ConvertXZoneToAvailabilityZone(region, xZone string) string {
+	return strings.ToLower(fmt.Sprintf("%s-%s", region, xZone))
+}
+
+func ConvertAvailabilityZoneToXZone(availabilityZone string) (string, error) {
+	matches := azRegex.FindStringSubmatch(availabilityZone)
+	if len(matches) != 5 {
+		return "", fmt.Errorf("invalid availability zone format: %s", availabilityZone)
+	}
+	return matches[4], nil
 }

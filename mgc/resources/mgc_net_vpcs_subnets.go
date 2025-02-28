@@ -17,20 +17,21 @@ import (
 )
 
 type mgcNetworkVpcsSubnetsModel struct {
-	ID             types.String   `tfsdk:"id"`
-	CidrBlock      types.String   `tfsdk:"cidr_block"`
-	Description    types.String   `tfsdk:"description"`
-	DnsNameservers []types.String `tfsdk:"dns_nameservers"`
-	IpVersion      types.String   `tfsdk:"ip_version"`
-	Name           types.String   `tfsdk:"name"`
-	SubnetpoolId   types.String   `tfsdk:"subnetpool_id"`
-	VpcId          types.String   `tfsdk:"vpc_id"`
-	// AvailabilityZone types.String   `tfsdk:"availability_zone"`
+	ID               types.String   `tfsdk:"id"`
+	CidrBlock        types.String   `tfsdk:"cidr_block"`
+	Description      types.String   `tfsdk:"description"`
+	DnsNameservers   []types.String `tfsdk:"dns_nameservers"`
+	IpVersion        types.String   `tfsdk:"ip_version"`
+	Name             types.String   `tfsdk:"name"`
+	SubnetpoolId     types.String   `tfsdk:"subnetpool_id"`
+	VpcId            types.String   `tfsdk:"vpc_id"`
+	AvailabilityZone types.String   `tfsdk:"availability_zone"`
 }
 
 type mgcNetworkVpcsSubnetsResource struct {
 	networkVpcsSubnets netSDK.VPCService
 	networkSubnets     netSDK.SubnetService
+	region             string
 }
 
 func NewNetworkVpcsSubnetsResource() resource.Resource {
@@ -106,14 +107,14 @@ func (r *mgcNetworkVpcsSubnetsResource) Schema(_ context.Context, _ resource.Sch
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			// "availability_zone": schema.StringAttribute{
-			// 	Description: "The availability zone of the VPC subnet",
-			// 	Computed:    true,
-			// 	Optional:    true,
-			// 	PlanModifiers: []planmodifier.String{
-			// 		tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
-			// 	},
-			// },
+			"availability_zone": schema.StringAttribute{
+				Description: "The availability zone of the VPC subnet",
+				Computed:    true,
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+				},
+			},
 		},
 	}
 }
@@ -130,6 +131,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Configure(ctx context.Context, req resou
 
 	r.networkVpcsSubnets = netSDK.New(&dataConfig.CoreConfig).VPCs()
 	r.networkSubnets = netSDK.New(&dataConfig.CoreConfig).Subnets()
+	r.region = dataConfig.Region
 }
 
 func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -153,7 +155,19 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 		SubnetPoolID:   data.SubnetpoolId.ValueStringPointer(),
 	}
 
-	subnetID, err := r.networkVpcsSubnets.CreateSubnet(ctx, data.VpcId.ValueString(), createParam)
+	var azparsed *string
+	if !data.AvailabilityZone.IsNull() {
+		az, err := tfutil.ConvertAvailabilityZoneToXZone(data.AvailabilityZone.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Availability Zone", err.Error())
+			return
+		}
+		azparsed = &az
+	}
+	subnetID, err := r.networkVpcsSubnets.CreateSubnet(ctx, data.VpcId.ValueString(), createParam, netSDK.SubnetCreateOptions{
+		Zone: azparsed,
+	})
+
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -188,6 +202,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Read(ctx context.Context, req resource.R
 	data.Name = types.StringPointerValue(subnet.Name)
 	data.SubnetpoolId = types.StringPointerValue(&subnet.SubnetPoolID)
 	data.VpcId = types.StringValue(subnet.VPCID)
+	data.AvailabilityZone = types.StringValue(tfutil.ConvertXZoneToAvailabilityZone(r.region, subnet.Zone))
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
