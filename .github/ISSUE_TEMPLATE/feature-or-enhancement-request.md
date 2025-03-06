@@ -3,7 +3,6 @@ name: Feature or enhancement request
 about: 'MGC Terraform '
 title: "[FEAT] - "
 labels: enhancement, waiting triage
-assignees: lfpicoloto1
 
 ---
 
