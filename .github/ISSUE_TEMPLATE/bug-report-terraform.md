@@ -3,7 +3,6 @@ name: Bug report Terraform
 about: Create a report to help us improve
 title: "[BUG] - "
 labels: bug, waiting triage
-assignees: lfpicoloto1
 
 ---
 
