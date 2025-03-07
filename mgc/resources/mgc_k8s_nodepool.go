@@ -102,10 +102,11 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 			},
 			"tags": schema.ListAttribute{
-				Description: "List of tags applied to the node pool.",
-				Optional:    true,
-				Computed:    true,
-				ElementType: types.StringType,
+				Description:        "List of tags applied to the node pool.",
+				DeprecationMessage: "Tags are deprecated and will be removed in a future release.",
+				Optional:           true,
+				Computed:           true,
+				ElementType:        types.StringType,
 			},
 			"created_at": schema.StringAttribute{
 				Description: "Date of creation of the Kubernetes Node.",

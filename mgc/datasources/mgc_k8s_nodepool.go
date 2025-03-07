@@ -152,9 +152,10 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 				Computed:    true,
 			},
 			"tags": schema.ListAttribute{
-				Description: "List of tags.",
-				ElementType: types.StringType,
-				Computed:    true,
+				Description:        "List of tags.",
+				ElementType:        types.StringType,
+				Computed:           true,
+				DeprecationMessage: "The tags attribute is deprecated and will be removed in a future release.",
 			},
 			"taints": schema.ListNestedAttribute{
 				Description: "List of taints.",
