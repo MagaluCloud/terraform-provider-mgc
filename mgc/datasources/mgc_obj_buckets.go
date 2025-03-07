@@ -2,13 +2,13 @@ package datasources
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkBuckets "github.com/MagaluCloud/magalu/mgc/lib/products/object_storage/buckets"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -16,8 +16,7 @@ import (
 var _ datasource.DataSource = &DatasourceBuckets{}
 
 type DatasourceBuckets struct {
-	sdkClient *mgcSdk.Client
-	buckets   sdkBuckets.Service
+	s3Client *minio.Client
 }
 
 type BucketModel struct {
@@ -26,7 +25,7 @@ type BucketModel struct {
 }
 
 type BucketsModel struct {
-	Buckets []BucketModel `tfsdk:"ssh_keys"`
+	Buckets []BucketModel `tfsdk:"buckets"`
 }
 
 func NewDatasourceBuckets() datasource.DataSource {
@@ -42,18 +41,24 @@ func (r *DatasourceBuckets) Configure(ctx context.Context, req datasource.Config
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
+	providerConfig := req.ProviderData.(tfutil.DataConfig)
+
+	minioClient, err := minio.New(
+		tfutil.RegionToS3Url(providerConfig.Region, providerConfig.Env),
+		&minio.Options{
+			Creds: credentials.NewStaticV4(
+				providerConfig.Keypair.KeyID,
+				providerConfig.Keypair.KeySecret,
+				""),
+			Secure: true,
+		})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+		resp.Diagnostics.AddError("Failed to create s3 client", err.Error())
 		return
 	}
 
-	r.buckets = sdkBuckets.NewService(ctx, r.sdkClient)
+	r.s3Client = minioClient
+
 }
 
 func (r *DatasourceBuckets) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -85,18 +90,17 @@ func (r *DatasourceBuckets) Read(ctx context.Context, req datasource.ReadRequest
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.buckets.ListContext(ctx, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBuckets.ListConfigs{}))
+	buckets, err := r.s3Client.ListBuckets(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get versions", err.Error())
+		resp.Diagnostics.AddError("Failed to get buckets", err.Error())
 		return
 	}
 
-	for _, key := range sdkOutput.Buckets {
+	for _, bucket := range buckets {
 		data.Buckets = append(data.Buckets, BucketModel{
-			Name:         types.StringValue(key.Name),
-			CreationDate: types.StringValue(key.CreationDate),
+			Name:         types.StringValue(bucket.Name),
+			CreationDate: types.StringValue(bucket.CreationDate.Format(time.RFC3339)),
 		})
-
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

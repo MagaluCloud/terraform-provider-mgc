@@ -1,6 +1,8 @@
 package tfutil
 
 import (
+	"fmt"
+
 	"github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
@@ -31,4 +33,21 @@ func RegionToUrl(region string, env string) string {
 
 func buildPreProdUrl(env string) string {
 	return preProdUrl + "/" + env
+}
+
+func RegionToS3Url(region string, env string) string {
+	// improve that ...
+	if env == "pre-prod" {
+		panic("pre-prod is not supported for S3")
+	}
+
+	var regionMap = map[string]string{
+		"br-ne1":  "br-ne1",
+		"br-se1":  "br-se1",
+		"br-mgl1": "br-se-1",
+	}
+
+	templateUrl := "%s.magaluobjects.com"
+
+	return fmt.Sprintf(templateUrl, regionMap[region])
 }
