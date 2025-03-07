@@ -40,8 +40,14 @@ func (r *DatasourceBucket) Configure(ctx context.Context, req datasource.Configu
 
 	providerConfig := req.ProviderData.(tfutil.DataConfig)
 
+	s3Url, err := tfutil.RegionToS3Url(providerConfig.Region, providerConfig.Env)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create s3 client", err.Error())
+		return
+	}
+
 	minioClient, err := minio.New(
-		tfutil.RegionToS3Url(providerConfig.Region, providerConfig.Env),
+		s3Url,
 		&minio.Options{
 			Creds: credentials.NewStaticV4(
 				providerConfig.Keypair.KeyID,
