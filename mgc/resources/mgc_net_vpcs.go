@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkVpc "github.com/MagaluCloud/magalu/mgc/lib/products/network/vpcs"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -26,8 +26,7 @@ type NetworkVPCModel struct {
 }
 
 type NetworkVPCResource struct {
-	sdkClient  *mgcSdk.Client
-	networkVPC networkVpc.Service
+	networkVPC netSDK.VPCService
 }
 
 func NewNetworkVPCResource() resource.Resource {
@@ -42,19 +41,13 @@ func (r *NetworkVPCResource) Configure(ctx context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkVPC = networkVpc.NewService(ctx, r.sdkClient)
+	r.networkVPC = netSDK.New(&dataConfig.CoreConfig).VPCs()
 }
 
 func (r *NetworkVPCResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -93,20 +86,19 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createdVPC, err := r.networkVPC.CreateContext(ctx, convertCreateTFModelToSDKModel(data),
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.CreateConfigs{}))
+	createdVPC, err := r.networkVPC.Create(ctx, netSDK.CreateVPCRequest{
+		Name:        data.Name.ValueString(),
+		Description: data.Description.ValueStringPointer(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create VPC", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	for startTime := time.Now(); time.Since(startTime) < NetworkPoolingTimeout; {
-		res, err := r.networkVPC.GetContext(ctx, networkVpc.GetParameters{
-			VpcId: createdVPC.Id,
-		},
-			tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.GetConfigs{}))
+		res, err := r.networkVPC.Get(ctx, createdVPC)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to get VPC", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 		if res.Status == "created" {
@@ -121,15 +113,8 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 		time.Sleep(10 * time.Second)
 	}
 
-	data.Id = types.StringValue(createdVPC.Id)
+	data.Id = types.StringValue(createdVPC)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func convertCreateTFModelToSDKModel(create NetworkVPCModel) networkVpc.CreateParameters {
-	return networkVpc.CreateParameters{
-		Name:        create.Name.ValueString(),
-		Description: create.Description.ValueStringPointer(),
-	}
 }
 
 func (r *NetworkVPCResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -139,13 +124,9 @@ func (r *NetworkVPCResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	vpc, err := r.networkVPC.GetContext(ctx, networkVpc.GetParameters{
-		VpcId: data.Id.ValueString(),
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.GetConfigs{}))
-
+	vpc, err := r.networkVPC.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read VPC", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -155,7 +136,7 @@ func (r *NetworkVPCResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	data.Name = types.StringPointerValue(vpc.Name)
 	data.Description = types.StringPointerValue(vpc.Description)
-	data.Id = types.StringPointerValue(vpc.Id)
+	data.Id = types.StringPointerValue(vpc.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -167,13 +148,9 @@ func (r *NetworkVPCResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.networkVPC.DeleteContext(ctx, networkVpc.DeleteParameters{
-		VpcId: data.Id.ValueString(),
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.DeleteConfigs{}))
-
+	err := r.networkVPC.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete VPC", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -183,21 +160,5 @@ func (r *NetworkVPCResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *NetworkVPCResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	vpcId := req.ID
-	data := NetworkVPCModel{}
-
-	vpc, err := r.networkVPC.GetContext(ctx, networkVpc.GetParameters{
-		VpcId: vpcId,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVpc.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import VPC", err.Error())
-		return
-	}
-
-	data.Id = types.StringPointerValue(vpc.Id)
-	data.Name = types.StringPointerValue(vpc.Name)
-	data.Description = types.StringPointerValue(vpc.Description)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
