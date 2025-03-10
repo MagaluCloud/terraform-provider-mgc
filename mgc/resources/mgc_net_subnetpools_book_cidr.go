@@ -3,9 +3,8 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSubnetpools "github.com/MagaluCloud/magalu/mgc/lib/products/network/subnetpools"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,8 +19,7 @@ type NetworkSubnetPoolsBookCIDRModel struct {
 }
 
 type NetworkSubnetPoolsBookCIDRResource struct {
-	sdkClient          *mgcSdk.Client
-	subnetPoolsService networkSubnetpools.Service
+	subnetPoolsService netSDK.SubnetPoolService
 }
 
 func NewNetworkSubnetPoolsBookCIDRResource() resource.Resource {
@@ -36,19 +34,13 @@ func (r *NetworkSubnetPoolsBookCIDRResource) Configure(ctx context.Context, req 
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.subnetPoolsService = networkSubnetpools.NewService(ctx, r.sdkClient)
+	r.subnetPoolsService = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
 }
 
 func (r *NetworkSubnetPoolsBookCIDRResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -87,12 +79,11 @@ func (r *NetworkSubnetPoolsBookCIDRResource) Create(ctx context.Context, req res
 		return
 	}
 
-	_, err := r.subnetPoolsService.CreateBookCidrContext(ctx, networkSubnetpools.CreateBookCidrParameters{
-		SubnetpoolId: data.SubnetPoolID.ValueString(),
-		Cidr:         data.CIDR.ValueStringPointer(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnetpools.CreateBookCidrConfigs{}))
+	_, err := r.subnetPoolsService.BookCIDR(ctx, data.SubnetPoolID.ValueString(), netSDK.BookCIDRRequest{
+		CIDR: data.CIDR.ValueStringPointer(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("failed to book CIDR", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -106,12 +97,11 @@ func (r *NetworkSubnetPoolsBookCIDRResource) Delete(ctx context.Context, req res
 		return
 	}
 
-	err := r.subnetPoolsService.CreateUnbookCidrContext(ctx, networkSubnetpools.CreateUnbookCidrParameters{
-		SubnetpoolId: data.SubnetPoolID.ValueString(),
-		Cidr:         data.CIDR.ValueStringPointer(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubnetpools.CreateUnbookCidrConfigs{}))
+	err := r.subnetPoolsService.UnbookCIDR(ctx, data.SubnetPoolID.ValueString(), netSDK.UnbookCIDRRequest{
+		CIDR: data.CIDR.ValueString(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("failed to delete CIDR", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
