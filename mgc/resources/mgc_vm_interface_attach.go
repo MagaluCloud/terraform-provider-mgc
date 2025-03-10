@@ -8,12 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/exp/slices"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVmInstances "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/instances"
-	sdkVmInstancesInterfaces "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/instances/network_interface"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 )
 
@@ -22,9 +18,7 @@ func NewVirtualMachineInterfaceAttachResource() resource.Resource {
 }
 
 type vmInterfaceAttach struct {
-	sdkClient   *mgcSdk.Client
-	vmInterface sdkVmInstancesInterfaces.Service
-	vmInstance  sdkVmInstances.Service
+	vmInstance computeSdk.InstanceService
 }
 
 type vmInterfaceAttachResourceModel struct {
@@ -41,19 +35,13 @@ func (r *vmInterfaceAttach) Configure(ctx context.Context, req resource.Configur
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.vmInterface = sdkVmInstancesInterfaces.NewService(ctx, r.sdkClient)
-	r.vmInstance = sdkVmInstances.NewService(ctx, r.sdkClient)
+	r.vmInstance = computeSdk.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *vmInterfaceAttach) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -85,20 +73,18 @@ func (r *vmInterfaceAttach) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	params := sdkVmInstancesInterfaces.AttachParameters{
-		Instance: sdkVmInstancesInterfaces.AttachParametersInstance{
-			Id: data.InstanceID.ValueString(),
+	err := r.vmInstance.AttachNetworkInterface(ctx, computeSdk.NICRequest{
+		Instance: computeSdk.IDOrName{
+			ID: data.InstanceID.ValueStringPointer(),
 		},
-		Network: sdkVmInstancesInterfaces.AttachParametersNetwork{
-			Interface: sdkVmInstancesInterfaces.AttachParametersNetworkInterface{
-				Id: data.InterfaceID.ValueString(),
+		Network: computeSdk.NICRequestInterface{
+			Interface: computeSdk.IDOrName{
+				ID: data.InterfaceID.ValueStringPointer(),
 			},
 		},
-	}
-
-	err := r.vmInterface.AttachContext(ctx, params, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstancesInterfaces.AttachConfigs{}))
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error attaching interface to VM", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -112,12 +98,9 @@ func (r *vmInterfaceAttach) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	getInstance, err := r.vmInstance.GetContext(ctx, sdkVmInstances.GetParameters{
-		Id:     data.InstanceID.ValueString(),
-		Expand: &sdkVmInstances.GetParametersExpand{"network"},
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.GetConfigs{}))
+	getInstance, err := r.vmInstance.Get(ctx, data.InstanceID.ValueString(), []string{"network"})
 	if err != nil {
-		resp.Diagnostics.AddError("Error getting VM instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -126,9 +109,14 @@ func (r *vmInterfaceAttach) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	hasInterfaceId := slices.ContainsFunc(*getInstance.Network.Interfaces, func(i sdkVmInstances.GetResultNetworkInterfacesItem) bool {
-		return i.Id == data.InterfaceID.ValueString()
-	})
+	hasInterfaceId := false
+
+	for _, iface := range *getInstance.Network.Interfaces {
+		if iface.ID == data.InterfaceID.ValueString() {
+			hasInterfaceId = true
+			break
+		}
+	}
 
 	if !hasInterfaceId {
 		resp.Diagnostics.AddError("Network interface not found on VM instance", "")
@@ -149,19 +137,18 @@ func (r *vmInterfaceAttach) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.vmInterface.DetachContext(ctx,
-		sdkVmInstancesInterfaces.DetachParameters{
-			Instance: sdkVmInstancesInterfaces.DetachParametersInstance{
-				Id: data.InstanceID.ValueString(),
-			},
-			Network: sdkVmInstancesInterfaces.DetachParametersNetwork{
-				Interface: sdkVmInstancesInterfaces.DetachParametersNetworkInterface{
-					Id: data.InterfaceID.ValueString(),
-				},
+	err := r.vmInstance.DetachNetworkInterface(ctx, computeSdk.NICRequest{
+		Instance: computeSdk.IDOrName{
+			ID: data.InstanceID.ValueStringPointer(),
+		},
+		Network: computeSdk.NICRequestInterface{
+			Interface: computeSdk.IDOrName{
+				ID: data.InterfaceID.ValueStringPointer(),
 			},
 		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstancesInterfaces.DetachConfigs{}))
+	})
+
 	if err != nil {
-		resp.Diagnostics.AddError("Error detaching interface from VM", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
 }

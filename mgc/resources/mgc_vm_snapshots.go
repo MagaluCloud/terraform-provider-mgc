@@ -9,11 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
+	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	sdkVmSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 )
 
@@ -27,8 +25,7 @@ func NewVirtualMachineSnapshotsResource() resource.Resource {
 }
 
 type vmSnapshots struct {
-	sdkClient   *mgcSdk.Client
-	vmSnapshots sdkVmSnapshots.Service
+	vmSnapshots computeSdk.SnapshotService
 }
 
 func (r *vmSnapshots) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -40,18 +37,13 @@ func (r *vmSnapshots) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.vmSnapshots = sdkVmSnapshots.NewService(ctx, r.sdkClient)
+	r.vmSnapshots = computeSdk.New(&dataConfig.CoreConfig).Snapshots()
 }
 
 type vmSnapshotsResourceModel struct {
@@ -97,18 +89,10 @@ func (r *vmSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	}
 }
 
-func (r *vmSnapshots) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	//do nothing
-}
-
-func (r *vmSnapshots) getVmSnapshot(ctx context.Context, id string) (sdkVmSnapshots.GetResult, error) {
-	getResult, err := r.vmSnapshots.GetContext(ctx,
-		sdkVmSnapshots.GetParameters{
-			Id: id,
-		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmSnapshots.GetConfigs{}))
+func (r *vmSnapshots) getVmSnapshot(ctx context.Context, id string) (*computeSdk.Snapshot, error) {
+	getResult, err := r.vmSnapshots.Get(ctx, id, []string{})
 	if err != nil {
-		return sdkVmSnapshots.GetResult{}, err
+		return nil, err
 	}
 	return getResult, nil
 }
@@ -119,15 +103,12 @@ func (r *vmSnapshots) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 	getResult, err := r.getVmSnapshot(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading VM",
-			"Could not read VM ID "+data.ID.ValueString()+": "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.ID = types.StringValue(getResult.Id)
-	data.Name = types.StringValue(*getResult.Name)
+	data.ID = types.StringValue(getResult.ID)
+	data.Name = types.StringValue(getResult.Name)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -141,23 +122,20 @@ func (r *vmSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createParams := sdkVmSnapshots.CreateParameters{
+	createParams := computeSdk.CreateSnapshotRequest{
 		Name: plan.Name.ValueString(),
-		Instance: sdkVmSnapshots.CreateParametersInstance{
-			Id: plan.VirtualMachineID.ValueString(),
+		Instance: computeSdk.IDOrName{
+			ID: plan.VirtualMachineID.ValueStringPointer(),
 		},
 	}
 
-	result, err := r.vmSnapshots.CreateContext(ctx, createParams, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmSnapshots.CreateConfigs{}))
+	result, err := r.vmSnapshots.Create(ctx, createParams)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Creating VM Snapshot",
-			"Could not create VM Snapshot: "+err.Error(),
-		)
+
 	}
 
 	plan.Name = types.StringValue(plan.Name.ValueString())
-	plan.ID = types.StringValue(result.Id)
+	plan.ID = types.StringValue(result)
 
 	plan.CreatedAt = types.StringValue(time.Now().Format(time.RFC850))
 	plan.UpdatedAt = types.StringValue(time.Now().Format(time.RFC850))
@@ -176,16 +154,9 @@ func (r *vmSnapshots) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	err := r.vmSnapshots.DeleteContext(ctx,
-		sdkVmSnapshots.DeleteParameters{
-			Id: data.ID.ValueString(),
-		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmSnapshots.DeleteConfigs{}))
+	err := r.vmSnapshots.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting VM Snapshot",
-			"Could not delete VM Snapshot "+data.ID.ValueString()+": "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

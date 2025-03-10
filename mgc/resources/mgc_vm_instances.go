@@ -16,9 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkVmInstances "github.com/MagaluCloud/magalu/mgc/lib/products/virtual_machine/instances"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -81,8 +79,7 @@ func NewVirtualMachineInstancesResource() resource.Resource {
 }
 
 type vmInstances struct {
-	sdkClient   *mgcSdk.Client
-	vmInstances sdkVmInstances.Service
+	vmInstances computeSdk.InstanceService
 }
 
 func (r *vmInstances) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -94,17 +91,13 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
-	r.vmInstances = sdkVmInstances.NewService(ctx, r.sdkClient)
+
+	r.vmInstances = computeSdk.New(&dataConfig.CoreConfig).Instances()
 }
 
 type vmInstancesResourceModel struct {
@@ -249,12 +242,9 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	getResult, err := r.vmInstances.GetContext(ctx, sdkVmInstances.GetParameters{
-		Id:     data.ID.ValueString(),
-		Expand: &sdkVmInstances.GetParametersExpand{"image", "machine-type", "network"},
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.GetConfigs{}))
+	getResult, err := r.vmInstances.Get(ctx, data.ID.ValueString(), []string{"image", "machine-type", "network"})
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading VM", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 	convertedData := r.toTerraformModel(ctx, getResult)
@@ -269,40 +259,43 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createdPublicIp := false
-	createParams := sdkVmInstances.CreateParameters{
+
+	createParams := computeSdk.CreateRequest{
 		Name: state.Name.ValueString(),
-		MachineType: sdkVmInstances.CreateParametersMachineType{
+		MachineType: computeSdk.IDOrName{
 			Name: state.MachineType.ValueStringPointer(),
 		},
-		Image: sdkVmInstances.CreateParametersImage{
+		Image: computeSdk.IDOrName{
 			Name: state.Image.ValueStringPointer(),
 		},
 		UserData:         state.UserData.ValueStringPointer(),
 		AvailabilityZone: state.AvailabilityZone.ValueStringPointer(),
 		SshKeyName:       state.SshKeyName.ValueStringPointer(),
-		Network: &sdkVmInstances.CreateParametersNetwork{
+		Network: &computeSdk.CreateParametersNetwork{
 			AssociatePublicIp: &createdPublicIp,
 		},
 	}
 
 	if state.VpcId.ValueString() != "" {
-		createParams.Network.Vpc = &sdkVmInstances.CreateParametersNetworkVpc{
-			Id: state.VpcId.ValueString(),
+		createParams.Network.Vpc = &computeSdk.CreateParametersNetworkVpc{
+			Vpc: computeSdk.IDOrName{
+				ID: state.VpcId.ValueStringPointer(),
+			},
 		}
 	}
 
-	createdId, err := r.vmInstances.CreateContext(ctx, createParams, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.CreateConfigs{}))
+	createdId, err := r.vmInstances.Create(ctx, createParams)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Creating VM", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdId.Id, StatusCompleted)
+	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdId, StatusCompleted)
 	if err != nil {
-		resp.Diagnostics.AddError("Error waiting for VM creation", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, *getResponse)
+	convertedResult := r.toTerraformModel(ctx, getResponse)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -316,25 +309,21 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if state.Name.ValueString() != plan.Name.ValueString() {
-		err := r.vmInstances.RenameContext(ctx, sdkVmInstances.RenameParameters{
-			Id:   plan.ID.ValueString(),
-			Name: plan.Name.ValueString(),
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.RenameConfigs{}))
+		err := r.vmInstances.Rename(ctx, plan.ID.ValueString(), plan.Name.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Error to rename vm", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	if state.MachineType.ValueString() != plan.MachineType.ValueString() {
-		err := r.vmInstances.RetypeContext(ctx, sdkVmInstances.RetypeParameters{
-			Id: plan.ID.ValueString(),
-			MachineType: sdkVmInstances.RetypeParametersMachineType{
+		err := r.vmInstances.Retype(ctx, plan.ID.ValueString(), computeSdk.RetypeRequest{
+			MachineType: computeSdk.IDOrName{
 				Name: plan.MachineType.ValueStringPointer(),
 			},
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.RetypeConfigs{}))
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Error on Update VM", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
@@ -345,7 +334,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, *getResult)
+	convertedResult := r.toTerraformModel(ctx, getResult)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -356,11 +345,8 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	err := r.vmInstances.DeleteContext(ctx,
-		sdkVmInstances.DeleteParameters{
-			Id: data.ID.ValueString(),
-		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.DeleteConfigs{}))
+	//false = not remove public ip
+	err := r.vmInstances.Delete(ctx, data.ID.ValueString(), false)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Deleting VM", err.Error())
 		return
@@ -375,26 +361,26 @@ func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateR
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
-func (r *vmInstances) toTerraformModel(ctx context.Context, server sdkVmInstances.GetResult) *vmInstancesResourceModel {
+func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance) *vmInstancesResourceModel {
 	interfaces := []VmInstancesNetworkInterfaceModel{}
 	if server.Network.Interfaces != nil {
 		for _, port := range *server.Network.Interfaces {
 			interfaces = append(interfaces, VmInstancesNetworkInterfaceModel{
-				ID:        types.StringValue(port.Id),
+				ID:        types.StringValue(port.ID),
 				Name:      types.StringValue(port.Name),
 				Ipv4:      types.StringPointerValue(port.AssociatedPublicIpv4),
 				LocalIpv4: types.StringValue(port.IpAddresses.PrivateIpv4),
-				Ipv6:      types.StringPointerValue(port.IpAddresses.PublicIpv6),
+				Ipv6:      types.StringPointerValue(&port.IpAddresses.PublicIpv6),
 				Primary:   types.BoolPointerValue(port.Primary),
 			})
 		}
 	}
 
 	data := vmInstancesResourceModel{
-		ID:                types.StringValue(server.Id),
+		ID:                types.StringValue(server.ID),
 		Name:              types.StringPointerValue(server.Name),
-		CreatedAt:         types.StringValue(server.CreatedAt),
-		SshKeyName:        types.StringPointerValue(server.SshKeyName),
+		CreatedAt:         types.StringValue(server.CreatedAt.Format(time.RFC3339)),
+		SshKeyName:        types.StringPointerValue(server.SSHKeyName),
 		MachineType:       types.StringPointerValue(server.MachineType.Name),
 		Image:             types.StringPointerValue(server.Image.Name),
 		UserData:          types.StringPointerValue(server.UserData),
@@ -403,13 +389,13 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server sdkVmInstance
 	}
 
 	if server.Network.Vpc != nil {
-		data.VpcId = types.StringValue(server.Network.Vpc.Id)
+		data.VpcId = types.StringValue(*server.Network.Vpc.ID)
 	}
 
 	return &data
 }
 
-func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*sdkVmInstances.GetResult, error) {
+func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, VmInstanceStatusTimeout)
 	defer cancel()
 
@@ -418,16 +404,13 @@ func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instan
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
-			instance, err := r.vmInstances.GetContext(ctx, sdkVmInstances.GetParameters{
-				Id:     instanceID,
-				Expand: &sdkVmInstances.GetParametersExpand{"image", "machine-type", "network"},
-			}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVmInstances.GetConfigs{}))
+			instance, err := r.vmInstances.Get(ctx, instanceID, []string{"image", "machine-type", "network"})
 			if err != nil {
 				return nil, err
 			}
 			currentStatus := InstanceStatus(instance.Status)
 			if currentStatus == status {
-				return &instance, nil
+				return instance, nil
 			}
 			if currentStatus.IsError() {
 				return nil, fmt.Errorf("instance %s is in error state: %s", instanceID, currentStatus)
