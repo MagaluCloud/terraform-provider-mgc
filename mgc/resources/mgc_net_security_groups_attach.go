@@ -5,9 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSecurityAttach "github.com/MagaluCloud/magalu/mgc/lib/products/network/ports"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,8 +21,7 @@ type NetworkSecurityGroupsAttachModel struct {
 }
 
 type NetworkSecurityGroupsAttachResource struct {
-	sdkClient                   *mgcSdk.Client
-	networkSecurityGroupsAttach networkSecurityAttach.Service
+	networkPorts netSDK.PortService
 }
 
 func NewNetworkSecurityGroupsAttachResource() resource.Resource {
@@ -38,19 +36,13 @@ func (r *NetworkSecurityGroupsAttachResource) Configure(ctx context.Context, req
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkSecurityGroupsAttach = networkSecurityAttach.NewService(ctx, r.sdkClient)
+	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
 }
 
 func (r *NetworkSecurityGroupsAttachResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -82,13 +74,9 @@ func (r *NetworkSecurityGroupsAttachResource) Read(ctx context.Context, req reso
 		return
 	}
 
-	getParam := networkSecurityAttach.GetParameters{
-		PortId: data.InterfaceID.ValueString(),
-	}
-	interfaceResponse, err := r.networkSecurityGroupsAttach.GetContext(ctx, getParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityAttach.GetConfigs{}))
+	interfaceResponse, err := r.networkPorts.Get(ctx, data.InterfaceID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get Network Interface", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -112,14 +100,9 @@ func (r *NetworkSecurityGroupsAttachResource) Create(ctx context.Context, req re
 		return
 	}
 
-	attachParam := networkSecurityAttach.AttachParameters{
-		PortId:          data.InterfaceID.ValueString(),
-		SecurityGroupId: data.SecurityGroupID.ValueString(),
-	}
-	err := r.networkSecurityGroupsAttach.AttachContext(ctx, attachParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityAttach.AttachConfigs{}))
+	err := r.networkPorts.AttachSecurityGroup(ctx, data.InterfaceID.ValueString(), data.SecurityGroupID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to attach Security Group", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -137,12 +120,7 @@ func (r *NetworkSecurityGroupsAttachResource) Delete(ctx context.Context, req re
 		return
 	}
 
-	detachParam := networkSecurityAttach.DetachParameters{
-		PortId:          data.InterfaceID.ValueString(),
-		SecurityGroupId: data.SecurityGroupID.ValueString(),
-	}
-	err := r.networkSecurityGroupsAttach.DetachContext(ctx, detachParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityAttach.DetachConfigs{}))
+	err := r.networkPorts.DetachSecurityGroup(ctx, data.InterfaceID.ValueString(), data.SecurityGroupID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to detach Security Group", err.Error())
 		return
@@ -150,40 +128,14 @@ func (r *NetworkSecurityGroupsAttachResource) Delete(ctx context.Context, req re
 }
 
 func (r *NetworkSecurityGroupsAttachResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	var securityGroupID, interfaceID string
 	input := strings.Split(req.ID, ",")
 	if len(input) != 2 {
 		resp.Diagnostics.AddError("Invalid ID", "ID must be in the format security_group_id,interface_id")
 		return
 	}
-	securityGroupID = input[0]
-	interfaceID = input[1]
 
-	data := NetworkSecurityGroupsAttachModel{
-		SecurityGroupID: types.StringValue(securityGroupID),
-		InterfaceID:     types.StringValue(interfaceID),
-	}
-
-	getParam := networkSecurityAttach.GetParameters{
-		PortId: interfaceID,
-	}
-	getResponse, err := r.networkSecurityGroupsAttach.GetContext(ctx, getParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityAttach.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import Security Group Attach", err.Error())
-		return
-	}
-
-	if getResponse.SecurityGroups == nil {
-		resp.Diagnostics.AddError("Interface without security groups", "Security Group is nil")
-		return
-	}
-
-	if !slices.Contains(*getResponse.SecurityGroups, securityGroupID) {
-		resp.Diagnostics.AddError("Security Group not attach to interface", "Security Group not found in interface")
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &NetworkSecurityGroupsAttachModel{
+		SecurityGroupID: types.StringValue(input[0]),
+		InterfaceID:     types.StringValue(input[1]),
+	})...)
 }
