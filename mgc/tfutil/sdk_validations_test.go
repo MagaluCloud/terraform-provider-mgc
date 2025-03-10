@@ -27,6 +27,7 @@ func TestParseSDKError_HTTPError(t *testing.T) {
 		},
 		Header: http.Header{
 			string(clientSDK.RequestIDKey): []string{"req-123"},
+			MgcTraceIDKey:                  []string{"trace-789"},
 		},
 	}
 	httpErr := &clientSDK.HTTPError{
@@ -40,7 +41,7 @@ func TestParseSDKError_HTTPError(t *testing.T) {
 		t.Errorf("expected message %q, got %q", simpleHttpError, msg)
 	}
 
-	expectedDetail := "HTTP Error:\n  Status: 404 Not Found\n  Body: {\"error\":\"not found\"}\n  URL: http://example.com/test\n  Request ID: req-123"
+	expectedDetail := "HTTP Error:\n  Status: 404 Not Found\n  Body: {\"error\":\"not found\"}\n  URL: http://example.com/test\n  Request ID: req-123\n  MGC Trace ID: trace-789"
 	if detail != expectedDetail {
 		t.Errorf("expected detail %q, got %q", expectedDetail, detail)
 	}
@@ -62,7 +63,7 @@ func TestParseSDKError_HTTPErrorNilResponse(t *testing.T) {
 		t.Errorf("expected message %q, got %q", simpleHttpError, msg)
 	}
 
-	expectedDetail := "HTTP Error:\n  Status: 500 Internal Server Error\n  Body: server error\n  URL: \n  Request ID: "
+	expectedDetail := "HTTP Error:\n  Status: 500 Internal Server Error\n  Body: server error\n  URL: \n  Request ID: \n  MGC Trace ID: "
 	if detail != expectedDetail {
 		t.Errorf("expected detail %q, got %q", expectedDetail, detail)
 	}
@@ -119,6 +120,7 @@ func TestParseSDKError_RetryErrorWithHTTPError(t *testing.T) {
 		},
 		Header: http.Header{
 			string(clientSDK.RequestIDKey): []string{"retry-456"},
+			MgcTraceIDKey:                  []string{"trace-123"},
 		},
 	}
 	httpErr := &clientSDK.HTTPError{
@@ -136,7 +138,7 @@ func TestParseSDKError_RetryErrorWithHTTPError(t *testing.T) {
 		t.Errorf("expected message %q, got %q", simpleMaxRetriesError, msg)
 	}
 
-	expectedHTTPDetail := "HTTP Error:\n  Status: 503 Service Unavailable\n  Body: unavailable\n  URL: http://example.com/retry\n  Request ID: retry-456"
+	expectedHTTPDetail := "HTTP Error:\n  Status: 503 Service Unavailable\n  Body: unavailable\n  URL: http://example.com/retry\n  Request ID: retry-456\n  MGC Trace ID: trace-123"
 	expectedDetail := fmt.Sprintf("Max HTTP retries exceeded at %d retries.\nLast error:\n %s", 3, expectedHTTPDetail)
 	if detail != expectedDetail {
 		t.Errorf("expected detail %q, got %q", expectedDetail, detail)
