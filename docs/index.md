@@ -21,6 +21,7 @@ With the provider you can manage:
 - Object Storage (Buckets)
 - Virtual Machines (instances, snapshots)
 - VPCs (subnets, security rules, public IPs)
+- SSH Keys
 
 The provider is in the development phase, so new Magalu Cloud features will be supported soon.
 
