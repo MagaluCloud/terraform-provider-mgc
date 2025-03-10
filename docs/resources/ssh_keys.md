@@ -31,3 +31,11 @@ resource "mgc_ssh_keys" "my_key" {
 ### Read-Only
 
 - `id` (String) ID of the SSH key
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import mgc_ssh_keys.my_key 123
+```
