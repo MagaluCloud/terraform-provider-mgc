@@ -3,11 +3,11 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSubenetpools "github.com/MagaluCloud/magalu/mgc/lib/products/network/subnetpools"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -26,8 +26,7 @@ type NetworkSubnetPoolModel struct {
 }
 
 type mgcNetworkSubnetpoolsResource struct {
-	sdkClient          *mgcSdk.Client
-	subnetPoolsService networkSubenetpools.Service
+	subnetPoolsService netSDK.SubnetPoolService
 }
 
 func NewNetworkSubnetpoolsResource() resource.Resource {
@@ -92,45 +91,34 @@ func (r *mgcNetworkSubnetpoolsResource) Configure(ctx context.Context, req resou
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.subnetPoolsService = networkSubenetpools.NewService(ctx, r.sdkClient)
+	r.subnetPoolsService = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
 }
 
 func (r *mgcNetworkSubnetpoolsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	data := NetworkSubnetPoolModel{}
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	creatParam := networkSubenetpools.CreateParameters{
-		Cidr:        data.Cidr.ValueStringPointer(),
+	subnetPool, err := r.subnetPoolsService.Create(ctx, netSDK.CreateSubnetPoolRequest{
+		CIDR:        data.Cidr.ValueStringPointer(),
 		Description: data.Description.ValueString(),
 		Name:        data.Name.ValueString(),
 		Type:        data.Type.ValueStringPointer(),
-	}
-
-	subnetPool, err := r.subnetPoolsService.CreateContext(ctx, creatParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubenetpools.CreateConfigs{}))
-
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create subnet pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.ID = types.StringValue(subnetPool.Id)
+	data.ID = types.StringValue(subnetPool)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -141,16 +129,13 @@ func (r *mgcNetworkSubnetpoolsResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	subnetPool, err := r.subnetPoolsService.GetContext(ctx, networkSubenetpools.GetParameters{
-		SubnetpoolId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubenetpools.GetConfigs{}))
-
+	subnetPool, err := r.subnetPoolsService.Get(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read subnet pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Cidr = types.StringPointerValue(subnetPool.Cidr)
+	data.Cidr = types.StringPointerValue(subnetPool.CIDR)
 	data.Description = types.StringValue(subnetPool.Description)
 	data.Name = types.StringValue(subnetPool.Name)
 	data.Type = types.StringValue(isDefaultConverter(subnetPool.IsDefault))
@@ -169,36 +154,15 @@ func (r *mgcNetworkSubnetpoolsResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.subnetPoolsService.DeleteContext(ctx, networkSubenetpools.DeleteParameters{
-		SubnetpoolId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubenetpools.DeleteConfigs{}))
-
+	err := r.subnetPoolsService.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete subnet pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
 
 func (r *mgcNetworkSubnetpoolsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	subnetPoolId := req.ID
-	data := NetworkSubnetPoolModel{}
-
-	subnetPool, err := r.subnetPoolsService.GetContext(ctx, networkSubenetpools.GetParameters{
-		SubnetpoolId: subnetPoolId,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSubenetpools.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import subnet pool", err.Error())
-		return
-	}
-
-	data.ID = types.StringValue(subnetPool.Id)
-	data.Cidr = types.StringPointerValue(subnetPool.Cidr)
-	data.Description = types.StringValue(subnetPool.Description)
-	data.Name = types.StringValue(subnetPool.Name)
-	data.Type = types.StringValue(isDefaultConverter(subnetPool.IsDefault))
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
 func isDefaultConverter(isDefault bool) string {

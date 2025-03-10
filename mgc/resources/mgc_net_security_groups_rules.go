@@ -3,13 +3,12 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkRules "github.com/MagaluCloud/magalu/mgc/lib/products/network/rules"
-	networkSecurityGroupsRules "github.com/MagaluCloud/magalu/mgc/lib/products/network/security_groups/rules"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -33,9 +32,7 @@ type NetworkSecurityGroupRuleModel struct {
 }
 
 type NetworkSecurityGroupsRulesResource struct {
-	sdkClient                  *mgcSdk.Client
-	networkSecurityGroupsRules networkSecurityGroupsRules.Service
-	networkRules               networkRules.Service
+	networkRules netSDK.RuleService
 }
 
 func NewNetworkSecurityGroupsRulesResource() resource.Resource {
@@ -139,20 +136,13 @@ func (r *NetworkSecurityGroupsRulesResource) Configure(ctx context.Context, req 
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkSecurityGroupsRules = networkSecurityGroupsRules.NewService(ctx, r.sdkClient)
-	r.networkRules = networkRules.NewService(ctx, r.sdkClient)
+	r.networkRules = netSDK.New(&dataConfig.CoreConfig).Rules()
 }
 
 func (r *NetworkSecurityGroupsRulesResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -166,25 +156,22 @@ func (r *NetworkSecurityGroupsRulesResource) Create(ctx context.Context, req res
 		return
 	}
 
-	createdRequest := networkSecurityGroupsRules.CreateParameters{
-		Description:     data.Description.ValueStringPointer(),
-		Direction:       data.Direction.ValueStringPointer(),
-		Ethertype:       data.Ethertype.ValueString(),
-		PortRangeMax:    tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMax.ValueInt64Pointer()),
-		PortRangeMin:    tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMin.ValueInt64Pointer()),
-		Protocol:        data.Protocol.ValueStringPointer(),
-		RemoteGroupId:   data.RemoteGroupId.ValueStringPointer(),
-		RemoteIpPrefix:  data.RemoteIpPrefix.ValueStringPointer(),
-		SecurityGroupId: data.SecurityGroupId.ValueString(),
-	}
-
-	created, err := r.networkSecurityGroupsRules.CreateContext(ctx, createdRequest, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroupsRules.CreateConfigs{}))
+	created, err := r.networkRules.Create(ctx, data.SecurityGroupId.ValueString(), netSDK.RuleCreateRequest{
+		Description:    data.Description.ValueStringPointer(),
+		Direction:      data.Direction.ValueStringPointer(),
+		EtherType:      data.Ethertype.ValueString(),
+		PortRangeMax:   tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMax.ValueInt64Pointer()),
+		PortRangeMin:   tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMin.ValueInt64Pointer()),
+		Protocol:       data.Protocol.ValueStringPointer(),
+		RemoteGroupID:  data.RemoteGroupId.ValueStringPointer(),
+		RemoteIPPrefix: data.RemoteIpPrefix.ValueStringPointer(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("unable to create security group rule", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringValue(created.Id)
+	data.Id = types.StringValue(created)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -195,23 +182,21 @@ func (r *NetworkSecurityGroupsRulesResource) Read(ctx context.Context, req resou
 		return
 	}
 
-	rule, err := r.networkRules.GetContext(ctx, networkRules.GetParameters{
-		RuleId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkRules.GetConfigs{}))
+	rule, err := r.networkRules.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to get security group rule", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	data.Description = types.StringPointerValue(rule.Description)
 	data.Direction = types.StringPointerValue(rule.Direction)
-	data.Ethertype = types.StringPointerValue(rule.Ethertype)
+	data.Ethertype = types.StringPointerValue(rule.EtherType)
 	data.PortRangeMax = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax))
 	data.PortRangeMin = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMin))
 	data.Protocol = types.StringPointerValue(rule.Protocol)
-	data.RemoteGroupId = types.StringPointerValue(rule.RemoteGroupId)
-	data.RemoteIpPrefix = types.StringPointerValue(rule.RemoteIpPrefix)
-	data.SecurityGroupId = types.StringPointerValue(rule.SecurityGroupId)
+	data.RemoteGroupId = types.StringPointerValue(rule.RemoteGroupID)
+	data.RemoteIpPrefix = types.StringPointerValue(rule.RemoteIPPrefix)
+	data.SecurityGroupId = types.StringPointerValue(rule.SecurityGroupID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
@@ -223,11 +208,9 @@ func (r *NetworkSecurityGroupsRulesResource) Delete(ctx context.Context, req res
 		return
 	}
 
-	err := r.networkRules.DeleteContext(ctx, networkRules.DeleteParameters{
-		RuleId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkRules.DeleteConfigs{}))
+	err := r.networkRules.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("unable to delete security group rule", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -237,27 +220,5 @@ func (r *NetworkSecurityGroupsRulesResource) Update(ctx context.Context, req res
 }
 
 func (r *NetworkSecurityGroupsRulesResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	ruleId := req.ID
-	data := NetworkSecurityGroupRuleModel{}
-
-	rule, err := r.networkRules.GetContext(ctx, networkRules.GetParameters{
-		RuleId: ruleId,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkRules.GetConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("unable to import security group rule", err.Error())
-		return
-	}
-
-	data.Id = types.StringPointerValue(rule.Id)
-	data.Description = types.StringPointerValue(rule.Description)
-	data.Direction = types.StringPointerValue(rule.Direction)
-	data.Ethertype = types.StringPointerValue(rule.Ethertype)
-	data.PortRangeMax = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax))
-	data.PortRangeMin = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMin))
-	data.Protocol = types.StringPointerValue(rule.Protocol)
-	data.RemoteGroupId = types.StringPointerValue(rule.RemoteGroupId)
-	data.RemoteIpPrefix = types.StringPointerValue(rule.RemoteIpPrefix)
-	data.SecurityGroupId = types.StringPointerValue(rule.SecurityGroupId)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }

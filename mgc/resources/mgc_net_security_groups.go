@@ -3,10 +3,10 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkSecurityGroups "github.com/MagaluCloud/magalu/mgc/lib/products/network/security_groups"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -24,8 +24,7 @@ type NetworkSecurityGroupsModel struct {
 }
 
 type NetworkSecurityGroupsResource struct {
-	sdkClient             *mgcSdk.Client
-	networkSecurityGroups networkSecurityGroups.Service
+	networkSecurityGroups netSDK.SecurityGroupService
 }
 
 func NewNetworkSecurityGroupsResource() resource.Resource {
@@ -40,19 +39,13 @@ func (r *NetworkSecurityGroupsResource) Configure(ctx context.Context, req resou
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkSecurityGroups = networkSecurityGroups.NewService(ctx, r.sdkClient)
+	r.networkSecurityGroups = netSDK.New(&dataConfig.CoreConfig).SecurityGroups()
 }
 
 func (r *NetworkSecurityGroupsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -97,12 +90,9 @@ func (r *NetworkSecurityGroupsResource) Read(ctx context.Context, req resource.R
 	var data NetworkSecurityGroupsModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	sc, err := r.networkSecurityGroups.GetContext(ctx, networkSecurityGroups.GetParameters{
-		SecurityGroupId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroups.GetConfigs{}))
-
+	sc, err := r.networkSecurityGroups.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read Security Group", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -122,24 +112,18 @@ func (r *NetworkSecurityGroupsResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	created, err := r.networkSecurityGroups.CreateContext(ctx, networkSecurityGroupTerraformModelToSdk(data),
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroups.CreateConfigs{}))
-
+	created, err := r.networkSecurityGroups.Create(ctx, netSDK.SecurityGroupCreateRequest{
+		Name:             data.Name.ValueString(),
+		Description:      data.Description.ValueStringPointer(),
+		SkipDefaultRules: data.DisableDefaultRules.ValueBoolPointer(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create Security Group", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringValue(created.Id)
+	data.Id = types.StringValue(created)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
-}
-
-func networkSecurityGroupTerraformModelToSdk(create NetworkSecurityGroupsModel) networkSecurityGroups.CreateParameters {
-	return networkSecurityGroups.CreateParameters{
-		Name:             create.Name.ValueString(),
-		Description:      create.Description.ValueStringPointer(),
-		SkipDefaultRules: create.DisableDefaultRules.ValueBoolPointer(),
-	}
 }
 
 func (r *NetworkSecurityGroupsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -149,12 +133,9 @@ func (r *NetworkSecurityGroupsResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.networkSecurityGroups.DeleteContext(ctx, networkSecurityGroups.DeleteParameters{
-		SecurityGroupId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroups.DeleteConfigs{}))
-
+	err := r.networkSecurityGroups.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete Security Group", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -164,20 +145,5 @@ func (r *NetworkSecurityGroupsResource) Update(ctx context.Context, req resource
 }
 
 func (r *NetworkSecurityGroupsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	scID := req.ID
-	data := NetworkSecurityGroupsModel{}
-	sc, err := r.networkSecurityGroups.GetContext(ctx, networkSecurityGroups.GetParameters{
-		SecurityGroupId: scID,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkSecurityGroups.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import Security Group", err.Error())
-		return
-	}
-
-	data.Id = types.StringPointerValue(sc.Id)
-	data.Name = types.StringPointerValue(sc.Name)
-	data.Description = types.StringPointerValue(sc.Description)
-	data.DisableDefaultRules = types.BoolValue(false)
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
