@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	github.com/MagaluCloud/magalu/mgc/lib v0.33.3
 	github.com/MagaluCloud/magalu/mgc/sdk v0.33.3
-	github.com/MagaluCloud/mgc-sdk-go v0.3.18
+	github.com/MagaluCloud/mgc-sdk-go v0.3.22
 	github.com/hashicorp/terraform-plugin-framework v1.14.1
 	github.com/hashicorp/terraform-plugin-framework-validators v0.17.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
@@ -92,7 +92,7 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect

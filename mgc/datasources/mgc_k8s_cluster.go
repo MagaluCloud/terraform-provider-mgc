@@ -390,15 +390,15 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 		// Zone is not directly available in GetResult, set to nil
 		Zone:        types.StringNull(),
 		Description: types.StringPointerValue(getResult.Description),
-		CreatedAt:   types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&getResult.CreatedAt)),
+		CreatedAt:   types.StringPointerValue(tfutil.ConvertTimeToRFC3339(getResult.CreatedAt)),
 		Region:      types.StringValue(*getResult.Region),
 		UpdatedAt:   types.StringPointerValue(tfutil.ConvertTimeToRFC3339(getResult.UpdatedAt)),
 	}
 
 	// Convert AllowedCIDRs
 
-	kubernetesCluster.AllowedCIDRs = make([]types.String, len(getResult.AllowedCIDRs))
-	for i, cidr := range getResult.AllowedCIDRs {
+	kubernetesCluster.AllowedCIDRs = make([]types.String, len(*getResult.AllowedCIDRs))
+	for i, cidr := range *getResult.AllowedCIDRs {
 		kubernetesCluster.AllowedCIDRs[i] = types.StringPointerValue(&cidr)
 	}
 
@@ -431,8 +431,8 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 	kubernetesCluster.State = types.StringValue(getResult.Status.State)
 
 	// Convert NodePools
-	kubernetesCluster.NodePools = make([]tfutil.NodePool, len(getResult.NodePools))
-	for i, np := range getResult.NodePools {
+	kubernetesCluster.NodePools = make([]tfutil.NodePool, len(*getResult.NodePools))
+	for i, np := range *getResult.NodePools {
 		kubernetesCluster.NodePools[i] = tfutil.ConvertToNodePoolSDK(np)
 	}
 
@@ -450,7 +450,7 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	controlplane := &Controlplane{
-		CreatedAt:  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&cp.CreatedAt)),
+		CreatedAt:  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(cp.CreatedAt)),
 		ID:         types.StringValue(cp.ID),
 		DiskSize:   types.Int64Value(int64(cp.InstanceTemplate.DiskSize)),
 		DiskType:   types.StringValue(cp.InstanceTemplate.DiskType),
@@ -463,29 +463,33 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 		UpdatedAt:  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(cp.UpdatedAt)),
 	}
 	if cp.AutoScale != nil {
-		controlplane.MaxReplicas = types.Int64Value(int64(cp.AutoScale.MaxReplicas))
-		controlplane.MinReplicas = types.Int64Value(int64(cp.AutoScale.MinReplicas))
+		controlplane.MaxReplicas = types.Int64Value(int64(*cp.AutoScale.MaxReplicas))
+		controlplane.MinReplicas = types.Int64Value(int64(*cp.AutoScale.MinReplicas))
 	}
 
 	// Convert Labels
 	controlplane.Labels = types.MapNull(types.StringType)
 
 	// Convert SecurityGroups
-	if len(cp.SecurityGroups) > 0 {
-		controlplane.SecurityGroups = make([]types.String, len(cp.SecurityGroups))
-		for i, sg := range cp.SecurityGroups {
+	if len(*cp.SecurityGroups) > 0 {
+		controlplane.SecurityGroups = make([]types.String, len(*cp.SecurityGroups))
+		for i, sg := range *cp.SecurityGroups {
 			controlplane.SecurityGroups[i] = types.StringPointerValue(&sg)
 		}
 	}
 
 	// Convert StatusMessages
-	controlplane.StatusMessages = make([]types.String, 1)
-	controlplane.StatusMessages[0] = types.StringValue(cp.Status.Message)
+	if len(cp.Status.Messages) > 0 {
+		controlplane.StatusMessages = make([]types.String, len(cp.Status.Messages))
+		for i, msg := range cp.Status.Messages {
+			controlplane.StatusMessages[i] = types.StringValue(msg)
+		}
+	}
 
 	// Convert Tags
-	if len(cp.Tags) > 0 {
-		controlplane.Tags = make([]types.String, len(cp.Tags))
-		for i, tag := range cp.Tags {
+	if len(*cp.Tags) > 0 {
+		controlplane.Tags = make([]types.String, len(*cp.Tags))
+		for i, tag := range *cp.Tags {
 			controlplane.Tags[i] = types.StringPointerValue(&tag)
 		}
 	}
@@ -503,9 +507,9 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	}
 
 	// Convert Zone
-	if len(cp.Zone) > 0 {
-		controlplane.Zone = make([]types.String, len(cp.Zone))
-		for i, zone := range cp.Zone {
+	if len(*cp.Zone) > 0 {
+		controlplane.Zone = make([]types.String, len(*cp.Zone))
+		for i, zone := range *cp.Zone {
 			controlplane.Zone[i] = types.StringPointerValue(&zone)
 		}
 	}

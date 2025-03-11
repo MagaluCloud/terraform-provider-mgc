@@ -215,7 +215,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		ID:                         types.StringValue(original.ID),
 		ClusterID:                  types.StringValue(clusterID),
 		Name:                       types.StringValue(original.Name),
-		CreatedAt:                  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(&original.CreatedAt)),
+		CreatedAt:                  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(original.CreatedAt)),
 		UpdatedAt:                  types.StringPointerValue(tfutil.ConvertTimeToRFC3339(original.UpdatedAt)),
 		Replicas:                   types.Int64Value(int64(original.Replicas)),
 		InstanceTemplateDiskSize:   types.Int64Value(int64(original.InstanceTemplate.DiskSize)),
@@ -230,27 +230,31 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	}
 
 	if original.AutoScale != nil {
-		flattened.AutoScaleMaxReplicas = types.Int64Value(int64(original.AutoScale.MaxReplicas))
-		flattened.AutoScaleMinReplicas = types.Int64Value(int64(original.AutoScale.MinReplicas))
+		flattened.AutoScaleMaxReplicas = types.Int64Value(int64(*original.AutoScale.MaxReplicas))
+		flattened.AutoScaleMinReplicas = types.Int64Value(int64(*original.AutoScale.MinReplicas))
 	}
 
 	labelsMap, _ := types.MapValueFrom(ctx, types.StringType, original.Labels)
 	flattened.Labels = labelsMap
 
-	if len(original.SecurityGroups) > 0 {
-		flattened.SecurityGroups = make([]types.String, len(original.SecurityGroups))
-		for i, sg := range original.SecurityGroups {
+	if len(*original.SecurityGroups) > 0 {
+		flattened.SecurityGroups = make([]types.String, len(*original.SecurityGroups))
+		for i, sg := range *original.SecurityGroups {
 			strVal := types.StringValue(sg)
 			flattened.SecurityGroups[i] = strVal
 		}
 	}
 
-	flattened.StatusMessages = make([]types.String, 1)
-	flattened.StatusMessages[0] = types.StringValue(original.Status.Message)
+	if len(original.Status.Messages) > 0 {
+		flattened.StatusMessages = make([]types.String, len(original.Status.Messages))
+		for i, msg := range original.Status.Messages {
+			flattened.StatusMessages[i] = types.StringValue(msg)
+		}
+	}
 
-	if len(original.Tags) > 0 {
-		flattened.Tags = make([]types.String, len(original.Tags))
-		for i, tag := range original.Tags {
+	if len(*original.Tags) > 0 {
+		flattened.Tags = make([]types.String, len(*original.Tags))
+		for i, tag := range *original.Tags {
 			flattened.Tags[i] = types.StringValue(tag)
 		}
 	}
@@ -266,9 +270,9 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	if len(original.Zone) > 0 {
-		flattened.Zone = make([]types.String, len(original.Zone))
-		for i, zone := range original.Zone {
+	if len(*original.Zone) > 0 {
+		flattened.Zone = make([]types.String, len(*original.Zone))
+		for i, zone := range *original.Zone {
 			flattened.Zone[i] = types.StringValue(zone)
 		}
 	}

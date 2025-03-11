@@ -35,23 +35,23 @@ func ConvertToNodePoolSDK(np sdkK8s.NodePool) NodePool {
 	nodePool := NodePool{
 		Name:      types.StringValue(np.Name),
 		Replicas:  types.Int64Value(int64(np.Replicas)),
-		CreatedAt: types.StringPointerValue(ConvertTimeToRFC3339(&np.CreatedAt)),
+		CreatedAt: types.StringPointerValue(ConvertTimeToRFC3339(np.CreatedAt)),
 		UpdatedAt: types.StringPointerValue(ConvertTimeToRFC3339(np.UpdatedAt)),
 		ID:        types.StringValue(np.ID),
 	}
 
 	if np.AutoScale != nil {
-		nodePool.MaxReplicas = types.Int64Value(int64(np.AutoScale.MaxReplicas))
-		nodePool.MinReplicas = types.Int64Value(int64(np.AutoScale.MinReplicas))
+		nodePool.MaxReplicas = types.Int64Value(int64(*np.AutoScale.MaxReplicas))
+		nodePool.MinReplicas = types.Int64Value(int64(*np.AutoScale.MinReplicas))
 	}
 
 	if np.InstanceTemplate.Flavor.Name != "" {
 		nodePool.Flavor = types.StringValue(np.InstanceTemplate.Flavor.Name)
 	}
 
-	if len(np.Tags) > 0 {
-		tags := make([]types.String, len(np.Tags))
-		for i, tag := range np.Tags {
+	if len(*np.Tags) > 0 {
+		tags := make([]types.String, len(*np.Tags))
+		for i, tag := range *np.Tags {
 			tags[i] = types.StringValue(tag)
 		}
 		if len(tags) > 0 {
