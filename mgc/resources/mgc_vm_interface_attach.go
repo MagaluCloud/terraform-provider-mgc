@@ -98,7 +98,7 @@ func (r *vmInterfaceAttach) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	getInstance, err := r.vmInstance.Get(ctx, data.InstanceID.ValueString(), []string{"network"})
+	getInstance, err := r.vmInstance.Get(ctx, data.InstanceID.ValueString(), []string{computeSdk.InstanceNetworkExpand})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

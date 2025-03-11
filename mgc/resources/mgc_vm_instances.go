@@ -27,6 +27,8 @@ const (
 
 type InstanceStatus string
 
+var imageExpands []string = []string{computeSdk.InstanceImageExpand, computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
+
 const (
 	StatusAttachingNic                 InstanceStatus = "attaching_nic"
 	StatusDetachingNic                 InstanceStatus = "detaching_nic"
@@ -242,7 +244,7 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	getResult, err := r.vmInstances.Get(ctx, data.ID.ValueString(), []string{"image", "machine-type", "network"})
+	getResult, err := r.vmInstances.Get(ctx, data.ID.ValueString(), imageExpands)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -348,7 +350,7 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 	//false = not remove public ip
 	err := r.vmInstances.Delete(ctx, data.ID.ValueString(), false)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Deleting VM", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -404,7 +406,7 @@ func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instan
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
-			instance, err := r.vmInstances.Get(ctx, instanceID, []string{"image", "machine-type", "network"})
+			instance, err := r.vmInstances.Get(ctx, instanceID, imageExpands)
 			if err != nil {
 				return nil, err
 			}

@@ -131,7 +131,8 @@ func (r *vmSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 
 	result, err := r.vmSnapshots.Create(ctx, createParams)
 	if err != nil {
-
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
 	}
 
 	plan.Name = types.StringValue(plan.Name.ValueString())
