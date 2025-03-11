@@ -4,9 +4,8 @@ import (
 	"context"
 	"strings"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkPIP "github.com/MagaluCloud/magalu/mgc/lib/products/network/public_ips"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,8 +20,7 @@ type NetworkPublicIAttachPModel struct {
 }
 
 type NetworkPublicIPAttachResource struct {
-	sdkClient  *mgcSdk.Client
-	networkPIP networkPIP.Service
+	networkPIP netSDK.PublicIPService
 }
 
 func NewNetworkPublicIPAttachResource() resource.Resource {
@@ -37,16 +35,13 @@ func (r *NetworkPublicIPAttachResource) Configure(ctx context.Context, req resou
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(err.Error(), errDetail.Error())
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkPIP = networkPIP.NewService(ctx, r.sdkClient)
+	r.networkPIP = netSDK.New(&dataConfig.CoreConfig).PublicIPs()
 }
 
 func (r *NetworkPublicIPAttachResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -78,13 +73,9 @@ func (r *NetworkPublicIPAttachResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	err := r.networkPIP.AttachContext(ctx, networkPIP.AttachParameters{
-		PublicIpId: model.PublicIpID.ValueString(),
-		PortId:     model.InterfaceID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.AttachConfigs{}))
-
+	err := r.networkPIP.AttachToPort(ctx, model.PublicIpID.ValueString(), model.InterfaceID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error attaching public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -98,13 +89,9 @@ func (r *NetworkPublicIPAttachResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.networkPIP.DetachContext(ctx, networkPIP.DetachParameters{
-		PublicIpId: model.PublicIpID.ValueString(),
-		PortId:     model.InterfaceID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.DetachConfigs{}))
-
+	err := r.networkPIP.DetachFromPort(ctx, model.PublicIpID.ValueString(), model.InterfaceID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error detaching public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -120,33 +107,25 @@ func (r *NetworkPublicIPAttachResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	pip, err := r.networkPIP.GetContext(ctx, networkPIP.GetParameters{
-		PublicIpId: model.PublicIpID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.GetConfigs{}))
-
+	pip, err := r.networkPIP.Get(ctx, model.PublicIpID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	model.InterfaceID = types.StringPointerValue(pip.PortId)
+	model.InterfaceID = types.StringPointerValue(pip.PortID)
 	resp.State.Set(ctx, &model)
 }
 
 func (r *NetworkPublicIPAttachResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	var model NetworkPublicIAttachPModel
-	input := req.ID
-	if input == "" {
-		resp.Diagnostics.AddError("Invalid ID", "ID must be in the format public_ip_id,interface_id")
-		return
-	}
-	parts := strings.Split(input, ",")
+	parts := strings.Split(req.ID, ",")
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError("Invalid ID", "ID must be in the format public_ip_id,interface_id")
 		return
 	}
 
-	model.PublicIpID = types.StringValue(parts[0])
-	model.InterfaceID = types.StringValue(parts[1])
-	resp.State.Set(ctx, &model)
+	resp.State.Set(ctx, &NetworkPublicIAttachPModel{
+		PublicIpID:  types.StringValue(parts[0]),
+		InterfaceID: types.StringValue(parts[1]),
+	})
 }

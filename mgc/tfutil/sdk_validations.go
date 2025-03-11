@@ -12,21 +12,25 @@ const (
 	simpleValidationError = "Request validation failed"
 	simpleGenericError    = "An unexpected error occurred"
 	simpleMaxRetriesError = "Max HTTP retries exceeded"
+
+	MgcTraceIDKey = "x-mgc-trace-id"
 )
 
 type HttpErrorResponse struct {
-	Status    string
-	Body      string
-	URL       string
-	RequestID string
+	Status     string
+	Body       string
+	URL        string
+	RequestID  string
+	MgcTraceID string
 }
 
 func (e HttpErrorResponse) String() string {
-	return fmt.Sprintf("HTTP Error:\n  Status: %s\n  Body: %s\n  URL: %s\n  Request ID: %s",
+	return fmt.Sprintf("HTTP Error:\n  Status: %s\n  Body: %s\n  URL: %s\n  Request ID: %s\n  MGC Trace ID: %s",
 		e.Status,
 		e.Body,
 		e.URL,
 		e.RequestID,
+		e.MgcTraceID,
 	)
 }
 
@@ -49,6 +53,9 @@ func buildFromSDKError(err *clientSDK.HTTPError) (HttpErrorResponse, error) {
 		for key, value := range err.Response.Header {
 			if strings.ToLower(key) == string(clientSDK.RequestIDKey) {
 				e.RequestID = value[0]
+			}
+			if strings.ToLower(key) == string(MgcTraceIDKey) {
+				e.MgcTraceID = value[0]
 			}
 		}
 	}
