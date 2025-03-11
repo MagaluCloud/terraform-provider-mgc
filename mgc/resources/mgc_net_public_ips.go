@@ -3,11 +3,10 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	networkPIP "github.com/MagaluCloud/magalu/mgc/lib/products/network/public_ips"
-	networkVPCPIP "github.com/MagaluCloud/magalu/mgc/lib/products/network/vpcs/public_ips"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -23,9 +22,8 @@ type NetworkPublicIPModel struct {
 }
 
 type NetworkPublicIPResource struct {
-	sdkClient     *mgcSdk.Client
-	networkPIP    networkPIP.Service
-	networkVPCPIP networkVPCPIP.Service
+	networkPIP netSDK.PublicIPService
+	networkVpc netSDK.VPCService
 }
 
 func NewNetworkPublicIPResource() resource.Resource {
@@ -40,17 +38,14 @@ func (r *NetworkPublicIPResource) Configure(ctx context.Context, req resource.Co
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(err.Error(), errDetail.Error())
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.networkPIP = networkPIP.NewService(ctx, r.sdkClient)
-	r.networkVPCPIP = networkVPCPIP.NewService(ctx, r.sdkClient)
+	r.networkPIP = netSDK.New(&dataConfig.CoreConfig).PublicIPs()
+	r.networkVpc = netSDK.New(&dataConfig.CoreConfig).VPCs()
 }
 
 func (r *NetworkPublicIPResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -96,26 +91,21 @@ func (r *NetworkPublicIPResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	createdPIP, err := r.networkVPCPIP.CreateContext(ctx, networkVPCPIP.CreateParameters{
+	createdPIP, err := r.networkVpc.CreatePublicIP(ctx, data.VPCId.ValueString(), netSDK.PublicIPCreateRequest{
 		Description: data.Description.ValueStringPointer(),
-		VpcId:       data.VPCId.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkVPCPIP.CreateConfigs{}))
-
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create Public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	pip, err := r.networkPIP.GetContext(ctx, networkPIP.GetParameters{
-		PublicIpId: createdPIP.Id,
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.GetConfigs{}))
+	pip, err := r.networkPIP.Get(ctx, createdPIP)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch public IP address", err.Error())
 	}
 
-	data.Id = types.StringPointerValue(pip.Id)
-	data.PublicIP = types.StringPointerValue(pip.PublicIp)
+	data.Id = types.StringPointerValue(pip.ID)
+	data.PublicIP = types.StringPointerValue(pip.PublicIP)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -126,18 +116,14 @@ func (r *NetworkPublicIPResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	pip, err := r.networkPIP.GetContext(ctx, networkPIP.GetParameters{
-		PublicIpId: data.Id.ValueString(),
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.GetConfigs{}))
-
+	pip, err := r.networkPIP.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringPointerValue(pip.Id)
-	data.PublicIP = types.StringPointerValue(pip.PublicIp)
+	data.Id = types.StringPointerValue(pip.ID)
+	data.PublicIP = types.StringPointerValue(pip.PublicIP)
 	data.Description = types.StringPointerValue(pip.Description)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
@@ -150,17 +136,11 @@ func (r *NetworkPublicIPResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.networkPIP.DeleteContext(ctx, networkPIP.DeleteParameters{
-		PublicIpId: data.Id.ValueString(),
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.DeleteConfigs{}))
-
+	err := r.networkPIP.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete public IP", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-
-	resp.State.RemoveResource(ctx)
 }
 
 func (r *NetworkPublicIPResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -168,21 +148,5 @@ func (r *NetworkPublicIPResource) Update(ctx context.Context, req resource.Updat
 }
 
 func (r *NetworkPublicIPResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	id := req.ID
-	data := NetworkPublicIPModel{}
-
-	pip, err := r.networkPIP.GetContext(ctx, networkPIP.GetParameters{
-		PublicIpId: id,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, networkPIP.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to import public IP", err.Error())
-		return
-	}
-
-	data.Id = types.StringPointerValue(pip.Id)
-	data.PublicIP = types.StringPointerValue(pip.PublicIp)
-	data.Description = types.StringPointerValue(pip.Description)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
