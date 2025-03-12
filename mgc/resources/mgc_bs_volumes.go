@@ -12,12 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
-	sdkBlockStorageVolumes "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/volumes"
 )
 
 const (
@@ -66,8 +64,7 @@ func NewBlockStorageVolumesResource() resource.Resource {
 }
 
 type bsVolumes struct {
-	sdkClient *mgcSdk.Client
-	bsVolumes sdkBlockStorageVolumes.Service
+	bsVolumes storageSDK.VolumeService
 }
 
 func (r *bsVolumes) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -78,19 +75,13 @@ func (r *bsVolumes) Configure(ctx context.Context, req resource.ConfigureRequest
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.bsVolumes = sdkBlockStorageVolumes.NewService(ctx, r.sdkClient)
+	r.bsVolumes = storageSDK.New(&dataConfig.CoreConfig).Volumes()
 }
 
 type bsVolumesResourceModel struct {
@@ -170,16 +161,13 @@ func (r *bsVolumes) Read(ctx context.Context, req resource.ReadRequest, resp *re
 	plan := &bsVolumesResourceModel{}
 	resp.Diagnostics.Append(req.State.Get(ctx, &plan)...)
 
-	getResult, err := r.bsVolumes.GetContext(ctx, sdkBlockStorageVolumes.GetParameters{
-		Id:     plan.ID.ValueString(),
-		Expand: &sdkBlockStorageVolumes.GetParametersExpand{"volume_type"},
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.GetConfigs{}))
+	getResult, err := r.bsVolumes.Get(ctx, plan.ID.ValueString(), []string{storageSDK.VolumeTypeExpand})
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading block storage", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	convertedResult := r.toTerraformModel(getResult, plan.SnapshotID.ValueStringPointer())
+	convertedResult := r.toTerraformModel(*getResult, plan.SnapshotID.ValueStringPointer())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -190,32 +178,31 @@ func (r *bsVolumes) Create(ctx context.Context, req resource.CreateRequest, resp
 		return
 	}
 
-	createParam := sdkBlockStorageVolumes.CreateParameters{
+	createParam := storageSDK.CreateVolumeRequest{
 		Name:      state.Name.ValueString(),
 		Size:      int(state.Size.ValueInt64()),
 		Encrypted: state.Encrypted.ValueBoolPointer(),
-		Type: sdkBlockStorageVolumes.CreateParametersType{
+		Type: storageSDK.IDOrName{
 			Name: state.Type.ValueStringPointer(),
 		},
 	}
 	if !state.SnapshotID.IsNull() {
-		createParam.Snapshot = &sdkBlockStorageVolumes.CreateParametersSnapshot{
-			Id: state.SnapshotID.ValueStringPointer(),
+		createParam.Snapshot = &storageSDK.IDOrName{
+			ID: state.SnapshotID.ValueStringPointer(),
 		}
 	}
 	if !state.AvailabilityZone.IsUnknown() {
 		createParam.AvailabilityZone = state.AvailabilityZone.ValueStringPointer()
 	}
 
-	createResult, err := r.bsVolumes.CreateContext(ctx, createParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.CreateConfigs{}))
+	createResult, err := r.bsVolumes.Create(ctx, createParam)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating volume", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	getResult, err := r.waitUntilVolumeStatusMatches(ctx, *createResult.Id, Completed)
+	getResult, err := r.waitUntilVolumeStatusMatches(ctx, createResult, Completed)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading block storage", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 	convertedResult := r.toTerraformModel(*getResult, state.SnapshotID.ValueStringPointer())
@@ -233,52 +220,46 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 	}
 
 	if planData.Name.ValueString() != state.Name.ValueString() {
-		err := r.bsVolumes.RenameContext(ctx, sdkBlockStorageVolumes.RenameParameters{
-			Id:   state.ID.ValueString(),
-			Name: planData.Name.ValueString(),
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.RenameConfigs{}))
+		err := r.bsVolumes.Rename(ctx, planData.ID.ValueString(), planData.Name.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Error renaming block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
 		if err != nil {
-			resp.Diagnostics.AddError("Server side error renaming block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	if planData.Type.ValueString() != state.Type.ValueString() {
-		err := r.bsVolumes.RetypeContext(ctx, sdkBlockStorageVolumes.RetypeParameters{
-			Id: planData.ID.ValueString(),
-			NewType: sdkBlockStorageVolumes.RetypeParametersNewType{
+		err := r.bsVolumes.Retype(ctx, planData.ID.ValueString(), storageSDK.RetypeVolumeRequest{
+			NewType: storageSDK.IDOrName{
 				Name: planData.Type.ValueStringPointer(),
 			},
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.RetypeConfigs{}))
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Error to retype the block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
 		if err != nil {
-			resp.Diagnostics.AddError("Server side error retyping block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	if planData.Size.ValueInt64() > state.Size.ValueInt64() {
-		err := r.bsVolumes.ExtendContext(ctx, sdkBlockStorageVolumes.ExtendParameters{
-			Id:   planData.ID.ValueString(),
+		err := r.bsVolumes.Extend(ctx, planData.ID.ValueString(), storageSDK.ExtendVolumeRequest{
 			Size: int(planData.Size.ValueInt64()),
-		},
-			tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.ExtendConfigs{}))
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Error to resize the block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
 		if err != nil {
-			resp.Diagnostics.AddError("Server side error resizing block storage volume", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
@@ -293,14 +274,9 @@ func (r *bsVolumes) Delete(ctx context.Context, req resource.DeleteRequest, resp
 		return
 	}
 
-	err := r.bsVolumes.DeleteContext(ctx,
-		sdkBlockStorageVolumes.DeleteParameters{
-			Id: data.ID.ValueString(),
-		},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.DeleteConfigs{}),
-	)
+	err := r.bsVolumes.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting block storage volume", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
 }
 
@@ -309,12 +285,12 @@ func (r *bsVolumes) ImportState(ctx context.Context, req resource.ImportStateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *bsVolumes) toTerraformModel(volume sdkBlockStorageVolumes.GetResult, snapshotId *string) bsVolumesResourceModel {
+func (r *bsVolumes) toTerraformModel(volume storageSDK.Volume, snapshotId *string) bsVolumesResourceModel {
 	return bsVolumesResourceModel{
-		ID:               types.StringValue(volume.Id),
+		ID:               types.StringValue(volume.ID),
 		Name:             types.StringValue(volume.Name),
 		AvailabilityZone: types.StringValue(volume.AvailabilityZone),
-		CreatedAt:        types.StringValue(volume.CreatedAt),
+		CreatedAt:        types.StringValue(*tfutil.ConvertTimeToRFC3339(&volume.CreatedAt)),
 		Size:             types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&volume.Size)),
 		Type:             types.StringPointerValue(volume.Type.Name),
 		SnapshotID:       types.StringPointerValue(snapshotId),
@@ -322,7 +298,7 @@ func (r *bsVolumes) toTerraformModel(volume sdkBlockStorageVolumes.GetResult, sn
 	}
 }
 
-func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID string, status VolumeStatus) (*sdkBlockStorageVolumes.GetResult, error) {
+func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID string, status VolumeStatus) (*storageSDK.Volume, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, BsVolumeStatusTimeout)
 	defer cancel()
 
@@ -331,16 +307,13 @@ func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID s
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for volume %s to reach status %s", volumeID, status)
 		case <-time.After(10 * time.Second):
-			volume, err := r.bsVolumes.GetContext(ctx, sdkBlockStorageVolumes.GetParameters{
-				Expand: &sdkBlockStorageVolumes.GetParametersExpand{"volume_type"},
-				Id:     volumeID,
-			}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageVolumes.GetConfigs{}))
+			volume, err := r.bsVolumes.Get(ctx, volumeID, []string{storageSDK.VolumeTypeExpand})
 			if err != nil {
 				return nil, err
 			}
 			currentStatus := VolumeStatus(volume.Status)
 			if currentStatus == status {
-				return &volume, nil
+				return volume, nil
 			}
 			if currentStatus.isError() {
 				return nil, fmt.Errorf("volume %s is in error state: %s", volumeID, currentStatus)

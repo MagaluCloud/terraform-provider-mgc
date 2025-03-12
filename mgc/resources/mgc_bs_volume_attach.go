@@ -6,13 +6,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	sdkVolumes "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/volumes"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
-	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 )
 
 const (
@@ -21,8 +21,7 @@ const (
 )
 
 type VolumeAttach struct {
-	sdkClient           *mgcSdk.Client
-	blockStorageVolumes sdkVolumes.Service
+	blockStorageVolumes storageSDK.VolumeService
 }
 
 type VolumeAttachResourceModel struct {
@@ -42,19 +41,13 @@ func (r *VolumeAttach) Configure(ctx context.Context, req resource.ConfigureRequ
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.blockStorageVolumes = sdkVolumes.NewService(ctx, r.sdkClient)
+	r.blockStorageVolumes = storageSDK.New(&dataConfig.CoreConfig).Volumes()
 }
 
 func (r *VolumeAttach) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -64,10 +57,16 @@ func (r *VolumeAttach) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"block_storage_id": schema.StringAttribute{
 				Description: "The ID of the block storage volume to attach.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"virtual_machine_id": schema.StringAttribute{
 				Description: "The ID of the virtual machine to attach the volume to.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -75,55 +74,36 @@ func (r *VolumeAttach) Schema(ctx context.Context, req resource.SchemaRequest, r
 
 func (r *VolumeAttach) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var model VolumeAttachResourceModel
-	diags := req.Plan.Get(ctx, &model)
-
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &model)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.blockStorageVolumes.AttachContext(ctx, sdkVolumes.AttachParameters{
-		Id:               model.BlockStorageID.ValueString(),
-		VirtualMachineId: model.VirtualMachineID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVolumes.AttachConfigs{}))
-
+	err := r.blockStorageVolumes.Attach(ctx, model.BlockStorageID.ValueString(), model.VirtualMachineID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to attach volume", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
-
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to attach volume in pooling", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	diags = resp.State.Set(ctx, &model)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
 func (r *VolumeAttach) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var model VolumeAttachResourceModel
-	diags := req.State.Get(ctx, &model)
-
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	resp.Diagnostics.Append(req.State.Get(ctx, &model)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	expand := sdkVolumes.GetParametersExpand{"attachment"}
-
-	result, err := r.blockStorageVolumes.GetContext(ctx, sdkVolumes.GetParameters{
-		Id:     model.BlockStorageID.ValueString(),
-		Expand: &expand,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVolumes.GetConfigs{}))
-
+	result, err := r.blockStorageVolumes.Get(ctx, model.BlockStorageID.ValueString(), []string{storageSDK.VolumeAttachExpand})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get volume", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -131,68 +111,33 @@ func (r *VolumeAttach) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.AddWarning("Volume is not attached to any virtual machine", "")
 		model.VirtualMachineID = types.StringValue("")
 	} else {
-		model.VirtualMachineID = types.StringPointerValue(result.Attachment.Instance.Id)
+		model.VirtualMachineID = types.StringPointerValue(result.Attachment.Instance.ID)
 	}
-	model.BlockStorageID = types.StringValue(result.Id)
+	model.BlockStorageID = types.StringValue(result.ID)
 
 	resp.State.Set(ctx, &model)
 }
 
 func (r *VolumeAttach) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var model VolumeAttachResourceModel
-	diags := req.Plan.Get(ctx, &model)
-
-	if diags.HasError() {
-		resp.Diagnostics = diags
-		return
-	}
-
-	err := r.blockStorageVolumes.AttachContext(ctx, sdkVolumes.AttachParameters{
-		Id:               model.BlockStorageID.ValueString(),
-		VirtualMachineId: model.VirtualMachineID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVolumes.AttachConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to attach volume", err.Error())
-		return
-	}
-
-	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to attach volume in pooling", err.Error())
-		return
-	}
-
-	diags = resp.State.Set(ctx, &model)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
+	resp.Diagnostics.AddError("Update not suported", "Update not suported for this resource")
 }
 
 func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var model VolumeAttachResourceModel
-	diags := req.State.Get(ctx, &model)
-
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	resp.Diagnostics.Append(req.State.Get(ctx, &model)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.blockStorageVolumes.DetachContext(ctx, sdkVolumes.DetachParameters{
-		Id: model.BlockStorageID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVolumes.DetachConfigs{}))
-
+	err := r.blockStorageVolumes.Detach(ctx, model.BlockStorageID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to detach volume", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
-
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to detach volume in pooling", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -200,9 +145,7 @@ func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, r
 func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, volumeID string, expetedStatus string) (err error) {
 	for startTime := time.Now(); time.Since(startTime) < AttachVolumeTimeout; {
 		time.Sleep(10 * time.Second)
-		getResult, err := r.blockStorageVolumes.GetContext(ctx, sdkVolumes.GetParameters{
-			Id: volumeID,
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkVolumes.GetConfigs{}))
+		getResult, err := r.blockStorageVolumes.Get(ctx, volumeID, []string{})
 		if err != nil {
 			return err
 		}

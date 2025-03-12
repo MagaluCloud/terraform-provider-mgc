@@ -15,12 +15,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
-	sdkBlockStorageSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/block_storage/snapshots"
 )
 
 const volumeSnapshotStatusTimeout = 70 * time.Minute
@@ -56,8 +54,7 @@ func NewBlockStorageSnapshotsResource() resource.Resource {
 }
 
 type bsSnapshots struct {
-	sdkClient   *mgcSdk.Client
-	bsSnapshots sdkBlockStorageSnapshots.Service
+	bsSnapshots storageSDK.SnapshotService
 }
 
 func (r *bsSnapshots) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -68,18 +65,13 @@ func (r *bsSnapshots) Configure(ctx context.Context, req resource.ConfigureReque
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
-	r.bsSnapshots = sdkBlockStorageSnapshots.NewService(ctx, r.sdkClient)
+
+	r.bsSnapshots = storageSDK.New(&dataConfig.CoreConfig).Snapshots()
 }
 
 type bsSnapshotsResourceModel struct {
@@ -166,16 +158,13 @@ func (r *bsSnapshots) Read(ctx context.Context, req resource.ReadRequest, resp *
 	data := &bsSnapshotsResourceModel{}
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	result, err := r.bsSnapshots.GetContext(ctx, sdkBlockStorageSnapshots.GetParameters{
-		Id: data.ID.ValueString()},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.GetConfigs{}),
-	)
+	result, err := r.bsSnapshots.Get(ctx, data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading block storage snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	convertedResult := r.toTerraformModel(result, data.SnapshotSourceID.ValueStringPointer())
+	convertedResult := r.toTerraformModel(*result, data.SnapshotSourceID.ValueStringPointer())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -186,33 +175,32 @@ func (r *bsSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createRequest := sdkBlockStorageSnapshots.CreateParameters{
+	createRequest := storageSDK.CreateSnapshotRequest{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueStringPointer(),
-		Volume: &sdkBlockStorageSnapshots.CreateParametersVolume{
-			Id: plan.VolumeId.ValueStringPointer(),
+		Volume: &storageSDK.IDOrName{
+			ID: plan.VolumeId.ValueStringPointer(),
 		},
 		Type: plan.Type.ValueStringPointer(),
 	}
 
 	if !plan.SnapshotSourceID.IsNull() {
-		createRequest.SourceSnapshot = &sdkBlockStorageSnapshots.CreateParametersSourceSnapshot{
-			Id: plan.SnapshotSourceID.ValueStringPointer(),
+		createRequest.SourceSnapshot = &storageSDK.IDOrName{
+			ID: plan.SnapshotSourceID.ValueStringPointer(),
 		}
 	}
 
-	createResult, err := r.bsSnapshots.CreateContext(ctx, createRequest,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.CreateConfigs{}))
+	createID, err := r.bsSnapshots.Create(ctx, createRequest)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	plan.ID = types.StringValue(createResult.Id)
+	plan.ID = types.StringValue(createID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
-	getResult, err := r.waitUntilSnapshotStatusMatches(ctx, plan.ID.ValueString(), SnapshotCompleted)
+	getResult, err := r.waitUntilSnapshotStatusMatches(ctx, createID, SnapshotCompleted)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -230,18 +218,14 @@ func (r *bsSnapshots) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if state.Name != plan.Name {
-		err := r.bsSnapshots.RenameContext(ctx, sdkBlockStorageSnapshots.RenameParameters{
-			Id:   state.ID.ValueString(),
-			Name: plan.Name.ValueString(),
-		},
-			tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.RenameConfigs{}))
+		err := r.bsSnapshots.Rename(ctx, state.ID.ValueString(), plan.Name.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Error renaming snapshot", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 		_, err = r.waitUntilSnapshotStatusMatches(ctx, state.ID.ValueString(), SnapshotCompleted)
 		if err != nil {
-			resp.Diagnostics.AddError("Error renaming snapshot", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		}
 	}
 
@@ -252,27 +236,25 @@ func (r *bsSnapshots) Delete(ctx context.Context, req resource.DeleteRequest, re
 	var data bsSnapshotsResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	err := r.bsSnapshots.DeleteContext(ctx, sdkBlockStorageSnapshots.DeleteParameters{
-		Id: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.DeleteConfigs{}))
+	err := r.bsSnapshots.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting VM Snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
 }
 
-func (r *bsSnapshots) toTerraformModel(snapshot sdkBlockStorageSnapshots.GetResult, sourceSnapshotId *string) bsSnapshotsResourceModel {
+func (r *bsSnapshots) toTerraformModel(snapshot storageSDK.Snapshot, sourceSnapshotId *string) bsSnapshotsResourceModel {
 	return bsSnapshotsResourceModel{
-		ID:               types.StringValue(snapshot.Id),
+		ID:               types.StringValue(snapshot.ID),
 		Name:             types.StringValue(snapshot.Name),
 		Description:      types.StringPointerValue(snapshot.Description),
-		CreatedAt:        types.StringValue(snapshot.CreatedAt),
-		VolumeId:         types.StringPointerValue(snapshot.Volume.Id),
+		CreatedAt:        types.StringValue(*tfutil.ConvertTimeToRFC3339(&snapshot.CreatedAt)),
+		VolumeId:         types.StringPointerValue(snapshot.Volume.ID),
 		SnapshotSourceID: types.StringPointerValue(sourceSnapshotId),
 		Type:             types.StringValue(snapshot.Type),
 	}
 }
 
-func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, snapshotID string, status SnapshotStatus) (*sdkBlockStorageSnapshots.GetResult, error) {
+func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, snapshotID string, status SnapshotStatus) (*storageSDK.Snapshot, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, volumeSnapshotStatusTimeout)
 	defer cancel()
 
@@ -281,15 +263,13 @@ func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, snapsh
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for snapshot %s to reach status %s", snapshotID, status)
 		case <-time.After(10 * time.Second):
-			snapshot, err := r.bsSnapshots.GetContext(ctx, sdkBlockStorageSnapshots.GetParameters{
-				Id: snapshotID,
-			}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkBlockStorageSnapshots.GetConfigs{}))
+			snapshot, err := r.bsSnapshots.Get(ctx, snapshotID, []string{})
 			if err != nil {
 				return nil, err
 			}
 			currentStatus := SnapshotStatus(snapshot.Status)
 			if currentStatus == status {
-				return &snapshot, nil
+				return snapshot, nil
 			}
 			if currentStatus.IsError() {
 				return nil, fmt.Errorf("snapshot %s is in error state: %s", snapshotID, currentStatus)
