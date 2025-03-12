@@ -28,7 +28,7 @@ type bsVolumesResourceItemModel struct {
 	TypeId           types.String `tfsdk:"type_id"`
 	State            types.String `tfsdk:"state"`
 	Status           types.String `tfsdk:"status"`
-	Encrepted        types.Bool   `tfsdk:"encrypted"`
+	Encrypted        types.Bool   `tfsdk:"encrypted"`
 }
 
 func NewDataSourceBsVolumes() datasource.DataSource {
@@ -138,7 +138,7 @@ func (r *DataSourceBsVolumes) Read(ctx context.Context, req datasource.ReadReque
 		item.TypeId = types.StringValue(sdkOutput.Type.ID)
 		item.State = types.StringValue(sdkOutput.State)
 		item.Status = types.StringValue(sdkOutput.Status)
-		item.Encrepted = types.BoolValue(sdkOutput.Encrypted)
+		item.Encrypted = types.BoolPointerValue(sdkOutput.Encrypted)
 
 		data.Volumes = append(data.Volumes, item)
 	}

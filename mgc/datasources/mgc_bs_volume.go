@@ -161,12 +161,12 @@ func (r *DataSourceBsVolume) Read(ctx context.Context, req datasource.ReadReques
 	data.TypeStatus = types.StringPointerValue(sdkOutput.Type.Status)
 	data.State = types.StringValue(sdkOutput.State)
 	data.Status = types.StringValue(sdkOutput.Status)
-	data.Encrypted = types.BoolValue(sdkOutput.Encrypted)
+	data.Encrypted = types.BoolPointerValue(sdkOutput.Encrypted)
 	if sdkOutput.Attachment != nil {
 		data.AttachedAt = types.StringValue(sdkOutput.Attachment.AttachedAt.Format(time.RFC3339))
 		data.AttachedDevice = types.StringPointerValue(sdkOutput.Attachment.Device)
-		data.AttachedInstanceId = types.StringValue(sdkOutput.Attachment.Instance.ID)
-		data.AttachedInstanceName = types.StringValue(sdkOutput.Attachment.Instance.Name)
+		data.AttachedInstanceId = types.StringPointerValue(sdkOutput.Attachment.Instance.ID)
+		data.AttachedInstanceName = types.StringPointerValue(sdkOutput.Attachment.Instance.Name)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
