@@ -1,3 +1,3 @@
-resource "mgc_container_registry_registries" "registry" {
+resource "mgc_container_registries" "registry" {
   name = "my_registry"
 }
