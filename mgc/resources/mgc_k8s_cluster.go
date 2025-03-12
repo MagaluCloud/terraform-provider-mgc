@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkCluster "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/cluster"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -43,8 +42,7 @@ type KubernetesClusterCreateResourceModel struct {
 }
 
 type k8sClusterResource struct {
-	sdkClient  *mgcSdk.Client
-	k8sCluster sdkCluster.Service
+	k8sCluster k8sSDK.ClusterService
 }
 
 func NewK8sClusterResource() resource.Resource {
@@ -59,19 +57,13 @@ func (r *k8sClusterResource) Configure(ctx context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.k8sCluster = sdkCluster.NewService(ctx, r.sdkClient)
+	r.k8sCluster = k8sSDK.New(&dataConfig.CoreConfig).Clusters()
 }
 
 func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -95,6 +87,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					boolplanmodifier.UseStateForUnknown(),
 					boolplanmodifier.RequiresReplace(),
 				},
+				DeprecationMessage: "This field is deprecated and will be removed in a future version.",
 			},
 			"name": schema.StringAttribute{
 				Description: "Kubernetes cluster name. Must be unique within a namespace and follow naming rules.",
@@ -166,32 +159,24 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 
 func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data KubernetesClusterCreateResourceModel
-	diags := req.State.Get(ctx, &data)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	param := sdkCluster.GetParameters{
-		ClusterId: data.ID.ValueString(),
-	}
-	cluster, err := r.k8sCluster.GetContext(ctx, param, sdkCluster.GetConfigs{})
+	cluster, err := r.k8sCluster.Get(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Kubernetes cluster", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	out := ConvertSDKCreateResultToTerraformCreateClsuterModel(&cluster)
+	out := convertSDKCreateResultToTerraformCreateClsuterModel(cluster)
 	out.EnabledBastion = data.EnabledBastion
 	out.AsyncCreation = data.AsyncCreation
 	out.EnabledServerGroup = data.EnabledServerGroup
 	out.Zone = data.Zone
-	diags = resp.State.Set(ctx, &out)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		resp.Diagnostics = diags
-		return
-	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &out)...)
 }
 
 func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -201,67 +186,62 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	param := convertTerraformModelToSDKCreateParameters(&data)
-	cluster, err := r.k8sCluster.CreateContext(ctx, *param,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.CreateConfigs{}))
+	cluster, err := r.k8sCluster.Create(ctx, k8sSDK.ClusterRequest{
+		AllowedCIDRs:       createAllowedCidrs(data.AllowedCidrs),
+		Description:        data.Description.ValueStringPointer(),
+		Name:               data.Name.ValueString(),
+		Version:            data.Version.ValueStringPointer(),
+		EnabledServerGroup: data.EnabledServerGroup.ValueBoolPointer(),
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create Kubernetes cluster", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	if cluster.Id == "" {
+	if cluster.ID == "" {
 		resp.Diagnostics.AddError("Failed to create Kubernetes cluster", "ID is empty")
 		return
 	}
 
-	createdCluster, err := r.GetClusterPooling(ctx, cluster.Id, data.AsyncCreation.ValueBool())
+	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, data.AsyncCreation.ValueBool())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Kubernetes cluster", err.Error())
-		data.ID = types.StringValue(cluster.Id)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		data.ID = types.StringValue(cluster.ID)
 		resp.State.Set(ctx, &data)
 		return
 	}
 
-	newState := ConvertSDKCreateResultToTerraformCreateClsuterModel(&createdCluster)
+	newState := convertSDKCreateResultToTerraformCreateClsuterModel(&createdCluster)
 	newState.EnabledBastion = data.EnabledBastion
 	newState.AsyncCreation = data.AsyncCreation
 	newState.EnabledServerGroup = data.EnabledServerGroup
 	newState.Zone = data.Zone
-	diags := resp.State.Set(ctx, &newState)
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		resp.Diagnostics = diags
-		return
-	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
-func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string, isAssync bool) (sdkCluster.GetResult, error) {
-	param := sdkCluster.GetParameters{
-		ClusterId: clusterId,
-	}
-
-	var result sdkCluster.GetResult
+func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string, isAssync bool) (k8sSDK.Cluster, error) {
+	var result *k8sSDK.Cluster
 	var err error
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
 		time.Sleep(1 * time.Minute)
-		result, err = r.k8sCluster.GetContext(ctx, param,
-			tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.GetConfigs{}))
+		result, err = r.k8sCluster.Get(ctx, clusterId)
 		if err != nil {
-			return sdkCluster.GetResult{}, err
+			return *result, err
 		}
 		state := strings.ToLower(result.Status.State)
 
 		if state == "running" || state == "provisioned" || isAssync {
-			return result, nil
+			return *result, nil
 		}
 		if state == "failed" {
-			return result, errors.New("cluster failed to provision")
+			return *result, errors.New("cluster failed to provision")
 		}
 
 		tflog.Debug(ctx, fmt.Sprintf("current cluster state: [%s]", state))
 	}
 
-	return result, errors.New("timeout waiting for cluster to provision")
+	return *result, errors.New("timeout waiting for cluster to provision")
 }
 
 func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -275,108 +255,65 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 	for _, c := range data.AllowedCidrs {
 		cidrs = append(cidrs, c.ValueString())
 	}
-	allowedCidrs := sdkCluster.UpdateParametersAllowedCidrs(cidrs)
 
-	param := sdkCluster.UpdateParameters{
-		ClusterId:    data.ID.ValueString(),
-		AllowedCidrs: &allowedCidrs,
-	}
-
-	_, err := r.k8sCluster.UpdateContext(ctx, param,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.UpdateConfigs{}))
+	_, err := r.k8sCluster.Update(ctx, data.ID.ValueString(), k8sSDK.AllowedCIDRsUpdateRequest{
+		AllowedCIDRs: cidrs,
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update Kubernetes cluster", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	resp.Diagnostics = resp.State.Set(ctx, &data)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data KubernetesClusterCreateResourceModel
-	diags := req.State.Get(ctx, &data)
-
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	param := sdkCluster.DeleteParameters{
-		ClusterId: data.ID.ValueString(),
-	}
-
-	err := r.k8sCluster.DeleteContext(ctx, param,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.DeleteConfigs{}))
+	err := r.k8sCluster.Delete(ctx, data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete Kubernetes cluster", err.Error())
-		return
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
-
-	r.deleteClusterPooling(ctx, data.ID.ValueString())
 }
 
 func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	clusterId := req.ID
-
-	if clusterId == "" {
+	if req.ID == "" {
 		resp.Diagnostics.AddError("Invalid import ID", "The ID must be provided")
 		return
 	}
 
-	param := sdkCluster.GetParameters{
-		ClusterId: clusterId,
-	}
-
-	cluster, err := r.k8sCluster.GetContext(ctx, param,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.GetConfigs{}))
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Kubernetes cluster", err.Error())
-		return
-	}
-
-	out := ConvertSDKCreateResultToTerraformCreateClsuterModel(&cluster)
-
-	out.EnabledServerGroup = types.BoolValue(true)
-
-	diags := resp.State.Set(ctx, &out)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &KubernetesClusterCreateResourceModel{
+		ID:                 types.StringValue(req.ID),
+		EnabledServerGroup: types.BoolValue(true),
+	})...)
 }
 
-func convertTerraformModelToSDKCreateParameters(data *KubernetesClusterCreateResourceModel) *sdkCluster.CreateParameters {
-	ac := createAllowedCidrs(data)
-	return &sdkCluster.CreateParameters{
-		AllowedCidrs:       ac,
-		Description:        data.Description.ValueStringPointer(),
-		Name:               data.Name.ValueString(),
-		Version:            data.Version.ValueStringPointer(),
-		EnabledServerGroup: data.EnabledServerGroup.ValueBoolPointer(),
-	}
-}
-
-func createAllowedCidrs(data *KubernetesClusterCreateResourceModel) *sdkCluster.CreateParametersAllowedCidrs {
-	allowedCidrs := []string{}
-	for _, c := range data.AllowedCidrs {
+func createAllowedCidrs(data []types.String) *[]string {
+	var allowedCidrs []string
+	for _, c := range data {
 		allowedCidrs = append(allowedCidrs, c.ValueString())
 	}
-	ac := sdkCluster.CreateParametersAllowedCidrs(allowedCidrs)
-
-	if len(ac) == 0 {
+	if len(allowedCidrs) == 0 {
 		return nil
 	}
 
-	return &ac
+	return &allowedCidrs
 }
 
-func ConvertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *sdkCluster.GetResult) *KubernetesClusterCreateResourceModel {
+func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Cluster) *KubernetesClusterCreateResourceModel {
 	if sdkResult == nil {
 		return nil
 	}
 
 	tfModel := &KubernetesClusterCreateResourceModel{
 		Name:      types.StringValue(sdkResult.Name),
-		ID:        types.StringValue(sdkResult.Id),
+		ID:        types.StringValue(sdkResult.ID),
 		Version:   types.StringValue(sdkResult.Version),
-		CreatedAt: types.StringPointerValue(sdkResult.CreatedAt),
+		CreatedAt: types.StringPointerValue(tfutil.ConvertTimeToRFC3339(sdkResult.CreatedAt)),
 	}
 
 	if sdkResult.Description != nil {
@@ -387,25 +324,21 @@ func ConvertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *sdkCluster.G
 		}
 	}
 
-	if sdkResult.AllowedCidrs != nil {
-		if len(*sdkResult.AllowedCidrs) == 0 {
-			sdkResult.AllowedCidrs = nil
+	if sdkResult.AllowedCIDRs != nil {
+		if len(*sdkResult.AllowedCIDRs) == 0 {
+			sdkResult.AllowedCIDRs = nil
 		} else {
-			tfModel.AllowedCidrs = tfutil.ConvertStringSliceToTypesStringSlice(*sdkResult.AllowedCidrs)
+			tfModel.AllowedCidrs = convertStringSliceToTypesStringSlice(*sdkResult.AllowedCIDRs)
 		}
 	}
 
 	return tfModel
 }
 
-func (r *k8sClusterResource) deleteClusterPooling(ctx context.Context, clusterId string) {
-	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
-		time.Sleep(30 * time.Second)
-		_, err := r.k8sCluster.GetContext(ctx, sdkCluster.GetParameters{
-			ClusterId: clusterId,
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkCluster.GetConfigs{}))
-		if err != nil {
-			return
-		}
+func convertStringSliceToTypesStringSlice(input []string) []types.String {
+	result := make([]types.String, len(input))
+	for i, v := range input {
+		result[i] = types.StringValue(v)
 	}
+	return result
 }

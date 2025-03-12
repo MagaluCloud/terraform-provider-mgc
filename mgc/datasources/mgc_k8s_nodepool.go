@@ -230,14 +230,18 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	}
 
 	if original.AutoScale != nil {
-		flattened.AutoScaleMaxReplicas = types.Int64Value(int64(*original.AutoScale.MaxReplicas))
-		flattened.AutoScaleMinReplicas = types.Int64Value(int64(*original.AutoScale.MinReplicas))
+		if original.AutoScale.MaxReplicas != nil {
+			flattened.AutoScaleMaxReplicas = types.Int64Value(int64(*original.AutoScale.MaxReplicas))
+		}
+		if original.AutoScale.MinReplicas != nil {
+			flattened.AutoScaleMinReplicas = types.Int64Value(int64(*original.AutoScale.MinReplicas))
+		}
 	}
 
 	labelsMap, _ := types.MapValueFrom(ctx, types.StringType, original.Labels)
 	flattened.Labels = labelsMap
 
-	if len(*original.SecurityGroups) > 0 {
+	if original.SecurityGroups != nil && len(*original.SecurityGroups) > 0 {
 		flattened.SecurityGroups = make([]types.String, len(*original.SecurityGroups))
 		for i, sg := range *original.SecurityGroups {
 			strVal := types.StringValue(sg)
@@ -245,14 +249,12 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	if len(original.Status.Messages) > 0 {
-		flattened.StatusMessages = make([]types.String, len(original.Status.Messages))
-		for i, msg := range original.Status.Messages {
-			flattened.StatusMessages[i] = types.StringValue(msg)
-		}
+	flattened.StatusMessages = make([]types.String, 1)
+	for i, msg := range original.Status.Messages {
+		flattened.StatusMessages[i] = types.StringValue(msg)
 	}
 
-	if len(*original.Tags) > 0 {
+	if original.Tags != nil && len(*original.Tags) > 0 {
 		flattened.Tags = make([]types.String, len(*original.Tags))
 		for i, tag := range *original.Tags {
 			flattened.Tags[i] = types.StringValue(tag)
@@ -270,7 +272,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	if len(*original.Zone) > 0 {
+	if original.Zone != nil && len(*original.Zone) > 0 {
 		flattened.Zone = make([]types.String, len(*original.Zone))
 		for i, zone := range *original.Zone {
 			flattened.Zone[i] = types.StringValue(zone)
