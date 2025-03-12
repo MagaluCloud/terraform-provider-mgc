@@ -1,18 +1,28 @@
 # Data source to get the latest Kubernetes version
-data "mgc_kubernetes_version" "latest" {
+variable "cluster-version" {
+  default = "v1.30.2"
+}
+
+variable "cluster-flavor" {
+  default = "cloud-k8s.gp1.small"
+}
+
+resource "random_pet" "name" {
+  length    = 1
+  separator = "-"
 }
 
 # Basic Kubernetes cluster
 resource "mgc_kubernetes_cluster" "basic_cluster" {
-  name        = "smoke-test-basic-cluster"
-  version     = data.mgc_kubernetes_version.latest.versions[0].version
+  name        = "${random_pet.name.id}-basic-cluster"
+  version     = var.cluster-version
   description = "Basic Kubernetes cluster for smoke test"
 }
 
 # Full-featured Kubernetes cluster
 resource "mgc_kubernetes_cluster" "full_cluster" {
-  name                 = "smoke-test-full-cluster"
-  version              = data.mgc_kubernetes_version.latest.versions[0].version
+  name                 = "${random_pet.name.id}-full-cluster"
+  version              = var.cluster-version
   description          = "Full-featured Kubernetes cluster for smoke test"
   enabled_server_group = true
   async_creation       = true
@@ -21,30 +31,33 @@ resource "mgc_kubernetes_cluster" "full_cluster" {
 }
 
 # Outputs for verification
-output "basic_cluster_id" {
-  value = mgc_kubernetes_cluster.basic_cluster.id
+output "basic_cluster" {
+  value = mgc_kubernetes_cluster.basic_cluster
 }
 
-output "basic_cluster_created_at" {
-  value = mgc_kubernetes_cluster.basic_cluster.created_at
-}
-
-output "full_cluster_id" {
-  value = mgc_kubernetes_cluster.full_cluster.id
-}
-
-output "full_cluster_created_at" {
-  value = mgc_kubernetes_cluster.full_cluster.created_at
+output "full_cluster" {
+  value = mgc_kubernetes_cluster.full_cluster
 }
 
 data "mgc_kubernetes_flavor" "available_flavors" {
+}
+
+output "flavor_list" {
+  value = data.mgc_kubernetes_flavor.available_flavors
+}
+
+data "mgc_kubernetes_version" "latest" {
+}
+
+output "versions_list" {
+  value = data.mgc_kubernetes_version.latest.versions
 }
 
 # Basic nodepool for the basic cluster
 resource "mgc_kubernetes_nodepool" "basic_nodepool" {
   name        = "basic-nodepool"
   cluster_id  = mgc_kubernetes_cluster.basic_cluster.id
-  flavor_name = data.mgc_kubernetes_flavor.available_flavors.nodepool[0].name
+  flavor_name = var.cluster-flavor
   replicas    = 1
 }
 
@@ -52,8 +65,8 @@ resource "mgc_kubernetes_nodepool" "basic_nodepool" {
 resource "mgc_kubernetes_nodepool" "full_nodepool" {
   name         = "full-nodepool"
   cluster_id   = mgc_kubernetes_cluster.full_cluster.id
-  flavor_name  = data.mgc_kubernetes_flavor.available_flavors.nodepool[0].name
-  replicas     = 2
+  flavor_name  = var.cluster-flavor
+  replicas     = 1
   min_replicas = 1
   max_replicas = 5
   tags         = ["smoke-test", "full-featured"]
@@ -65,4 +78,12 @@ resource "mgc_kubernetes_nodepool" "full_nodepool" {
       effect = "NoSchedule"
     }
   ]
+}
+
+output "basic_nodepool" {
+  value = mgc_kubernetes_nodepool.basic_nodepool
+}
+
+output "full_nodepool" {
+  value = mgc_kubernetes_nodepool.full_nodepool
 }

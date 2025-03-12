@@ -31,7 +31,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 ### Optional
 
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
-- `async_creation` (Boolean) Enables asynchronous creation of the Kubernetes cluster.
+- `async_creation` (Boolean, Deprecated) Enables asynchronous creation of the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.
 - `enabled_bastion` (Boolean, Deprecated) Enables the use of a bastion host for secure access to the cluster.
 - `enabled_server_group` (Boolean) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools.

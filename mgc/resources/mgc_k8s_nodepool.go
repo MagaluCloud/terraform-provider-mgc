@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	sdkNodepool "github.com/MagaluCloud/magalu/mgc/lib/products/kubernetes/nodepool"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
-	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,9 +20,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+type NodePoolResourceModel struct {
+	ClusterID types.String `tfsdk:"cluster_id"`
+	tfutil.NodePool
+}
+
 type NewNodePoolResource struct {
-	sdkClient   *mgcSdk.Client
-	sdkNodepool sdkNodepool.Service
+	sdkNodepool k8sSDK.NodePoolService
 }
 
 func NewNewNodePoolResource() resource.Resource {
@@ -38,19 +41,13 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.sdkNodepool = sdkNodepool.NewService(ctx, r.sdkClient)
+	r.sdkNodepool = k8sSDK.New(&dataConfig.CoreConfig).Nodepools()
 }
 
 func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -148,48 +145,43 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 }
 
 func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data tfutil.NodePoolCreate
-	diags := req.State.Get(ctx, &data)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	var data NodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	nodepool, err := r.sdkNodepool.GetContext(ctx, sdkNodepool.GetParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.GetConfigs{}))
 
+	nodepool, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get node pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	data.NodePool = tfutil.ConvertToNodePoolGet(&nodepool)
+
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
 func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data tfutil.NodePoolCreate
-	diags := req.Config.Get(ctx, &data)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	var data NodePoolResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var tags sdkNodepool.CreateParametersTags
+	var tags *[]string
 	if data.Tags != nil {
-		tags = sdkNodepool.CreateParametersTags(*convertStringArrayTFToSliceString(data.Tags))
+		tags = convertStringArrayTFToSliceString(data.Tags)
 	}
-	createParams := sdkNodepool.CreateParameters{
-		ClusterId: data.ClusterID.ValueString(),
-		Flavor:    data.Flavor.ValueString(),
-		Name:      data.Name.ValueString(),
-		Replicas:  int(data.Replicas.ValueInt64()),
-		Tags:      &tags,
-		Taints:    convertTaintsNP(data.Taints),
+	createParams := k8sSDK.CreateNodePoolRequest{
+		Flavor:   data.Flavor.ValueString(),
+		Name:     data.Name.ValueString(),
+		Replicas: int(data.Replicas.ValueInt64()),
+		Tags:     tags,
+		Taints:   convertTaintsNP(data.Taints),
 	}
 
 	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
-		createParams.AutoScale = &sdkNodepool.CreateParametersAutoScale{}
+		createParams.AutoScale = &k8sSDK.AutoScale{}
 	}
 
 	if !data.MaxReplicas.IsNull() {
@@ -200,48 +192,42 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		createParams.AutoScale.MinReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
 	}
 
-	nodepool, err := r.sdkNodepool.CreateContext(ctx, createParams,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.CreateConfigs{}))
-
+	nodepool, err := r.sdkNodepool.Create(ctx, data.ClusterID.ValueString(), createParams)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create node pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.NodePool = tfutil.ConvertToNodePoolCreate(&nodepool)
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 
-	err = r.waitNodePoolCreation(ctx, nodepool.Id, data.ClusterID.ValueString())
+	err = r.waitNodePoolCreation(ctx, nodepool.ID, data.ClusterID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to wait for node pool creation", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
 
 func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data tfutil.NodePoolCreate
-	diags := req.Config.Get(ctx, &data)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	var data NodePoolResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state tfutil.NodePoolCreate
-	diags = req.State.Get(ctx, &state)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	var state NodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	repli := int(data.Replicas.ValueInt64())
-	updateParam := sdkNodepool.UpdateParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: state.ID.ValueString(),
-		Replicas:   &repli,
+	updateParam := k8sSDK.PatchNodePoolRequest{
+		Replicas: &repli,
 	}
 
 	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
-		updateParam.AutoScale = &sdkNodepool.UpdateParametersAutoScale{}
+		updateParam.AutoScale = &k8sSDK.AutoScale{}
 	}
 
 	if !data.MaxReplicas.IsNull() {
@@ -251,81 +237,64 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		updateParam.AutoScale.MinReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
 	}
 
-	nodepool, err := r.sdkNodepool.UpdateContext(ctx, updateParam,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.UpdateConfigs{}))
-
+	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update node pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	data.NodePool = tfutil.ConvertToNodePoolUpdate(&nodepool)
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
 
 	err = r.waitNodePoolCreation(ctx, data.ID.ValueString(), data.ClusterID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to wait for node pool creation", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data tfutil.NodePoolCreate
-	diags := req.State.Get(ctx, &data)
-	if diags.HasError() {
-		resp.Diagnostics = diags
+	var data NodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.sdkNodepool.DeleteContext(ctx, sdkNodepool.DeleteParameters{
-		ClusterId:  data.ClusterID.ValueString(),
-		NodePoolId: data.ID.ValueString(),
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.DeleteConfigs{}))
-
+	err := r.sdkNodepool.Delete(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete node pool", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
 
 func (r *NewNodePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	var data tfutil.NodePoolCreate
 	ids := strings.Split(req.ID, ",")
 	if len(ids) != 2 {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: cluster_id,node_pool_id")
 		return
 	}
 
-	nodepool, err := r.sdkNodepool.GetContext(ctx, sdkNodepool.GetParameters{
-		ClusterId:  ids[0],
-		NodePoolId: ids[1],
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.GetConfigs{}))
-
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get node pool", err.Error())
-		return
-	}
-
-	data.ClusterID = types.StringValue(ids[0])
-	data.NodePool = tfutil.ConvertToNodePoolGet(&nodepool)
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &NodePoolResourceModel{
+		ClusterID: types.StringValue(ids[0]),
+		NodePool: tfutil.NodePool{
+			ID: types.StringValue(ids[1]),
+		},
+	})...)
 }
 
-func convertTaintsNP(taints *[]tfutil.Taint) *sdkNodepool.CreateParametersTaints {
+func convertTaintsNP(taints *[]tfutil.Taint) *[]k8sSDK.Taint {
 	if taints == nil {
 		return nil
 	}
-	taintsNP := make([]sdkNodepool.CreateParametersTaintsItem, len(*taints))
+	taintsNP := make([]k8sSDK.Taint, len(*taints))
 	for i, taint := range *taints {
-		taintsNP[i] = sdkNodepool.CreateParametersTaintsItem{
+		taintsNP[i] = k8sSDK.Taint{
 			Effect: taint.Effect.ValueString(),
 			Key:    taint.Key.ValueString(),
 			Value:  taint.Value.ValueString(),
 		}
 	}
-	rt := sdkNodepool.CreateParametersTaints(taintsNP)
-	return &rt
+	return &taintsNP
 }
 
 func convertStringArrayTFToSliceString(tags *[]types.String) *[]string {
@@ -343,15 +312,10 @@ func (r *NewNodePoolResource) waitNodePoolCreation(ctx context.Context, nodepool
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
 		time.Sleep(30 * time.Second)
 
-		nodepool, err := r.sdkNodepool.GetContext(ctx, sdkNodepool.GetParameters{
-			ClusterId:  clusterId,
-			NodePoolId: nodepoolid,
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, sdkNodepool.GetConfigs{}))
-
+		nodepool, err := r.sdkNodepool.Get(ctx, clusterId, nodepoolid)
 		if err != nil {
 			return err
 		}
-
 		if nodepool.Status.State == "Running" {
 			return nil
 		}
