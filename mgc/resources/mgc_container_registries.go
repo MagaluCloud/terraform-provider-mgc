@@ -3,9 +3,8 @@ package resources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	registries "github.com/MagaluCloud/magalu/mgc/lib/products/container_registry/registries"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,8 +19,7 @@ type ContainerRegistryModel struct {
 }
 
 type ContainerRegistryResource struct {
-	sdkClient       *mgcSdk.Client
-	registryService registries.Service
+	registryService crSDK.RegistriesService
 }
 
 func NewContainerRegistryRegistriesResource() resource.Resource {
@@ -36,19 +34,13 @@ func (r *ContainerRegistryResource) Configure(ctx context.Context, req resource.
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.registryService = registries.NewService(ctx, r.sdkClient)
+	r.registryService = crSDK.New(&dataConfig.CoreConfig).Registries()
 }
 
 func (r *ContainerRegistryResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -77,15 +69,15 @@ func (r *ContainerRegistryResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	created, err := r.registryService.CreateContext(ctx, registries.CreateParameters{
+	created, err := r.registryService.Create(ctx, &crSDK.RegistryRequest{
 		Name: data.Name.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, registries.CreateConfigs{}))
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create registry", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringValue(created.Id)
+	data.Id = types.StringValue(created.ID)
 	data.Name = types.StringValue(created.Name)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -97,11 +89,9 @@ func (r *ContainerRegistryResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	registry, err := r.registryService.GetContext(ctx, registries.GetParameters{
-		RegistryId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, registries.GetConfigs{}))
+	registry, err := r.registryService.Get(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read registry", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -123,11 +113,9 @@ func (r *ContainerRegistryResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	err := r.registryService.DeleteContext(ctx, registries.DeleteParameters{
-		RegistryId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, registries.DeleteConfigs{}))
+	err := r.registryService.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete registry", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
