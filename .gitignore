@@ -8,6 +8,9 @@ cli.yaml
 .history/
 .vscode
 
+#Zed
+.zed
+
 # VIM
 *.swp
 
