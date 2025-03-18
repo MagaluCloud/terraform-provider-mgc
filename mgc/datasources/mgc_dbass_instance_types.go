@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaas "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instance_types"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -17,8 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbInstanceTypes{}
 
 type DataSourceDbInstanceTypes struct {
-	sdkClient     *mgcSdk.Client
-	instanceTypes dbaas.Service
+	instanceTypes dbSDK.InstanceTypeService
 }
 
 type dbInstanceTypeModel struct {
@@ -46,19 +44,13 @@ func (r *DataSourceDbInstanceTypes) Configure(ctx context.Context, req datasourc
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.instanceTypes = dbaas.NewService(ctx, r.sdkClient)
+	r.instanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
 }
 
 func (r *DataSourceDbInstanceTypes) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -111,24 +103,23 @@ func (r *DataSourceDbInstanceTypes) Read(ctx context.Context, req datasource.Rea
 	}
 
 	limit := 50
-	params := dbaas.ListParameters{
+	instanceTypes, err := r.instanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
 		Status: data.Status.ValueStringPointer(),
 		Limit:  &limit,
-	}
-	instanceTypes, err := r.instanceTypes.ListContext(ctx, params, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaas.ListConfigs{}))
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("failed to list db instance types", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	instanceTypeModels := make([]DbInstanceType, 0, len(instanceTypes.Results))
-	for _, instanceType := range instanceTypes.Results {
+	instanceTypeModels := make([]DbInstanceType, 0, len(instanceTypes))
+	for _, instanceType := range instanceTypes {
 		instanceTypeModels = append(instanceTypeModels, DbInstanceType{
-			ID:   types.StringValue(instanceType.Id),
+			ID:   types.StringValue(instanceType.ID),
 			Name: types.StringValue(instanceType.Label),
-			Ram:  types.StringValue(instanceType.Ram),
+			Ram:  types.StringValue(instanceType.RAM),
 			Size: types.StringValue(instanceType.Size),
-			Vcpu: types.StringValue(instanceType.Vcpu),
+			Vcpu: types.StringValue(instanceType.VCPU),
 		})
 	}
 	data.InstanceTypes = instanceTypeModels

@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaas "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/engines"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -17,8 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbEngines{}
 
 type DataSourceDbEngines struct {
-	sdkClient *mgcSdk.Client
-	dbEngines dbaas.Service
+	dbEngines dbSDK.EngineService
 }
 
 type dbEngineModel struct {
@@ -46,19 +44,13 @@ func (r *DataSourceDbEngines) Configure(ctx context.Context, req datasource.Conf
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.dbEngines = dbaas.NewService(ctx, r.sdkClient)
+	r.dbEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
 }
 
 func (r *DataSourceDbEngines) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -111,20 +103,19 @@ func (r *DataSourceDbEngines) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	limit := 50
-	params := dbaas.ListParameters{
+	engines, err := r.dbEngines.List(ctx, dbSDK.ListEngineOptions{
 		Status: data.Status.ValueStringPointer(),
 		Limit:  &limit,
-	}
-	engines, err := r.dbEngines.ListContext(ctx, params, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaas.ListConfigs{}))
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("failed to list db engines", err.Error())
 		return
 	}
 
-	engineModels := make([]DbEngines, 0, len(engines.Results))
-	for _, engine := range engines.Results {
+	engineModels := make([]DbEngines, 0, len(engines))
+	for _, engine := range engines {
 		engineModels = append(engineModels, DbEngines{
-			ID:      types.StringValue(engine.Id),
+			ID:      types.StringValue(engine.ID),
 			Engine:  types.StringValue(engine.Engine),
 			Name:    types.StringValue(engine.Name),
 			Status:  types.StringValue(engine.Status),

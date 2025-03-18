@@ -4,9 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -123,32 +120,6 @@ func TestConvertIntPointerToInt64Pointer(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestAddCLIAuthWarning(t *testing.T) {
-	t.Parallel()
-
-	t.Run("resource configure response", func(t *testing.T) {
-		resp := &resource.ConfigureResponse{
-			Diagnostics: diag.Diagnostics{},
-		}
-
-		AddCLIAuthWarning(resp)
-		assert.Equal(t, 1, len(resp.Diagnostics))
-		assert.Equal(t, diag.SeverityWarning, resp.Diagnostics[0].Severity())
-		assert.Contains(t, resp.Diagnostics[0].Summary(), "DEPRECATED")
-	})
-
-	t.Run("datasource configure response", func(t *testing.T) {
-		resp := &datasource.ConfigureResponse{
-			Diagnostics: diag.Diagnostics{},
-		}
-
-		AddCLIAuthWarning(resp)
-		assert.Equal(t, 1, len(resp.Diagnostics))
-		assert.Equal(t, diag.SeverityWarning, resp.Diagnostics[0].Severity())
-		assert.Contains(t, resp.Diagnostics[0].Summary(), "DEPRECATED")
-	})
 }
 
 func TestSdkParamValueToString(t *testing.T) {

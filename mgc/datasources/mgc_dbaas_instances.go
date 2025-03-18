@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaas "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instances"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -17,8 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbInstances{}
 
 type DataSourceDbInstances struct {
-	sdkClient *mgcSdk.Client
-	instances dbaas.Service
+	instances dbSDK.InstanceService
 }
 
 type dbInstanceModel struct {
@@ -58,19 +56,13 @@ func (r *DataSourceDbInstances) Configure(ctx context.Context, req datasource.Co
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.instances = dbaas.NewService(ctx, r.sdkClient)
+	r.instances = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -158,20 +150,19 @@ func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaReq
 	}
 }
 
-func (r *DataSourceDbInstances) getAllInstances(ctx context.Context, params dbaas.ListParameters, configs dbaas.ListConfigs) ([]dbaas.ListResultResultsItem, error) {
-	var allResults []dbaas.ListResultResultsItem
+func (r *DataSourceDbInstances) getAllInstances(ctx context.Context, params dbSDK.ListInstanceOptions) ([]dbSDK.InstanceDetail, error) {
+	var allResults []dbSDK.InstanceDetail
 	params.Offset = new(int)
 	for {
-		instances, err := r.instances.ListContext(ctx, params, configs)
+		instances, err := r.instances.List(ctx, params)
 		if err != nil {
 			return nil, err
 		}
-		allResults = append(allResults, instances.Results...)
-		currentCount := *params.Offset + instances.Meta.Page.Count
-		if currentCount >= instances.Meta.Page.Total {
+		allResults = append(allResults, instances...)
+		if len(instances) == 0 {
 			break
 		}
-		*params.Offset = currentCount
+		*params.Offset = *params.Offset + len(allResults)
 	}
 	return allResults, nil
 }
@@ -182,49 +173,63 @@ func (r *DataSourceDbInstances) Read(ctx context.Context, req datasource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	params := dbaas.ListParameters{
-		Limit:  new(int),
-		Status: data.Status.ValueStringPointer(),
+
+	params := dbSDK.ListInstanceOptions{
+		Limit: new(int),
 	}
+	if data.Status.ValueString() != "" {
+		status := dbSDK.InstanceStatus(data.Status.ValueString())
+		params.Status = &status
+	}
+
 	*params.Limit = 25
-	instances, err := r.getAllInstances(ctx, params, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaas.ListConfigs{}))
+	instances, err := r.getAllInstances(ctx, params)
 	if err != nil {
-		resp.Diagnostics.AddError("failed to list db instances", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	var instanceModels []dbInstance
 	for _, instance := range instances {
-		var addresses []InstanceAddress
-		for _, address := range instance.Addresses {
-			addresses = append(addresses, InstanceAddress{
-				Access:  types.StringValue(address.Access),
-				Address: types.StringPointerValue(address.Address),
-				Type:    types.StringPointerValue(address.Type),
-			})
-		}
 		instanceModels = append(instanceModels, dbInstance{
-			Addresses:           addresses,
+			Addresses:           convertToAddressModel(instance.Addresses),
 			BackupRetentionDays: types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&instance.BackupRetentionDays)),
 			CreatedAt:           types.StringValue(instance.CreatedAt),
-			EngineID:            types.StringValue(instance.EngineId),
-			ID:                  types.StringValue(instance.Id),
-			InstanceTypeID:      types.StringValue(instance.InstanceTypeId),
+			EngineID:            types.StringValue(instance.EngineID),
+			ID:                  types.StringValue(instance.ID),
+			InstanceTypeID:      types.StringValue(instance.InstanceTypeID),
 			Name:                types.StringValue(instance.Name),
-			Parameters:          convertToStringMapInstances(instance.Parameters),
-			Status:              types.StringValue(instance.Status),
+			Parameters:          convertToStringMapInstance(instance.Parameters),
+			Status:              types.StringValue(string(instance.Status)),
 			VolumeSize:          types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&instance.Volume.Size)),
-			VolumeType:          types.StringValue(instance.Volume.Type),
+			VolumeType:          types.StringValue(string(instance.Volume.Type)),
 		})
 	}
 	data.Instances = instanceModels
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func convertToStringMapInstances(params dbaas.ListResultResultsItemParameters) map[string]types.String {
+func convertToStringMapInstance(params []dbSDK.InstanceParametersResponse) map[string]types.String {
 	result := make(map[string]types.String, len(params))
 	for _, value := range params {
 		result[value.Name] = types.StringValue(tfutil.SdkParamValueToString(value.Value))
 	}
 	return result
+}
+
+func convertToAddressModel(addresses []dbSDK.Address) []InstanceAddress {
+	var modelAd []InstanceAddress
+	for _, address := range addresses {
+		a := InstanceAddress{
+			Access:  types.StringValue(string(address.Access)),
+			Address: types.StringPointerValue(address.Address),
+		}
+
+		if address.Type != nil {
+			a.Type = types.StringValue(string(*address.Type))
+		}
+
+		modelAd = append(modelAd, a)
+	}
+	return modelAd
 }
