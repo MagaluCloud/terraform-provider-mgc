@@ -70,6 +70,8 @@ jobs:
       - name: Create and push tag
         id: create-and-push-tag
         if: steps.config-git.outcome == 'success'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
         run: |
           git tag -a ${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
           git push origin ${{ github.event.inputs.version }}
