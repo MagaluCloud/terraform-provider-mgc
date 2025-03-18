@@ -30,13 +30,11 @@ The MGC provider gives you comprehensive control over your Magalu Cloud resource
 
 - **Managed Kubernetes Clusters** - Deploy production-ready Kubernetes
 - **Node Pools** - Scale your Kubernetes worker nodes
-- **Cluster Upgrades** - Manage Kubernetes versions
 
 ### Database as a Service (DBaaS)
 
 - **Database Instances** - Deploy managed database services
 - **Replication** - Configure high availability and read replicas
-- **Backups** - Schedule and manage database backups
 
 ### Storage
 
