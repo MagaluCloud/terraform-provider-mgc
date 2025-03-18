@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaasSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instances/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -43,8 +42,7 @@ type DBaaSInstanceSnapshotModel struct {
 }
 
 type DBaaSInstanceSnapshotResource struct {
-	sdkClient       *mgcSdk.Client
-	snapshotService dbaasSnapshots.Service
+	instanceService dbSDK.InstanceService
 }
 
 func NewDBaaSInstanceSnapshotResource() resource.Resource {
@@ -59,19 +57,13 @@ func (r *DBaaSInstanceSnapshotResource) Configure(ctx context.Context, req resou
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.snapshotService = dbaasSnapshots.NewService(ctx, r.sdkClient)
+	r.instanceService = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DBaaSInstanceSnapshotResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -114,21 +106,20 @@ func (r *DBaaSInstanceSnapshotResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	created, err := r.snapshotService.CreateContext(ctx, dbaasSnapshots.CreateParameters{
-		InstanceId:  data.InstanceId.ValueString(),
+	created, err := r.instanceService.CreateSnapshot(ctx, data.InstanceId.ValueString(), dbSDK.SnapshotCreateRequest{
 		Name:        data.Name.ValueString(),
 		Description: data.Description.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.CreateConfigs{}))
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringValue(created.Id)
+	data.Id = types.StringValue(created.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-	err = r.waitUntilSnapshotStatusMatches(ctx, data.InstanceId.ValueString(), created.Id, DBaaSInstanceSnapshotStatusAvailable)
+	err = r.waitUntilSnapshotStatusMatches(ctx, data.InstanceId.ValueString(), created.ID, DBaaSInstanceSnapshotStatusAvailable)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -140,12 +131,9 @@ func (r *DBaaSInstanceSnapshotResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	snapshot, err := r.snapshotService.GetContext(ctx, dbaasSnapshots.GetParameters{
-		InstanceId: data.InstanceId.ValueString(),
-		SnapshotId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.GetConfigs{}))
+	snapshot, err := r.instanceService.GetSnapshot(ctx, data.InstanceId.ValueString(), data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -168,12 +156,9 @@ func (r *DBaaSInstanceSnapshotResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	_, err := r.snapshotService.DeleteContext(ctx, dbaasSnapshots.DeleteParameters{
-		InstanceId: data.InstanceId.ValueString(),
-		SnapshotId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.DeleteConfigs{}))
+	err := r.instanceService.DeleteSnapshot(ctx, data.InstanceId.ValueString(), data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -204,10 +189,7 @@ func (r *DBaaSInstanceSnapshotResource) waitUntilSnapshotStatusMatches(ctx conte
 		case <-timeoutCtx.Done():
 			return fmt.Errorf("timeout waiting for snapshot %s to reach status %s", snapshotID, status)
 		case <-time.After(10 * time.Second):
-			snapshot, err := r.snapshotService.GetContext(ctx, dbaasSnapshots.GetParameters{
-				InstanceId: instanceID,
-				SnapshotId: snapshotID,
-			}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.GetConfigs{}))
+			snapshot, err := r.instanceService.GetSnapshot(ctx, instanceID, snapshotID)
 			if err != nil {
 				return err
 			}

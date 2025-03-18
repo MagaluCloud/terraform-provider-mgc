@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaasSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instances/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -13,8 +12,7 @@ import (
 )
 
 type DataSourceDbSnapshot struct {
-	sdkClient *mgcSdk.Client
-	snapshots dbaasSnapshots.Service
+	snapshots dbSDK.InstanceService
 }
 
 type dbSnapshotModel struct {
@@ -39,19 +37,13 @@ func (r *DataSourceDbSnapshot) Configure(ctx context.Context, req datasource.Con
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.snapshots = dbaasSnapshots.NewService(ctx, r.sdkClient)
+	r.snapshots = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbSnapshot) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -97,19 +89,16 @@ func (r *DataSourceDbSnapshot) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	snapshot, err := r.snapshots.GetContext(ctx, dbaasSnapshots.GetParameters{
-		InstanceId: data.InstanceId.ValueString(),
-		SnapshotId: data.ID.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.GetConfigs{}))
+	snapshot, err := r.snapshots.GetSnapshot(ctx, data.InstanceId.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("failed to get snapshot", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	data.Name = types.StringValue(snapshot.Name)
 	data.Description = types.StringValue(snapshot.Description)
 	data.CreatedAt = types.StringValue(snapshot.CreatedAt)
-	data.Status = types.StringValue(snapshot.Status)
+	data.Status = types.StringValue(string(snapshot.Status))
 	data.Size = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&snapshot.AllocatedSize))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

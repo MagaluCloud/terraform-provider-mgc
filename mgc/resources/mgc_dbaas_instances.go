@@ -8,11 +8,7 @@ import (
 	"strings"
 	"time"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaasEngines "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/engines"
-	dbaasInstanceTypes "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instance_types"
-	dbaasInstances "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instances"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -68,10 +64,9 @@ type DBaaSInstanceModel struct {
 }
 
 type DBaaSInstanceResource struct {
-	sdkClient          *mgcSdk.Client
-	dbaasInstances     dbaasInstances.Service
-	dbaasEngines       dbaasEngines.Service
-	dbaasInstanceTypes dbaasInstanceTypes.Service
+	dbaasInstances     dbSDK.InstanceService
+	dbaasEngines       dbSDK.EngineService
+	dbaasInstanceTypes dbSDK.InstanceTypeService
 }
 
 func NewDBaaSInstanceResource() resource.Resource {
@@ -86,21 +81,15 @@ func (r *DBaaSInstanceResource) Configure(ctx context.Context, req resource.Conf
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.dbaasInstances = dbaasInstances.NewService(ctx, r.sdkClient)
-	r.dbaasEngines = dbaasEngines.NewService(ctx, r.sdkClient)
-	r.dbaasInstanceTypes = dbaasInstanceTypes.NewService(ctx, r.sdkClient)
+	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
+	r.dbaasInstanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
 }
 
 func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -230,31 +219,30 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	params := dbaasInstances.CreateParameters{
+	params := dbSDK.InstanceCreateRequest{
 		Name:           data.Name.ValueString(),
 		User:           data.User.ValueString(),
 		Password:       data.Password.ValueString(),
-		EngineId:       &engineID,
-		InstanceTypeId: &instanceTypeID,
-		Volume: dbaasInstances.CreateParametersVolume{
+		EngineID:       &engineID,
+		InstanceTypeID: &instanceTypeID,
+		Volume: dbSDK.InstanceVolumeRequest{
 			Size: *tfutil.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
 		},
 		BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(data.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
 	}
 
-	created, err := r.dbaasInstances.CreateContext(ctx, params,
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.CreateConfigs{}))
+	created, err := r.dbaasInstances.Create(ctx, params)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create DBaaS Instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	data.Id = types.StringValue(created.Id)
+	data.Id = types.StringValue(created.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 	err = r.waitUntilInstanceStatusMatches(ctx, data.Id.ValueString(), DBaaSInstanceStatusActive.String())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create DBaaS Instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -266,23 +254,21 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	instance, err := r.dbaasInstances.GetContext(ctx, dbaasInstances.GetParameters{
-		InstanceId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.GetConfigs{}))
+	instance, err := r.dbaasInstances.Get(ctx, data.Id.ValueString(), dbSDK.GetInstanceOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read DBaaS Instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	engineName, engineVersion, err := r.getEngineNameAndVersionByID(ctx, instance.EngineId)
+	engineName, engineVersion, err := r.getEngineNameAndVersionByID(ctx, instance.EngineID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get engine name and version", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	instanceTypeName, err := r.getInstanceTypeNameByID(ctx, instance.InstanceTypeId)
+	instanceTypeName, err := r.getInstanceTypeNameByID(ctx, instance.InstanceTypeID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get instance type name", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -312,50 +298,45 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
 		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, planData.InstanceType.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Invalid instance type", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 
-		_, err = r.dbaasInstances.ResizeContext(ctx, dbaasInstances.ResizeParameters{
-			InstanceId:     currentData.Id.ValueString(),
-			InstanceTypeId: &instanceTypeID,
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.ResizeConfigs{}))
+		_, err = r.dbaasInstances.Resize(ctx, currentData.Id.ValueString(), dbSDK.InstanceResizeRequest{
+			InstanceTypeID: &instanceTypeID,
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to update DBaaS Instance", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	if planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
-		_, err := r.dbaasInstances.ResizeContext(ctx, dbaasInstances.ResizeParameters{
-			InstanceId: currentData.Id.ValueString(),
-			Volume: &dbaasInstances.ResizeParametersVolume{
+		_, err := r.dbaasInstances.Resize(ctx, currentData.Id.ValueString(), dbSDK.InstanceResizeRequest{
+			Volume: &dbSDK.InstanceVolumeResizeRequest{
 				Size: *tfutil.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
 			},
-		}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.ResizeConfigs{}))
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to update DBaaS Instance", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	if (planData.BackupRetentionDays.ValueInt64() != currentData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != currentData.BackupStartAt.ValueString()) {
-		params := dbaasInstances.UpdateParameters{
-			InstanceId:          planData.Id.ValueString(),
+		_, err := r.dbaasInstances.Update(ctx, planData.Id.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
 			BackupStartAt:       planData.BackupStartAt.ValueStringPointer(),
-		}
-		_, err := r.dbaasInstances.UpdateContext(ctx, params,
-			tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.UpdateConfigs{}))
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to update DBaaS Instance", err.Error())
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
 
 	err := r.waitUntilInstanceStatusMatches(ctx, planData.Id.ValueString(), DBaaSInstanceStatusActive.String())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update DBaaS Instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -369,11 +350,9 @@ func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	_, err := r.dbaasInstances.DeleteContext(ctx, dbaasInstances.DeleteParameters{
-		InstanceId: data.Id.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.DeleteConfigs{}))
+	err := r.dbaasInstances.Delete(ctx, data.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete DBaaS Instance", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 }
@@ -385,43 +364,39 @@ func (r *DBaaSInstanceResource) ImportState(ctx context.Context, req resource.Im
 }
 
 func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	status := DBaaSInstanceStatusActive.String()
-	engines, err := r.dbaasEngines.ListContext(ctx, dbaasEngines.ListParameters{
-		Status: &status,
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasEngines.ListConfigs{}))
+	active := "ACTIVE"
+	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{
+		Status: &active,
+	})
 	if err != nil {
 		return "", err
 	}
-	for _, engine := range engines.Results {
+	for _, engine := range engines {
 		if engine.Name == engineName && engine.Version == engineVersion {
-			return engine.Id, nil
+			return engine.ID, nil
 		}
 	}
 	return "", errors.New("engine not found")
 }
 
 func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string) (string, error) {
-	status := "ACTIVE"
-	instanceTypes, err := r.dbaasInstanceTypes.ListContext(ctx, dbaasInstanceTypes.ListParameters{
-		Status: &status,
-	},
-		tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstanceTypes.ListConfigs{}))
+	active := "ACTIVE"
+	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
+		Status: &active,
+	})
 	if err != nil {
 		return "", err
 	}
-	for _, instance := range instanceTypes.Results {
+	for _, instance := range instanceTypes {
 		if instance.Label == instanceType {
-			return instance.Id, nil
+			return instance.ID, nil
 		}
 	}
 	return "", errors.New("instance type not found")
 }
 
 func (r *DBaaSInstanceResource) getEngineNameAndVersionByID(ctx context.Context, engineID string) (name string, version string, err error) {
-	engine, err := r.dbaasEngines.GetContext(ctx, dbaasEngines.GetParameters{
-		EngineId: engineID,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasEngines.GetConfigs{}))
+	engine, err := r.dbaasEngines.Get(ctx, engineID)
 	if err != nil {
 		return "", "", err
 	}
@@ -429,9 +404,7 @@ func (r *DBaaSInstanceResource) getEngineNameAndVersionByID(ctx context.Context,
 }
 
 func (r *DBaaSInstanceResource) getInstanceTypeNameByID(ctx context.Context, instanceTypeID string) (string, error) {
-	instanceType, err := r.dbaasInstanceTypes.GetContext(ctx, dbaasInstanceTypes.GetParameters{
-		InstanceTypeId: instanceTypeID,
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstanceTypes.GetConfigs{}))
+	instanceType, err := r.dbaasInstanceTypes.Get(ctx, instanceTypeID)
 	if err != nil {
 		return "", err
 	}
@@ -446,9 +419,7 @@ func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Conte
 		case <-timeoutCtx.Done():
 			return fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
-			instance, err := r.dbaasInstances.GetContext(ctx, dbaasInstances.GetParameters{
-				InstanceId: instanceID,
-			}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasInstances.GetConfigs{}))
+			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
 			if err != nil {
 				return err
 			}

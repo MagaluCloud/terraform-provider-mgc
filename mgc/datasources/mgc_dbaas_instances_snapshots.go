@@ -3,9 +3,8 @@ package datasources
 import (
 	"context"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/lib"
-	dbaasSnapshots "github.com/MagaluCloud/magalu/mgc/lib/products/dbaas/instances/snapshots"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/client"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -13,8 +12,7 @@ import (
 )
 
 type DataSourceDbSnapshots struct {
-	sdkClient *mgcSdk.Client
-	snapshots dbaasSnapshots.Service
+	snapshots dbSDK.InstanceService
 }
 
 type dbSnapshotsModel struct {
@@ -34,19 +32,13 @@ func (r *DataSourceDbSnapshots) Configure(ctx context.Context, req datasource.Co
 	if req.ProviderData == nil {
 		return
 	}
-
-	var err error
-	var errDetail error
-	r.sdkClient, err, errDetail = client.NewSDKClient(req, resp)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			err.Error(),
-			errDetail.Error(),
-		)
+	dataConfig, ok := req.ProviderData.(tfutil.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
 
-	r.snapshots = dbaasSnapshots.NewService(ctx, r.sdkClient)
+	r.snapshots = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbSnapshots) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -104,23 +96,21 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	snapshots, err := r.snapshots.ListContext(ctx, dbaasSnapshots.ListParameters{
-		InstanceId: data.InstanceId.ValueString(),
-	}, tfutil.GetConfigsFromTags(r.sdkClient.Sdk().Config().Get, dbaasSnapshots.ListConfigs{}))
+	snapshots, err := r.snapshots.ListSnapshots(ctx, data.InstanceId.ValueString(), dbSDK.ListSnapshotOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError("failed to list snapshots", err.Error())
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
 	var snapshotModels []dbSnapshotModel
-	for _, snapshot := range snapshots.Results {
+	for _, snapshot := range snapshots {
 		snapshotModels = append(snapshotModels, dbSnapshotModel{
-			ID:          types.StringValue(snapshot.Id),
+			ID:          types.StringValue(snapshot.ID),
 			Name:        types.StringValue(snapshot.Name),
 			InstanceId:  data.InstanceId,
 			Description: types.StringValue(snapshot.Description),
 			CreatedAt:   types.StringValue(snapshot.CreatedAt),
-			Status:      types.StringValue(snapshot.Status),
+			Status:      types.StringValue(string(snapshot.Status)),
 			Size:        types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&snapshot.AllocatedSize)),
 		})
 	}
