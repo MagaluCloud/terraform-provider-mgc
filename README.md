@@ -1,24 +1,130 @@
-## Magalu Cloud Provider
+# Magalu Cloud Terraform Provider
 
-The MGC provider allows you to use Terraform to manage your resources on Magalu Cloud.
+[![Go Report Card](https://goreportcard.com/badge/github.com/MagaluCloud/terraform-provider-mgc)](https://goreportcard.com/report/github.com/MagaluCloud/terraform-provider-mgc)
+[![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+[![HashiCorp Partner](https://img.shields.io/badge/HashiCorp-Technology%20Partner-7B42BC)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
 
-With the provider, you can manage:
+The official Terraform provider for Magalu Cloud, allowing you to manage your cloud infrastructure as code. As an official HashiCorp Technology Partner, this provider follows Terraform best practices for reliability and user experience.
 
-- VPCs (subnets, security rules, public IPs)
-- Virtual Machines (instances, snapshots)
-- Kubernetes (clusters, node pools)
-- DBaaS (instances, replications)
-- Block Storage (volumes, snapshots, VM attachment)
-- Object Storage
+## Provider Features
 
-The provider is currently under development, so new Magalu Cloud resources will be supported soon.
+The MGC provider gives you comprehensive control over your Magalu Cloud resources, including:
 
-# References
-[Magalu Cloud Official Documentation](https://docs.magalu.cloud/docs/terraform/overview)
+### Networking
 
-[Magalu Cloud Terraform Provider](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
+- **Virtual Private Clouds (VPCs)** - Create isolated network environments
+- **Subnets** - Segment your VPC networks
+- **Security Rules** - Control traffic with fine-grained permissions
+- **Public IPs** - Expose services to the internet
 
-# Participate
-- You can contribute to an [open issue](https://github.com/MagaluCloud/terraform-provider-mgc/issues) to report a bug or suggest improvements and new features
-- You can open tópic in our [Dicussions Forum](https://github.com/MagaluCloud/terraform-provider-mgc/discussions)
-- See our roadmap in [projects](https://github.com/orgs/MagaluCloud/projects/2/views/7)
+### Compute
+
+- **Virtual Machines** - Deploy and manage instances with various sizes and configurations
+- **VM Snapshots** - Create point-in-time backups of your instances
+- **SSH Keys** - Securely access your virtual machines
+
+### Kubernetes
+
+- **Managed Kubernetes Clusters** - Deploy production-ready Kubernetes
+- **Node Pools** - Scale your Kubernetes worker nodes
+- **Cluster Upgrades** - Manage Kubernetes versions
+
+### Database as a Service (DBaaS)
+
+- **Database Instances** - Deploy managed database services
+- **Replication** - Configure high availability and read replicas
+- **Backups** - Schedule and manage database backups
+
+### Storage
+
+- **Block Storage** - Persistent volumes for your instances
+- **Volume Snapshots** - Point-in-time backups
+- **VM Volume Attachment** - Connect storage to your virtual machines
+- **Object Storage** - S3-compatible storage for unstructured data
+
+## Usage Example
+
+```hcl
+terraform {
+  required_providers {
+    mgc = {
+      source = "magalucloud/mgc"
+    }
+  }
+}
+
+provider "mgc" {
+  region  = "br-ne1"
+  api_key = var.api_key
+}
+
+variable "api_key" {
+  type      = string
+  sensitive = true
+}
+
+# Create a virtual machine instance
+resource "mgc_virtual_machine_instances" "example_vm" {
+  name              = "example-vm"
+  machine_type      = "BV1-1-40"
+  image             = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name      = "my-ssh-key"
+}
+```
+
+## Documentation
+
+For complete usage documentation and examples, visit:
+
+- [Magalu Cloud Official Documentation](https://docs.magalu.cloud/docs/terraform/overview)
+- [Terraform Registry Documentation](https://registry.terraform.io/providers/MagaluCloud/mgc/latest/docs)
+
+## Local Development
+
+### Building the Provider
+
+1. Clone the repository
+2. Run `make build` to build the provider locally
+
+```bash
+# Clone the repo
+git clone https://github.com/MagaluCloud/terraform-provider-mgc.git
+cd terraform-provider-mgc
+
+# Build the provider
+make build
+```
+
+### Testing
+
+Before submitting contributions, please run:
+
+```bash
+# Run pre-commit checks
+make before-commit
+
+# Run all tests
+make go-test
+```
+
+## Contributing
+
+We welcome contributions to the Magalu Cloud Terraform Provider!
+
+1. **Report Issues**: Found a bug or have a feature request? [Open an issue](https://github.com/MagaluCloud/terraform-provider-mgc/issues)
+
+2. **Submit PRs**: Contributions via pull requests are welcome. Please:
+
+   - Fork the repository
+   - Create a feature branch
+   - Make your changes
+   - Run `make before-commit` to verify
+   - Submit a PR
+
+3. **Join Discussions**: Participate in our [Discussions Forum](https://github.com/MagaluCloud/terraform-provider-mgc/discussions)
+
+4. **View Roadmap**: See our development plans in our [project roadmap](https://github.com/orgs/MagaluCloud/projects/2/views/7)
+
+## License
+
+This provider is released under the [Mozilla Public License 2.0](LICENSE).
