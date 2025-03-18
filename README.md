@@ -72,6 +72,23 @@ resource "mgc_virtual_machine_instances" "example_vm" {
 }
 ```
 
+## Releases and Versioning
+
+The provider follows [semantic versioning](https://semver.org/) practices. You can find all releases, including pre-releases, release notes, and binaries at our [GitHub Releases page](https://github.com/MagaluCloud/terraform-provider-mgc/releases).
+
+When specifying the provider version in your Terraform configurations, we recommend using version constraints to ensure compatibility:
+
+```hcl
+terraform {
+  required_providers {
+    mgc = {
+      source  = "magalucloud/mgc"
+      version = "~> 0.32.0"
+    }
+  }
+}
+```
+
 ## Documentation
 
 For complete usage documentation and examples, visit:
