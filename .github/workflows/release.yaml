@@ -3,16 +3,13 @@ name: Release Terraform
 on:
   workflow_dispatch:
     inputs:
-      runTerraform:
-        description: "Run deploy of Terraform"
-        type: boolean
-        required: false
-
-concurrency:
-  group: ci-check-${{ github.ref }}
+      version:
+        description: "Version to release (e.g., v1.0.0)"
+        required: true
+        type: string
 
 jobs:
-  build:
+  deploy:
     runs-on: ${{ vars.RUNNER_RUNS_ON }}
     timeout-minutes: 10
     steps:
@@ -21,37 +18,71 @@ jobs:
         with:
           fetch-depth: 1
           token: ${{ secrets.MAGALUBOT_GH_PAT }}
+
       - name: Set up Go
         uses: actions/setup-go@v5.0.2
         with:
           cache-dependency-path: "**/go.sum"
           go-version: stable
 
-  terraform-release:
-    needs: build
-    runs-on: ${{ vars.RUNNER_RUNS_ON }}
-    timeout-minutes: 20
-    if: ${{ inputs.runTerraform }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.7
-        with:
-          fetch-depth: 1
-          token: ${{ secrets.MAGALUBOT_GH_PAT }}
-      - name: Set up Go
-        uses: actions/setup-go@v5.0.2
-        with:
-          cache-dependency-path: "**/go.sum"
-          go-version: stable
       - name: Import GPG key
+        id: import-gpg-key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
         run: |
-          echo "${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}" | gpg --batch --yes --passphrase "${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}" --import
-      - name: Run GoReleaser
+          # Import the private key with passphrase
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import
+
+          # Get Key ID and Fingerprint
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | awk '/sec/ {split($2, a, "/"); print a[2]}')
+          FINGERPRINT=$(gpg --fingerprint --with-colons $KEY_ID | awk -F: '$1 == "fpr" {print $10; exit}')
+
+          # Trust the key ultimately
+          echo "${FINGERPRINT}:6:" | gpg --import-ownertrust
+
+          # Create GPG wrapper script
+          mkdir -p ~/bin
+          echo '#!/bin/sh' > ~/bin/git-gpg-wrapper
+          echo 'echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"' >> ~/bin/git-gpg-wrapper
+          chmod +x ~/bin/git-gpg-wrapper
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+          # Set GPG_TTY to avoid warnings
+          echo "GPG_TTY=$(tty)" >> $GITHUB_ENV
+
+      - name: Configure Git
+        id: config-git
+        if: steps.import-gpg-key.outcome == 'success'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
+        run: |
+          git config --global user.email "${{vars.MAGALUBOT_EMAIL}}"
+          git config --global user.name "${{vars.MAGALUBOT_USER_NAME}}"
+          git config --global commit.gpgsign true
+          git config --global tag.gpgsign true
+          git config --global gpg.program git-gpg-wrapper
+          # Get and set the signing key
+          SIGNING_KEY=$(gpg --list-secret-keys --keyid-format LONG | awk '/sec/ {split($2, a, "/"); print a[2]}')
+          git config --global user.signingkey $SIGNING_KEY
+
+      - name: Create and push tag
+        id: create-and-push-tag
+        if: steps.config-git.outcome == 'success'
+        env:
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
+        run: |
+          git tag -a ${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Build with GoReleaser
+        id: build-with-goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: 2
-          args: release --clean --config="goreleaser_terraform.yaml"
+          args: release --clean --config="release.yaml"
         env:
           VERSION: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.MAGALUBOT_GH_PAT }}
