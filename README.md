@@ -103,7 +103,15 @@ For complete usage documentation and examples, visit:
 ### Building the Provider
 
 1. Clone the repository
-2. Run `make build` to build the provider locally
+2. Install dependencies
+
+- Install [Go](https://golang.org/dl/) (version 1.24 or higher)
+- Install [GoReleaser](https://goreleaser.com/)
+- Install [Terraform](https://www.terraform.io/downloads)
+- Install [Make](https://www.gnu.org/software/make/)
+- Install [Git](https://git-scm.com/downloads)
+
+3. Run `make build` to build the provider locally
 
 ```bash
 # Clone the repo
