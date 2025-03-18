@@ -1,11 +1,12 @@
 # Magalu Cloud Terraform Provider
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/MagaluCloud/terraform-provider-mgc)](https://goreportcard.com/report/github.com/MagaluCloud/terraform-provider-mgc)
-[![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![HashiCorp Partner](https://img.shields.io/badge/HashiCorp-Technology%20Partner-7B42BC)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
 [![Terraform Registry Downloads](https://img.shields.io/badge/dynamic/json?color=blue&label=downloads&query=%24.data.attributes.downloads&url=https%3A%2F%2Fregistry.terraform.io%2Fv2%2Fproviders%2Fmagalucloud%2Fmgc)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
-[![GitHub Stars](https://img.shields.io/github/stars/MagaluCloud/terraform-provider-mgc)](https://github.com/MagaluCloud/terraform-provider-mgc/stargazers)
 [![GitHub release (latest)](https://img.shields.io/github/v/release/MagaluCloud/terraform-provider-mgc)](https://github.com/MagaluCloud/terraform-provider-mgc/releases)
+[![GitHub Actions](https://github.com/MagaluCloud/mgc-sdk-go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/MagaluCloud/terraform-provider-mgc)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/MagaluCloud/terraform-provider-mgc)](https://github.com/MagaluCloud/terraform-provider-mgc)
+[![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
 The official Terraform provider for Magalu Cloud, allowing you to manage your cloud infrastructure as code. As an official HashiCorp Partner, this provider follows Terraform best practices for reliability and user experience.
 
