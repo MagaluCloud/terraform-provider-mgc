@@ -94,4 +94,7 @@ go-vet:
 go-test:
 	go test -v ./...
 
-before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory 
+before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory
+
+build:
+	goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"

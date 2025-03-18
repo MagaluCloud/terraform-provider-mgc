@@ -32,8 +32,8 @@ builds:
 archives:
   - id: terraform
     name_template: "terraform-provider-mgc_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format: zip
-    builds:
+    formats: ["zip"]
+    ids:
       - terraform
     files:
       - src: "README.md"
@@ -42,8 +42,8 @@ archives:
         dst: "docs/"
   - id: terraformwin
     name_template: "terraform-provider-mgc_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format: zip
-    builds:
+    formats: ["zip"]
+    ids:
       - terraformwin
     files:
       - src: "README.md"
