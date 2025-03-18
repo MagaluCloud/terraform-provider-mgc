@@ -31,26 +31,25 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
         run: |
-          # Create a temporary keyring file
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          # Import the private key with passphrase
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import
+
+          # Get Key ID and Fingerprint
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | awk '/sec/ {split($2, a, "/"); print a[2]}')
+          FINGERPRINT=$(gpg --fingerprint --with-colons $KEY_ID | awk -F: '$1 == "fpr" {print $10; exit}')
 
           # Trust the key ultimately
-          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep -Po '(?<=rsa)([A-Z0-9]+)')
-          echo "${KEY_ID}:6:" | gpg --import-ownertrust
+          echo "${FINGERPRINT}:6:" | gpg --import-ownertrust
 
-          # Configure git to use GPG
-          git config --global user.signingkey "$KEY_ID"
-          git config --global commit.gpgsign true
-          git config --global tag.gpgsign true
+          # Create GPG wrapper script
+          mkdir -p ~/bin
+          echo '#!/bin/sh' > ~/bin/git-gpg-wrapper
+          echo 'echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 "$@"' >> ~/bin/git-gpg-wrapper
+          chmod +x ~/bin/git-gpg-wrapper
+          echo "$HOME/bin" >> $GITHUB_PATH
 
-          # Configure GPG to use passphrase
-          mkdir -p ~/.gnupg
-          echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
-          echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
-          gpg-connect-agent reloadagent /bye
-
-          # Export key ID for later use
-          echo "GPG_KEY_ID=$KEY_ID" >> $GITHUB_ENV
+          # Set GPG_TTY to avoid warnings
+          echo "GPG_TTY=$(tty)" >> $GITHUB_ENV
 
       - name: Configure Git
         id: config-git
