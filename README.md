@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![HashiCorp Partner](https://img.shields.io/badge/HashiCorp-Technology%20Partner-7B42BC)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
 
-The official Terraform provider for Magalu Cloud, allowing you to manage your cloud infrastructure as code. As an official HashiCorp Technology Partner, this provider follows Terraform best practices for reliability and user experience.
+The official Terraform provider for Magalu Cloud, allowing you to manage your cloud infrastructure as code. As an official HashiCorp Partner, this provider follows Terraform best practices for reliability and user experience.
 
 ## Provider Features
 
@@ -122,8 +122,6 @@ We welcome contributions to the Magalu Cloud Terraform Provider!
    - Submit a PR
 
 3. **Join Discussions**: Participate in our [Discussions Forum](https://github.com/MagaluCloud/terraform-provider-mgc/discussions)
-
-4. **View Roadmap**: See our development plans in our [project roadmap](https://github.com/orgs/MagaluCloud/projects/2/views/7)
 
 ## License
 
