@@ -162,7 +162,7 @@ func (r *DataSourceDbInstances) getAllInstances(ctx context.Context, params dbSD
 		if len(instances) == 0 {
 			break
 		}
-		*params.Offset = *params.Offset + len(allResults)
+		*params.Offset = *params.Offset + len(instances)
 	}
 	return allResults, nil
 }
