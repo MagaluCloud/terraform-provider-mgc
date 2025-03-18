@@ -4,7 +4,7 @@
 [![HashiCorp Partner](https://img.shields.io/badge/HashiCorp-Technology%20Partner-7B42BC)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
 [![Terraform Registry Downloads](https://img.shields.io/badge/dynamic/json?color=blue&label=downloads&query=%24.data.attributes.downloads&url=https%3A%2F%2Fregistry.terraform.io%2Fv2%2Fproviders%2Fmagalucloud%2Fmgc)](https://registry.terraform.io/providers/MagaluCloud/mgc/latest)
 [![GitHub release (latest)](https://img.shields.io/github/v/release/MagaluCloud/terraform-provider-mgc)](https://github.com/MagaluCloud/terraform-provider-mgc/releases)
-[![GitHub Actions](https://github.com/MagaluCloud/mgc-sdk-go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/MagaluCloud/terraform-provider-mgc)
+[![Go Checks](https://github.com/MagaluCloud/terraform-provider-mgc/actions/workflows/go-checks.yml/badge.svg?branch=main)](https://github.com/MagaluCloud/terraform-provider-mgc/actions/workflows/go-checks.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/MagaluCloud/terraform-provider-mgc)](https://github.com/MagaluCloud/terraform-provider-mgc)
 [![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 

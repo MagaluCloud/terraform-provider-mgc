@@ -3,7 +3,10 @@ name: Go Checks
 on:
   pull_request:
     branches:
-      - main  
+      - main
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -19,11 +22,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
         with:
-          go-version: '1.23'  
+          go-version: "1.23"
 
       - name: Run go fmt
         id: fmt
-        continue-on-error: true  
+        continue-on-error: true
         run: |
           # Capture unformatted files and set as output
           unformatted=$(gofmt -l .)
@@ -38,7 +41,7 @@ jobs:
 
       - name: Run go vet
         id: vet
-        continue-on-error: true  
+        continue-on-error: true
         run: |
           # Capture vet errors and set as output
           vet_errors=$(go vet ./... 2>&1 | tee /dev/stderr)
@@ -52,7 +55,7 @@ jobs:
           fi
 
       - name: Post PR comment with errors
-        if: always()  
+        if: always()
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
         env:
           FMT_ERRORS: ${{ steps.fmt.outputs.unformatted_files }}
