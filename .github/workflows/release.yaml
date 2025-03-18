@@ -54,6 +54,9 @@ jobs:
       - name: Configure Git
         id: config-git
         if: steps.import-gpg-key.outcome == 'success'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.MAGALUBOT_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.MAGALUBOT_GPG_PASSPHRASE }}
         run: |
           git config --global user.email "${{vars.MAGALUBOT_EMAIL}}"
           git config --global user.name "${{vars.MAGALUBOT_USER_NAME}}"
