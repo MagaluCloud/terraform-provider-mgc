@@ -51,3 +51,4 @@ terraform.tfstate.backup
 terraform.tfstate.d
 **/__debug_bin**
 terraform-provider-mgc
+coverage.out
