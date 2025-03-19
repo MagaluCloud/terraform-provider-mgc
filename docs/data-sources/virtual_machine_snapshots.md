@@ -3,12 +3,12 @@
 page_title: "mgc_virtual_machine_snapshots Data Source - terraform-provider-mgc"
 subcategory: "Virtual Machine"
 description: |-
-  
+  This data source provides a list of virtual machine snapshots.
 ---
 
 # mgc_virtual_machine_snapshots (Data Source)
 
-
+This data source provides a list of virtual machine snapshots.
 
 ## Example Usage
 

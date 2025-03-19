@@ -44,6 +44,7 @@ type vmSnapshotsListModel struct {
 
 func (r *DataSourceVmSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "This data source provides a list of virtual machine snapshots.",
 		Attributes: map[string]schema.Attribute{
 			"snapshots": schema.ListNestedAttribute{
 				Computed:    true,
