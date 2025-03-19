@@ -219,6 +219,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceSSH,
 		datasources.NewDatasourceBucket,
 		datasources.NewDatasourceBuckets,
+		datasources.NewDataSourceVmSnapshots,
 	}
 }
 
