@@ -41,7 +41,7 @@ func (r *NetworkVPCsDatasource) Configure(ctx context.Context, req datasource.Co
 
 func (r *NetworkVPCsDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network VPC",
+		Description: "Network VPCs",
 		Attributes: map[string]schema.Attribute{
 			"items": schema.ListNestedAttribute{
 				Computed: true,

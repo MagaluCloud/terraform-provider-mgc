@@ -36,7 +36,7 @@ func (r *mgcNetworkSubnetpoolsDatasource) Metadata(_ context.Context, req dataso
 
 func (r *mgcNetworkSubnetpoolsDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network Subnet Pool",
+		Description: "Network Subnet Pools",
 		Attributes: map[string]schema.Attribute{
 			"items": schema.ListNestedAttribute{
 				Computed: true,

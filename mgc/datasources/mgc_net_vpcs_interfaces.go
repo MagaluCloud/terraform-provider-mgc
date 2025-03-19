@@ -29,7 +29,7 @@ func (r *NetworkVPCInterfacesDatasource) Metadata(_ context.Context, req datasou
 
 func (r *NetworkVPCInterfacesDatasource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network VPC Interface",
+		Description: "Network VPC Interfaces",
 		Attributes: map[string]schema.Attribute{
 			"items": schema.ListNestedAttribute{
 				Computed: true,
