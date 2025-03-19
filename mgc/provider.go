@@ -245,7 +245,7 @@ func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
 
 	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
 		sdk.WithBaseURL(sdkUrl),
-		sdk.WithUserAgent("MgcTF/"+tfVersion+"-mgc-sdk-go"),
+		sdk.WithUserAgent("MgcTF/"+tfVersion),
 	)
 
 	return output
