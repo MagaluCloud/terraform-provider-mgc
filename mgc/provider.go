@@ -220,6 +220,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDatasourceBucket,
 		datasources.NewDatasourceBuckets,
 		datasources.NewDataSourceVmSnapshots,
+		datasources.NewDataSourceKubernetesClusterList,
 	}
 }
 
