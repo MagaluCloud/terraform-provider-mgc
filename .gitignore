@@ -52,3 +52,5 @@ terraform.tfstate.d
 **/__debug_bin**
 terraform-provider-mgc
 coverage.out
+debug.pid
+debug_output**.log

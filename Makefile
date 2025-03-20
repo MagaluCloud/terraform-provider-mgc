@@ -129,6 +129,19 @@ debug: ## Run the provider in debug mode
 	@echo -e "$(GREEN)Running in debug mode...$(NC)"
 	@$(GO) run main.go --debug
 
+debugc: ## Run the provider in debug mode
+	@echo -e "$(GREEN)Running in debug mode...$(NC)"
+	@LOG_FILE="debug_output_$(shell date +%Y%m%d_%H%M%S).log"; \
+	echo -e "$(GREEN)Debug logs will be written to $$LOG_FILE$(NC)"; \
+	$(GO) run main.go --debug > "$$LOG_FILE" & echo $$! > debug.pid; \
+	sleep 2; \
+	./copy-export.sh "$$LOG_FILE"; \
+	read -p "Press Enter to stop debugging..." dummy; \
+	if [ -f debug.pid ]; then \
+		kill -15 $$(cat debug.pid) || true; \
+		rm -f debug.pid; \
+		echo -e "$(GREEN)Debug process stopped$(NC)"; \
+	fi
 clean: ## Clean build artifacts
 	@echo -e "$(GREEN)Cleaning build artifacts...$(NC)"
 	@rm -rf dist/
