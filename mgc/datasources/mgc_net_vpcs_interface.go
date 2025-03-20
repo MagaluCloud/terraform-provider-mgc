@@ -155,43 +155,5 @@ func (r *NetworkVPCInterfaceDatasource) Read(ctx context.Context, req datasource
 		return
 	}
 
-	data.Name = types.StringPointerValue(vpcInterface.Name)
-	data.VpcId = types.StringPointerValue(vpcInterface.VPCID)
-	data.IpAddress = []NetworkVPCInterfaceIpAddressModel{}
-	if vpcInterface.IPAddress == nil {
-		for _, ipAddress := range *vpcInterface.IPAddress {
-			data.IpAddress = append(data.IpAddress, NetworkVPCInterfaceIpAddressModel{
-				Ethertype: types.StringPointerValue(ipAddress.Ethertype),
-				IpAddress: types.StringValue(ipAddress.IPAddress),
-				SubnetId:  types.StringValue(ipAddress.SubnetID),
-			})
-		}
-	}
-	data.IsAdminStateUp = types.BoolPointerValue(vpcInterface.IsAdminStateUp)
-	data.IsPortSecurityEnabled = types.BoolPointerValue(vpcInterface.IsPortSecurityEnabled)
-	data.PublicIp = []NetworkVPCInterfacePublicIpModel{}
-	if vpcInterface.PublicIP == nil {
-		for _, publicIp := range *vpcInterface.PublicIP {
-			data.PublicIp = append(data.PublicIp, NetworkVPCInterfacePublicIpModel{
-				PublicIp:   types.StringPointerValue(publicIp.PublicIP),
-				PublicIpId: types.StringPointerValue(publicIp.PublicIPID),
-			})
-		}
-	}
-	data.SecurityGroups = []types.String{}
-	if vpcInterface.SecurityGroups != nil {
-		for _, securityGroup := range *vpcInterface.SecurityGroups {
-			data.SecurityGroups = append(data.SecurityGroups, types.StringValue(securityGroup))
-		}
-	}
-
-	if vpcInterface.CreatedAt != nil {
-		data.CreatedAt = types.StringValue(vpcInterface.CreatedAt.String())
-	}
-	if vpcInterface.Updated != nil {
-		data.Updated = types.StringValue(vpcInterface.Updated.String())
-	}
-	data.Description = types.StringPointerValue(vpcInterface.Description)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, toNetworkVPCInterfaceModel(*vpcInterface))...)
 }
