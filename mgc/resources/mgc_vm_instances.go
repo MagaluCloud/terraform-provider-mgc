@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -28,6 +28,23 @@ const (
 type InstanceStatus string
 
 var imageExpands []string = []string{computeSdk.InstanceImageExpand, computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
+
+var errorStatus = []InstanceStatus{
+	StatusCreatingError,
+	StatusCreatingNetworkError,
+	StatusCreatingErrorQuota,
+	StatusCreatingErrorQuotaRam,
+	StatusCreatingErrorQuotaVcpu,
+	StatusCreatingErrorQuotaDisk,
+	StatusCreatingErrorQuotaInstance,
+	StatusCreatingErrorQuotaFloatingIP,
+	StatusCreatingErrorQuotaNetwork,
+	StatusRetypingError,
+	StatusRetypingErrorQuotaRam,
+	StatusRetypingErrorQuotaVcpu,
+	StatusRetypingErrorQuota,
+	StatusDeletingError,
+}
 
 const (
 	StatusAttachingNic                 InstanceStatus = "attaching_nic"
@@ -73,7 +90,7 @@ func (s InstanceStatus) String() string {
 }
 
 func (s InstanceStatus) IsError() bool {
-	return strings.HasSuffix(string(s), "_error")
+	return slices.Contains(errorStatus, s)
 }
 
 func NewVirtualMachineInstancesResource() resource.Resource {
@@ -415,6 +432,9 @@ func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instan
 				return instance, nil
 			}
 			if currentStatus.IsError() {
+				if instance.Error != nil && instance.Error.Message != "" {
+					return nil, fmt.Errorf("%s", instance.Error.Message)
+				}
 				return nil, fmt.Errorf("instance %s is in error state: %s", instanceID, currentStatus)
 			}
 		}
