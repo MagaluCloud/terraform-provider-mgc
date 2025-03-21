@@ -51,6 +51,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Schema(_ context.Context, _ resource.Sch
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cidr_block": schema.StringAttribute{
@@ -113,6 +114,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Schema(_ context.Context, _ resource.Sch
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
