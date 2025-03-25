@@ -68,7 +68,7 @@ func (r *NetworkPublicIPAttachResource) Schema(_ context.Context, _ resource.Sch
 
 func (r *NetworkPublicIPAttachResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var model NetworkPublicIAttachPModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &model)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

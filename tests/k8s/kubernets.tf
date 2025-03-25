@@ -25,7 +25,6 @@ resource "mgc_kubernetes_cluster" "full_cluster" {
   version              = var.cluster-version
   description          = "Full-featured Kubernetes cluster for smoke test"
   enabled_server_group = true
-  async_creation       = true
   allowed_cidrs        = ["10.0.0.0/24", "192.168.1.0/24"]
   zone                 = "example-zone-1"
 }

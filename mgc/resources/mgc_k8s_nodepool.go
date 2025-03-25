@@ -66,6 +66,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -102,7 +103,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Description:        "List of tags applied to the node pool.",
 				DeprecationMessage: "Tags are deprecated and will be removed in a future release.",
 				Optional:           true,
-				Computed:           true,
 				ElementType:        types.StringType,
 			},
 			"created_at": schema.StringAttribute{
@@ -116,6 +116,9 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"id": schema.StringAttribute{
 				Description: "Node pool's UUID.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"taints": schema.ListNestedAttribute{
 				Description: "Property associating a set of nodes.",
@@ -163,7 +166,7 @@ func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest
 
 func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data NodePoolResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -180,15 +183,15 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		Taints:   convertTaintsNP(data.Taints),
 	}
 
-	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
+	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
 		createParams.AutoScale = &k8sSDK.AutoScale{}
 	}
 
-	if !data.MaxReplicas.IsNull() {
+	if !data.MaxReplicas.IsUnknown() {
 		createParams.AutoScale.MaxReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MaxReplicas.ValueInt64Pointer())
 	}
 
-	if !data.MinReplicas.IsNull() {
+	if !data.MinReplicas.IsUnknown() {
 		createParams.AutoScale.MinReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
 	}
 
@@ -200,6 +203,9 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 
 	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	err = r.waitNodePoolCreation(ctx, nodepool.ID, data.ClusterID.ValueString())
 	if err != nil {
@@ -210,7 +216,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 
 func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data NodePoolResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -226,14 +232,14 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		Replicas: &repli,
 	}
 
-	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
+	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
 		updateParam.AutoScale = &k8sSDK.AutoScale{}
 	}
 
-	if !data.MaxReplicas.IsNull() {
+	if !data.MaxReplicas.IsUnknown() {
 		updateParam.AutoScale.MaxReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MaxReplicas.ValueInt64Pointer())
 	}
-	if !data.MinReplicas.IsNull() {
+	if !data.MinReplicas.IsUnknown() {
 		updateParam.AutoScale.MinReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
 	}
 
