@@ -138,7 +138,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Configure(ctx context.Context, req resou
 
 func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	data := mgcNetworkVpcsSubnetsModel{}
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -158,7 +158,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 	}
 
 	var azparsed *string
-	if !data.AvailabilityZone.IsNull() {
+	if !data.AvailabilityZone.IsUnknown() {
 		az, err := tfutil.ConvertAvailabilityZoneToXZone(data.AvailabilityZone.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Invalid Availability Zone", err.Error())
@@ -169,12 +169,18 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 	subnetID, err := r.networkVpcsSubnets.CreateSubnet(ctx, data.VpcId.ValueString(), createParam, netSDK.SubnetCreateOptions{
 		Zone: azparsed,
 	})
-
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
+	createdSubnet, err := r.networkSubnets.Get(ctx, subnetID)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	data.AvailabilityZone = types.StringValue(tfutil.ConvertXZoneToAvailabilityZone(r.region, createdSubnet.Zone))
 	data.ID = types.StringValue(subnetID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
