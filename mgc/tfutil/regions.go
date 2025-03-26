@@ -20,6 +20,11 @@ var regions = map[string]map[string]string{
 		"br-mgl1": client.BrMgl1.String(),
 		"br-se1":  client.BrSe1.String(),
 	},
+	ENV_PRE_PROD: {
+		"br-ne1":  buildPreProdUrl("br-ne1"),
+		"br-mgl1": buildPreProdUrl("br-mgl1"),
+		"br-se1":  buildPreProdUrl("br-se1"),
+	},
 }
 var s3Regions = map[string]map[string]string{
 	ENV_PROD: {
@@ -32,10 +37,6 @@ var s3Regions = map[string]map[string]string{
 func RegionToUrl(region string, env string) string {
 	if env == ENV_DEV_QA {
 		return buildQAUrl(region)
-	}
-
-	if env == ENV_PRE_PROD {
-		return buildPreProdUrl(region)
 	}
 
 	if regions[env] == nil {
@@ -51,9 +52,6 @@ func RegionToUrl(region string, env string) string {
 }
 
 func buildPreProdUrl(region string) string {
-	if region == "" {
-		return URL_PRE_PROD
-	}
 	return URL_PRE_PROD + "/" + region
 }
 

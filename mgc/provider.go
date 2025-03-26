@@ -123,7 +123,7 @@ func (v *regionValidator) ValidateString(ctx context.Context, req validator.Stri
 		return
 	}
 
-	if env == "prod" {
+	if env != "dev-qa" {
 		validRegions := []string{"br-ne1", "br-se1", "br-mgl1"}
 		region := req.ConfigValue.ValueString()
 
