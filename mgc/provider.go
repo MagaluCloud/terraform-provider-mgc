@@ -2,7 +2,9 @@ package mgc
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"runtime"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
 	resources "github.com/MagaluCloud/terraform-provider-mgc/mgc/resources"
@@ -255,7 +257,7 @@ func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
 
 	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
 		sdk.WithBaseURL(sdkUrl),
-		sdk.WithUserAgent("MgcTF/"+tfVersion),
+		sdk.WithUserAgent(fmt.Sprintf("MgcTF/%s (%s; %s)", tfVersion, runtime.GOOS, runtime.GOARCH)),
 	)
 
 	return output
