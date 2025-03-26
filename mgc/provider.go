@@ -2,7 +2,6 @@ package mgc
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
@@ -68,7 +67,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					stringvalidator.AlsoRequires(
 						path.MatchRoot("env"),
 					),
-					&regionValidator{},
+					&tfutil.RegionValidator{},
 				},
 			},
 			"api_key": schema.StringAttribute{
@@ -102,44 +101,6 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 	}
 }
 
-type regionValidator struct{}
-
-func (v *regionValidator) Description(ctx context.Context) string {
-	return "region is only validated when env is 'prod'"
-}
-
-func (v *regionValidator) MarkdownDescription(ctx context.Context) string {
-	return "region is only validated when env is `prod`"
-}
-
-func (v *regionValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-
-	var env string
-	diags := req.Config.GetAttribute(ctx, path.Root("env"), &env)
-	if diags.HasError() {
-		return
-	}
-
-	if env != "dev-qa" {
-		validRegions := []string{"br-ne1", "br-se1", "br-mgl1"}
-		region := req.ConfigValue.ValueString()
-
-		for _, validRegion := range validRegions {
-			if region == validRegion {
-				return
-			}
-		}
-
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid Region",
-			fmt.Sprintf("Expected region to be one of %v, got: %s", validRegions, region),
-		)
-	}
-}
 func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var plan ProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
