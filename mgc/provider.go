@@ -2,6 +2,7 @@ package mgc
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
@@ -9,6 +10,7 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -52,18 +54,21 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Description: "Terraform Provider for Magalu Cloud",
 		Attributes: map[string]schema.Attribute{
+			"env": schema.StringAttribute{
+				Description: "The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("prod", "pre-prod", "dev-qa"),
+				},
+			},
 			"region": schema.StringAttribute{
 				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1"),
-				},
-			},
-			"env": schema.StringAttribute{
-				Description: "The environment to use. Options: prod / pre-prod. Default is prod.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf("prod", "pre-prod"),
+					stringvalidator.AlsoRequires(
+						path.MatchRoot("env"),
+					),
+					&regionValidator{},
 				},
 			},
 			"api_key": schema.StringAttribute{
@@ -97,6 +102,44 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 	}
 }
 
+type regionValidator struct{}
+
+func (v *regionValidator) Description(ctx context.Context) string {
+	return "region is only validated when env is 'prod'"
+}
+
+func (v *regionValidator) MarkdownDescription(ctx context.Context) string {
+	return "region is only validated when env is `prod`"
+}
+
+func (v *regionValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	var env string
+	diags := req.Config.GetAttribute(ctx, path.Root("env"), &env)
+	if diags.HasError() {
+		return
+	}
+
+	if env == "prod" {
+		validRegions := []string{"br-ne1", "br-se1", "br-mgl1"}
+		region := req.ConfigValue.ValueString()
+
+		for _, validRegion := range validRegions {
+			if region == validRegion {
+				return
+			}
+		}
+
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid Region",
+			fmt.Sprintf("Expected region to be one of %v, got: %s", validRegions, region),
+		)
+	}
+}
 func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var plan ProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
