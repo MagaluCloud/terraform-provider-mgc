@@ -30,16 +30,16 @@ var s3Regions = map[string]map[string]string{
 }
 
 func RegionToUrl(region string, env string) string {
-	if regions[env] == nil {
-		env = ENV_PROD
-	}
-
 	if env == ENV_DEV_QA {
 		return buildQAUrl(region)
 	}
 
 	if env == ENV_PRE_PROD {
 		return buildPreProdUrl(region)
+	}
+
+	if regions[env] == nil {
+		env = ENV_PROD
 	}
 
 	if regions[env][region] == "" {

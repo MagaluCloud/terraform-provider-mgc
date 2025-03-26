@@ -48,7 +48,7 @@ func TestRegionToUrl(t *testing.T) {
 		{
 			inputRegion: "invalid-region",
 			inputEnv:    "pre-prod",
-			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-se1",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com/invalid-region",
 		},
 		{
 			inputRegion: "br-ne1",
@@ -66,9 +66,19 @@ func TestRegionToUrl(t *testing.T) {
 			expectedUrl: client.BrSe1.String(),
 		},
 		{
+			inputRegion: "xpto",
+			inputEnv:    "dev-qa",
+			expectedUrl: "https://api.dev-qa.jaxyendy.com/xpto",
+		},
+		{
+			inputRegion: "",
+			inputEnv:    "dev-qa",
+			expectedUrl: "https://api.dev-qa.jaxyendy.com",
+		},
+		{
 			inputRegion: "",
 			inputEnv:    "pre-prod",
-			expectedUrl: "https://api.pre-prod.jaxyendy.com/br-se1",
+			expectedUrl: "https://api.pre-prod.jaxyendy.com",
 		},
 		{
 			inputRegion: "br-ne1",
