@@ -2,8 +2,6 @@ module github.com/MagaluCloud/terraform-provider-mgc
 
 go 1.24
 
-toolchain go1.24.0
-
 require (
 	github.com/MagaluCloud/magalu/mgc/lib v0.33.3
 	github.com/MagaluCloud/magalu/mgc/sdk v0.33.3
@@ -30,7 +28,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 )
 
 require (
@@ -93,7 +91,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
