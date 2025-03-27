@@ -10,7 +10,7 @@ builds:
       - arm64
     binary: terraform-provider-mgc
     ldflags:
-      - -s -w -X main.Version={{.Version}}"
+      - -s -w -X main.Version={{.Version}}
     flags:
       - -tags=embed release
     main: main.go
@@ -25,7 +25,7 @@ builds:
       - arm64
     binary: terraform-provider-mgc
     ldflags:
-      - -s -w -X main.Version={{.Version}}"
+      - -s -w -X main.Version={{.Version}}
     flags:
       - -tags=embed release
     main: main.go
