@@ -26,7 +26,7 @@ func (v *RegionValidator) ValidateString(ctx context.Context, req validator.Stri
 	var env string
 	diags := req.Config.GetAttribute(ctx, path.Root("env"), &env)
 	if diags.HasError() {
-		return
+		env = "prod"
 	}
 
 	if env != "dev-qa" {
