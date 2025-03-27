@@ -65,7 +65,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
 				Optional:    true,
 				Validators: []validator.String{
-					&tfutil.RegionValidator{},
+					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1", "br-mc1"),
 				},
 			},
 			"api_key": schema.StringAttribute{
