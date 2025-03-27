@@ -11,7 +11,6 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -66,10 +65,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.AlsoRequires(
-						path.MatchRoot("env"),
-					),
-					&tfutil.RegionValidator{},
+					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1", "br-mc1"),
 				},
 			},
 			"api_key": schema.StringAttribute{
