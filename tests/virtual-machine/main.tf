@@ -11,13 +11,18 @@ variable "machine_type" {
   default     = "BV1-1-40"
 }
 
+resource "mgc_ssh_keys" "ssh_key" {
+  name = "testkey"
+  key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAKWxY1opxbh0LNTNeAHORTZEHdPRFvrfcXyhZQlsR7t"
+}
+
 # Test Case 1: Basic VM Instance
 resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
   name              = var.instance_name
   availability_zone = "br-ne1-a"
   machine_type      = var.machine_type
   image             = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name      = "publio"
+  ssh_key_name      = mgc_ssh_keys.ssh_key.name
   user_data         = base64encode("#!/bin/bash\necho 'Test Case 1: Basic Instance'")
 
   lifecycle {
@@ -31,7 +36,7 @@ resource "mgc_virtual_machine_instances" "tc2_instance_with_az" {
   availability_zone = "br-ne1-a"
   machine_type      = "BV4-8-100"
   image             = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name      = "publio"
+  ssh_key_name      = mgc_ssh_keys.ssh_key.name
   user_data         = base64encode("#!/bin/bash\necho 'Test Case 2: AZ Instance'")
 
   depends_on = [mgc_virtual_machine_instances.tc1_basic_instance]
@@ -148,25 +153,25 @@ output "vm_instance_validation" {
       name               = data.mgc_virtual_machine_instance.tc1_validation.name
       created_at         = data.mgc_virtual_machine_instance.tc1_validation.created_at
       updated_at         = data.mgc_virtual_machine_instance.tc1_validation.updated_at
-      image_id          = data.mgc_virtual_machine_instance.tc1_validation.image_id
-      image_name        = data.mgc_virtual_machine_instance.tc1_validation.image_name
-      image_platform    = data.mgc_virtual_machine_instance.tc1_validation.image_platform
-      machine_type_id   = data.mgc_virtual_machine_instance.tc1_validation.machine_type_id
-      machine_type_name = data.mgc_virtual_machine_instance.tc1_validation.machine_type_name
-      machine_type_disk = data.mgc_virtual_machine_instance.tc1_validation.machine_type_disk
-      machine_type_ram  = data.mgc_virtual_machine_instance.tc1_validation.machine_type_ram
+      image_id           = data.mgc_virtual_machine_instance.tc1_validation.image_id
+      image_name         = data.mgc_virtual_machine_instance.tc1_validation.image_name
+      image_platform     = data.mgc_virtual_machine_instance.tc1_validation.image_platform
+      machine_type_id    = data.mgc_virtual_machine_instance.tc1_validation.machine_type_id
+      machine_type_name  = data.mgc_virtual_machine_instance.tc1_validation.machine_type_name
+      machine_type_disk  = data.mgc_virtual_machine_instance.tc1_validation.machine_type_disk
+      machine_type_ram   = data.mgc_virtual_machine_instance.tc1_validation.machine_type_ram
       machine_type_vcpus = data.mgc_virtual_machine_instance.tc1_validation.machine_type_vcpus
-      vpc_id            = data.mgc_virtual_machine_instance.tc1_validation.vpc_id
-      vpc_name          = data.mgc_virtual_machine_instance.tc1_validation.vpc_name
-      ssh_key_name      = data.mgc_virtual_machine_instance.tc1_validation.ssh_key_name
-      status            = data.mgc_virtual_machine_instance.tc1_validation.status
-      state             = data.mgc_virtual_machine_instance.tc1_validation.state
-      user_data         = data.mgc_virtual_machine_instance.tc1_validation.user_data
-      availability_zone = data.mgc_virtual_machine_instance.tc1_validation.availability_zone
-      labels            = data.mgc_virtual_machine_instance.tc1_validation.labels
-      error_message     = data.mgc_virtual_machine_instance.tc1_validation.error_message
-      error_slug        = data.mgc_virtual_machine_instance.tc1_validation.error_slug
-      interfaces        = data.mgc_virtual_machine_instance.tc1_validation.interfaces
+      vpc_id             = data.mgc_virtual_machine_instance.tc1_validation.vpc_id
+      vpc_name           = data.mgc_virtual_machine_instance.tc1_validation.vpc_name
+      ssh_key_name       = data.mgc_virtual_machine_instance.tc1_validation.ssh_key_name
+      status             = data.mgc_virtual_machine_instance.tc1_validation.status
+      state              = data.mgc_virtual_machine_instance.tc1_validation.state
+      user_data          = data.mgc_virtual_machine_instance.tc1_validation.user_data
+      availability_zone  = data.mgc_virtual_machine_instance.tc1_validation.availability_zone
+      labels             = data.mgc_virtual_machine_instance.tc1_validation.labels
+      error_message      = data.mgc_virtual_machine_instance.tc1_validation.error_message
+      error_slug         = data.mgc_virtual_machine_instance.tc1_validation.error_slug
+      interfaces         = data.mgc_virtual_machine_instance.tc1_validation.interfaces
     }
   }
 }

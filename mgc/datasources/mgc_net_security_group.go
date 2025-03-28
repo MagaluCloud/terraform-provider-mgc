@@ -232,7 +232,6 @@ func securityGroupRulesSdkModelToTerraform(rules *[]netSDK.RuleResponse) []Netwo
 			PortRangeMax:    types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax)),
 			PortRangeMin:    types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMin)),
 			Protocol:        types.StringPointerValue(rule.Protocol),
-			RemoteGroupId:   types.StringPointerValue(rule.RemoteGroupID),
 			RemoteIpPrefix:  types.StringPointerValue(rule.RemoteIPPrefix),
 			SecurityGroupId: types.StringPointerValue(rule.SecurityGroupID),
 			Status:          types.StringValue(rule.Status),
