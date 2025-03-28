@@ -26,7 +26,6 @@ type NetworkSecurityGroupRuleModel struct {
 	PortRangeMax    types.Int64  `tfsdk:"port_range_max"`
 	PortRangeMin    types.Int64  `tfsdk:"port_range_min"`
 	Protocol        types.String `tfsdk:"protocol"`
-	RemoteGroupId   types.String `tfsdk:"remote_group_id"`
 	RemoteIpPrefix  types.String `tfsdk:"remote_ip_prefix"`
 	SecurityGroupId types.String `tfsdk:"security_group_id"`
 }
@@ -104,13 +103,6 @@ func (r *NetworkSecurityGroupsRulesResource) Schema(_ context.Context, _ resourc
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"remote_group_id": schema.StringAttribute{
-				Description: "ID of the remote security group. Example: 'sg-0123456789abcdef0'",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 			"remote_ip_prefix": schema.StringAttribute{
 				Description: "CIDR notation of remote IPv4 and IPv6 range. Example: '192.168.1.0/24', '0.0.0.0/0', '::/0' or '2001:db8::/32'",
 				Optional:    true,
@@ -163,7 +155,6 @@ func (r *NetworkSecurityGroupsRulesResource) Create(ctx context.Context, req res
 		PortRangeMax:   tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMax.ValueInt64Pointer()),
 		PortRangeMin:   tfutil.ConvertInt64PointerToIntPointer(data.PortRangeMin.ValueInt64Pointer()),
 		Protocol:       data.Protocol.ValueStringPointer(),
-		RemoteGroupID:  data.RemoteGroupId.ValueStringPointer(),
 		RemoteIPPrefix: data.RemoteIpPrefix.ValueStringPointer(),
 	})
 	if err != nil {
@@ -194,7 +185,6 @@ func (r *NetworkSecurityGroupsRulesResource) Read(ctx context.Context, req resou
 	data.PortRangeMax = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax))
 	data.PortRangeMin = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMin))
 	data.Protocol = types.StringPointerValue(rule.Protocol)
-	data.RemoteGroupId = types.StringPointerValue(rule.RemoteGroupID)
 	data.RemoteIpPrefix = types.StringPointerValue(rule.RemoteIPPrefix)
 	data.SecurityGroupId = types.StringPointerValue(rule.SecurityGroupID)
 
