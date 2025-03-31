@@ -1,3 +1,10 @@
+---
+page_title: "API Keys"
+subcategory: "Guides"
+description: |-
+  How to configure and use API Keys with the Magalu Cloud Terraform Provider.
+---
+
 # API Keys
 
 This page describes how to configure and use API Keys with the Magalu Cloud Terraform Provider.
