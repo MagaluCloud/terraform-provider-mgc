@@ -29,17 +29,17 @@ resource "mgc_virtual_machine_instances" "tc2_instance_with_az" {
 }
 
 resource "mgc_virtual_machine_instances" "tc3_instance_with_usardata" {
-  name              = "tc3-instance-with-userdata"
-  machine_type      = "BV4-8-100"
-  image             = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name      = "your-ssh-key-name"
-  user_data         = base64encode("#!/bin/bash\necho 'Hello, World!'")
+  name         = "tc3-instance-with-userdata"
+  machine_type = "BV4-8-100"
+  image        = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name = "your-ssh-key-name"
+  user_data    = base64encode("#!/bin/bash\necho 'Hello, World!'")
 }
 
 resource "mgc_virtual_machine_instances" "tc4_instance_with_windows" {
-  name              = "tc4-instance-with-windows"
-  machine_type      = "BV4-8-100"
-  image             = "windows-server-2022"
+  name         = "tc4-instance-with-windows"
+  machine_type = "BV4-8-100"
+  image        = "windows-server-2022"
 }
 ```
 
