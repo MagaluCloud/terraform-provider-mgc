@@ -15,7 +15,7 @@ SSH keys in Magalu Cloud are **global resources**, meaning they are not tied to 
 
 ## Creating SSH Keys
 
-### Option 1: Generate SSH Keys on Your Local Machine
+### 1: Generate SSH Keys on Your Local Machine
 
 Before uploading to Magalu Cloud, you can generate a new SSH key pair:
 
@@ -27,7 +27,7 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ssh-keygen -t ed25519 -C "your_email@example.com"
 ```
 
-### Option 2: Create SSH Keys with Terraform
+### 2: Create SSH Keys resource
 
 To add an SSH key to Magalu Cloud using Terraform:
 
