@@ -8,6 +8,10 @@ description: "A comprehensive guide showing two easy methods to give virtual mac
 
 There are two simple ways to give your virtual machines public IP addresses in Magalu Cloud. Let's explore both methods with clear, easy-to-follow steps.
 
+# Introduction
+
+When you create a virtual machine in Magalu Cloud, it comes with a default network interface that includes a private IP address. This guide shows you how to assign a public IP address to your VM using Terraform.
+
 ## Method 1: Using the Default Interface (The Simplest Approach)
 
 Every VM in Magalu Cloud automatically comes with a default network interface. This method uses that existing interface.
