@@ -16,7 +16,7 @@ Magalu Cloud's networking follows a hierarchical model that allows you to create
 2. **Subnet Pools**: Collections of IP addresses that can be allocated to subnets
 3. **Subnets**: Segmented network address spaces within a VPC
 4. **Interfaces**: Connection points for Virtual Machines to a network
-   - Also known as NICs (Network Interface Cards) and Ports
+   - Also known as NICs (Network Interface Cards) or Ports
 5. **Security Groups**: Virtual firewalls for controlling inbound and outbound traffic
 6. **Public IPs**: Addresses for connecting resources to the internet
 
