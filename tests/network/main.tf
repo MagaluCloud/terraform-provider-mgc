@@ -19,7 +19,7 @@ data "mgc_network_security_group" "primary_sg_data" {
   id = mgc_network_security_groups.primary_sg.id
 }
 
-# data "mgc_network_security_groups" "security_groups" {}
+data "mgc_network_security_groups" "security_groups" {}
 
 # Security Group Rules
 resource "mgc_network_security_groups_rules" "ssh_ipv4_rule" {
@@ -46,14 +46,14 @@ resource "mgc_network_security_groups_rules" "ssh_ipv6_rule" {
 
 # VPC Resources
 resource "mgc_network_vpcs" "main_vpc" {
-  name = "main-vpc-test-tf-tests-teste"
+  name = "main-vpc-test-tf"
 }
 
 data "mgc_network_vpc" "main_vpc_data" {
   id = mgc_network_vpcs.main_vpc.id
 }
 
-# data "mgc_network_vpcs" "vpcs_data" {}
+data "mgc_network_vpcs" "vpcs_data" {}
 
 # VPC Interfaces
 resource "mgc_network_vpcs_interfaces" "pip_interface" {
@@ -66,7 +66,7 @@ data "mgc_network_vpcs_interface" "primary_interface_data" {
   id = mgc_network_vpcs_interfaces.pip_interface.id
 }
 
-# data "mgc_network_vpcs_interfaces" "vpcs_interfaces_data" {}
+data "mgc_network_vpcs_interfaces" "vpcs_interfaces_data" {}
 
 # Security Group Attachment
 resource "mgc_network_security_groups_attach" "primary_sg_attachment" {
@@ -107,13 +107,13 @@ data "mgc_network_public_ip" "example" {
   id = mgc_network_public_ips.example.id
 }
 
-# data "mgc_network_public_ips" "public_ips" {}
+data "mgc_network_public_ips" "public_ips" {}
 
 data "mgc_network_subnetpool" "subnetpool_data" {
   id = mgc_network_vpcs_subnets.primary_subnet.subnetpool_id
 }
 
-# data "mgc_network_subnetpools" "subnetpools_data" {}
+data "mgc_network_subnetpools" "subnetpools_data" {}
 
 #Public IP Attachment
 resource "mgc_network_public_ips_attach" "example" {
@@ -146,22 +146,22 @@ output "datasource_public_ip_id" {
   value = data.mgc_network_public_ip.example
 }
 
-# output "datasource_sgs" {
-#   value = data.mgc_network_security_groups.security_groups
-# }
+output "datasource_sgs" {
+  value = data.mgc_network_security_groups.security_groups
+}
 
-# output "public_ips" {
-#   value = data.mgc_network_public_ips.public_ips
-# }
+output "public_ips" {
+  value = data.mgc_network_public_ips.public_ips
+}
 
-# output "subnetpools_data" {
-#   value = data.mgc_network_subnetpools.subnetpools_data
-# }
+output "subnetpools_data" {
+  value = data.mgc_network_subnetpools.subnetpools_data
+}
 
-# output "vpcs_data" {
-#   value = data.mgc_network_vpcs.vpcs_data
-# }
+output "vpcs_data" {
+  value = data.mgc_network_vpcs.vpcs_data
+}
 
-# output "vpcs_interfaces_data" {
-#   value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
-# }
+output "vpcs_interfaces_data" {
+  value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
+}
