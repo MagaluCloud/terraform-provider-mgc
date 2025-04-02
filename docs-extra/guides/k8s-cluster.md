@@ -51,14 +51,12 @@ resource "mgc_kubernetes_cluster" "advanced_cluster" {
   version       = "v1.30.2"
   description   = "Production-grade Kubernetes cluster"
   allowed_cidrs = ["10.0.0.0/16", "192.168.1.0/24"] # Restrict API server access
-  zone          = "br-ne1-a"                        # Specify availability zone
 }
 ```
 
 Additional parameters:
 
 - `allowed_cidrs`: Restricts Kubernetes API access to specific IP ranges
-- `zone`: Specifies the availability zone for the cluster
 
 ### Checking Available Kubernetes Versions
 
@@ -192,6 +190,8 @@ output "kubeconfig_yaml" {
 ### Scaling a Nodepool
 
 To scale an existing nodepool, simply update the `replicas` value:
+The replicas value can be updated to scale the nodepool up or down.
+Be aware that replicas values is dynamic when autoscaling is enabled, this means that when a nodepool is created and you perform an action on terraform, it may return a different value than the one you set originally.
 
 ```terraform
 # Scale up the general nodepool

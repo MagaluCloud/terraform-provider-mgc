@@ -153,6 +153,4 @@ For Windows VMs, SSH keys are not utilized for direct access. Instead:
 
 2. **Global Resource**: Remember that SSH keys exist at the account level, not the region level, making them accessible across all regions.
 
-3. **Linux Distributions Only**: SSH key injection at launch only works for Linux VMs; Windows VMs require different authentication methods.
-
 By effectively managing your SSH keys in Magalu Cloud, you can ensure secure access to your virtual machines while maintaining operational flexibility across all regions.
