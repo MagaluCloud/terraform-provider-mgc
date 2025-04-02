@@ -35,6 +35,14 @@ resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
   ssh_key_name = "publio"
 }
 
+resource "mgc_virtual_machine_instances" "tc1_basic_instance_with_vpcid" {
+  name         = "tc1-basic-instance-with-vpcid"
+  machine_type = "BV1-1-40"
+  vpc_id = mgc_network_vpcs.main_vpc.id
+  image        = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name = "publio"
+}
+
 # 8141911d-62e8-4337-b735-3dce3c9fd3c7
 resource "mgc_virtual_machine_interface_attach" "attach_vm" {
   instance_id  = mgc_virtual_machine_instances.tc1_basic_instance.id
