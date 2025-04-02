@@ -105,7 +105,9 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 			break
 		}
 		if strings.Contains(res.Status, "error") {
-			resp.Diagnostics.AddError("Error in VPC creation", res.Status)
+			resp.Diagnostics.AddError(
+				"Error in VPC creation",
+				"VPC creation failed with status: ["+res.Status+"] \nVPC ID: "+createdVPC+" \nPlease check the VPC status in the Magalu Cloud CLI or contact support")
 			return
 		}
 		tflog.Info(ctx, "VPC is not yet created, waiting for 10 seconds",
