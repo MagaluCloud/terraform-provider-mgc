@@ -296,10 +296,8 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	if state.VpcId.ValueString() != "" {
-		createParams.Network.Vpc = &computeSdk.CreateParametersNetworkVpc{
-			Vpc: computeSdk.IDOrName{
-				ID: state.VpcId.ValueStringPointer(),
-			},
+		createParams.Network.Vpc = &computeSdk.IDOrName{
+			ID: state.VpcId.ValueStringPointer(),
 		}
 	}
 
