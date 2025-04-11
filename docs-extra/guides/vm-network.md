@@ -12,6 +12,56 @@ There are two simple ways to give your virtual machines public IP addresses in M
 
 When you create a virtual machine in Magalu Cloud, it comes with a default network interface that includes a private IP address. This guide shows you how to assign a public IP address to your VM using Terraform.
 
+## Understanding VM Network Interfaces
+
+Every VM in Magalu Cloud automatically comes with a `network_interfaces` attribute, which is a list of interfaces attached to the VM. Here's what you need to know:
+
+1. **Default Primary Interface**: When a VM is created, it automatically gets a primary interface with a local IPv4 address
+2. **Interface Structure**: Each interface in the list contains these attributes:
+
+   - `id`: Unique identifier for the interface
+   - `name`: The name of the interface
+   - `ipv4`: Public IPv4 address (if a public IP is attached)
+   - `local_ipv4`: Private IPv4 address within the VPC
+   - `ipv6`: IPv6 address (if configured)
+   - `primary`: Boolean flag indicating if this is the primary interface
+
+3. **Accessing Interface Properties**: You need to iterate through the interfaces list to access properties
+
+4. **Multiple Interfaces**: If you attach additional interfaces to your VM, they'll all appear in the `network_interfaces` list, each with their own properties
+
+5. **Tracking Public IPs**: When you attach a public IP to an interface, the `ipv4` field of that interface will be updated with the public IP address
+
+### Example: Getting the Primary Interface's Local IP
+
+```terraform
+locals {
+  primary_local_ip = [
+    for interface in mgc_virtual_machine_instances.my_vm.network_interfaces :
+    interface.local_ipv4 if interface.primary
+  ][0]
+}
+
+output "vm_private_ip" {
+  value = local.primary_local_ip
+}
+```
+
+### Example: Getting the Public IP (if attached)
+
+```terraform
+locals {
+  primary_public_ip = [
+    for interface in mgc_virtual_machine_instances.my_vm.network_interfaces :
+    interface.ipv4 if interface.primary
+  ][0]
+}
+
+output "vm_public_ip" {
+  value = local.primary_public_ip
+}
+```
+
 ## Method 1: Using the Default Interface (The Simplest Approach)
 
 Every VM in Magalu Cloud automatically comes with a default network interface. This method uses that existing interface.

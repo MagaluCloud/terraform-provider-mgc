@@ -26,7 +26,6 @@ resource "mgc_kubernetes_cluster" "full_cluster" {
   description          = "Full-featured Kubernetes cluster for smoke test"
   enabled_server_group = true
   allowed_cidrs        = ["10.0.0.0/24", "192.168.1.0/24"]
-  zone                 = "example-zone-1"
 }
 
 # Outputs for verification
@@ -68,7 +67,6 @@ resource "mgc_kubernetes_nodepool" "full_nodepool" {
   replicas     = 1
   min_replicas = 1
   max_replicas = 5
-  tags         = ["smoke-test", "full-featured"]
 
   taints = [
     {
