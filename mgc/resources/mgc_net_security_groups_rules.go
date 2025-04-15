@@ -179,7 +179,11 @@ func (r *NetworkSecurityGroupsRulesResource) Read(ctx context.Context, req resou
 		return
 	}
 
-	data.Description = types.StringPointerValue(rule.Description)
+	//Fix for network API retorning empty description for null values
+	if data.Description.ValueStringPointer() != nil || *rule.Description != "" {
+		data.Description = types.StringPointerValue(rule.Description)
+	}
+
 	data.Direction = types.StringPointerValue(rule.Direction)
 	data.Ethertype = types.StringPointerValue(rule.EtherType)
 	data.PortRangeMax = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(rule.PortRangeMax))
