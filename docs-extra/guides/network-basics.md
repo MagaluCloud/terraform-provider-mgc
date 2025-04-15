@@ -43,12 +43,9 @@ Subnet pools define the IP addresses that can be used within your VPC:
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main subnet pool for production"
-  type        = "pip"  # "pip" for Public IP allocation
   cidr        = "172.16.0.0/16"  # The address space for your network
 }
 ```
-
-The `type = "pip"` parameter indicates this subnet pool can be used for allocating public IPs.
 
 ### Step 3: Create a Subnet
 
@@ -96,7 +93,7 @@ Security groups act as virtual firewalls:
 resource "mgc_network_security_groups" "web_sg" {
   name                  = "web-security-group"
   description           = "Security group for web servers"
-  disable_default_rules = false  # Use default rules
+  disable_default_rules = false  # Use default rules (Allow all inbound traffic)
 }
 ```
 
@@ -192,7 +189,6 @@ resource "mgc_network_vpcs" "app_vpc" {
 resource "mgc_network_subnetpools" "app_subnet_pool" {
   name        = "app-subnet-pool"
   description = "Subnet pool for application networks"
-  type        = "pip"
   cidr        = "10.0.0.0/16"
 }
 

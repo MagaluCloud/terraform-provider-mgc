@@ -6,7 +6,6 @@ import (
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,7 +21,6 @@ type NetworkSubnetPoolModel struct {
 	Cidr        types.String `tfsdk:"cidr"`
 	Description types.String `tfsdk:"description"`
 	Name        types.String `tfsdk:"name"`
-	Type        types.String `tfsdk:"type"`
 }
 
 type mgcNetworkSubnetpoolsResource struct {
@@ -71,18 +69,6 @@ func (r *mgcNetworkSubnetpoolsResource) Schema(_ context.Context, _ resource.Sch
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"type": schema.StringAttribute{
-				Description: "The type of the subnet pool. Possible values are 'pip' (Public IP) and 'default'",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("default"),
-				Validators: []validator.String{
-					stringvalidator.OneOf("pip", "default"),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 		},
 	}
 }
@@ -111,7 +97,6 @@ func (r *mgcNetworkSubnetpoolsResource) Create(ctx context.Context, req resource
 		CIDR:        data.Cidr.ValueStringPointer(),
 		Description: data.Description.ValueString(),
 		Name:        data.Name.ValueString(),
-		Type:        data.Type.ValueStringPointer(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -138,7 +123,6 @@ func (r *mgcNetworkSubnetpoolsResource) Read(ctx context.Context, req resource.R
 	data.Cidr = types.StringPointerValue(subnetPool.CIDR)
 	data.Description = types.StringValue(subnetPool.Description)
 	data.Name = types.StringValue(subnetPool.Name)
-	data.Type = types.StringValue(isDefaultConverter(subnetPool.IsDefault))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -163,11 +147,4 @@ func (r *mgcNetworkSubnetpoolsResource) Delete(ctx context.Context, req resource
 
 func (r *mgcNetworkSubnetpoolsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
-}
-
-func isDefaultConverter(isDefault bool) string {
-	if isDefault {
-		return "default"
-	}
-	return "pip"
 }

@@ -7,7 +7,6 @@ resource "mgc_network_security_groups" "primary_sg" {
 
 resource "mgc_network_security_groups" "secondary_sg" {
   name                  = "secondary-security-group"
-  description           = "Secondary security group for additional services"
   disable_default_rules = true
 }
 
@@ -78,7 +77,6 @@ resource "mgc_network_security_groups_attach" "primary_sg_attachment" {
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main Subnet Pool"
-  type        = "pip"
   cidr        = "172.5.0.0/16"
 }
 

@@ -66,7 +66,7 @@ func (r *mgcNetworkSubnetpoolDatasource) Schema(_ context.Context, _ datasource.
 				Computed:    true,
 			},
 			"is_default": schema.BoolAttribute{
-				Description: "Whether the subnetpool is the default subnetpool or public IP",
+				Description: "Indicates whether the subnetpool is the default subnetpool for the Tenant",
 				Computed:    true,
 			},
 		},
