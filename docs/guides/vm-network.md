@@ -124,7 +124,6 @@ resource "mgc_network_vpcs" "my_vpc" {
 resource "mgc_network_subnetpools" "my_pool" {
   name        = "my-subnet-pool"
   description = "My IP address pool"
-  type        = "pip"
   cidr        = "172.29.0.0/16"
 }
 
@@ -245,7 +244,6 @@ resource "mgc_network_vpcs" "main_vpc" {
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main Subnet Pool"
-  type        = "pip"
   cidr        = "172.5.0.0/16"
 }
 

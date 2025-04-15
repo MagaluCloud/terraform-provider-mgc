@@ -16,7 +16,6 @@ Network Subnet Pool
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main Subnet Pool"
-  type        = "pip"
   cidr        = "172.26.0.0/16"
 }
 ```
@@ -32,7 +31,6 @@ resource "mgc_network_subnetpools" "main_subnetpool" {
 ### Optional
 
 - `cidr` (String) The CIDR block of the subnet pool
-- `type` (String) The type of the subnet pool. Possible values are 'pip' (Public IP) and 'default'
 
 ### Read-Only
 
