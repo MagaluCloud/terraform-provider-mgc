@@ -32,5 +32,5 @@ Read-Only:
 - `cidr` (String) The CIDR range associated with the subnetpool
 - `description` (String) The description of the subnetpool
 - `id` (String) The unique identifier of the subnetpool
-- `is_default` (Boolean) Whether the subnetpool is the default subnetpool or public IP
+- `is_default` (Boolean) Indicates whether the subnetpool is the default subnetpool for the Tenant
 - `name` (String) The name of the subnetpool

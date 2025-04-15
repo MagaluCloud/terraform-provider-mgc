@@ -5,7 +5,6 @@ resource "mgc_network_vpcs" "main_vpc" {
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main Subnet Pool"
-  type        = "pip"
   cidr        = "172.29.0.0/16"
 }
 
@@ -18,14 +17,14 @@ resource "mgc_network_vpcs_subnets" "primary_subnet" {
   subnetpool_id   = mgc_network_subnetpools.main_subnetpool.id
   vpc_id          = mgc_network_vpcs.main_vpc.id
 
-  depends_on = [ mgc_network_subnetpools.main_subnetpool ]
+  depends_on = [mgc_network_subnetpools.main_subnetpool]
 }
 
 resource "mgc_network_vpcs_interfaces" "primary_interface" {
   name   = "interface-attach-vm"
   vpc_id = mgc_network_vpcs.main_vpc.id
 
-  depends_on = [ mgc_network_vpcs_subnets.primary_subnet ]
+  depends_on = [mgc_network_vpcs_subnets.primary_subnet]
 }
 
 resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
@@ -38,7 +37,7 @@ resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
 resource "mgc_virtual_machine_instances" "tc1_basic_instance_with_vpcid" {
   name         = "tc1-basic-instance-with-vpcid"
   machine_type = "BV1-1-40"
-  vpc_id = mgc_network_vpcs.main_vpc.id
+  vpc_id       = mgc_network_vpcs.main_vpc.id
   image        = "cloud-ubuntu-24.04 LTS"
   ssh_key_name = "publio"
 }
