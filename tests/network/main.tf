@@ -1,17 +1,17 @@
 # Security Groups
 resource "mgc_network_security_groups" "primary_sg" {
-  name                  = "primary-security-group-tf"
+  name                  = "primary-security-group-tf2"
   description           = "Primary security group for main services"
   disable_default_rules = true
 }
 
 resource "mgc_network_security_groups" "secondary_sg" {
-  name                  = "secondary-security-group"
+  name                  = "secondary-security-group2"
   disable_default_rules = true
 }
 
 resource "mgc_network_security_groups" "auxiliary_sg" {
-  name = "auxiliary-security-group"
+  name = "auxiliary-security-group2"
 }
 
 data "mgc_network_security_group" "primary_sg_data" {
@@ -45,7 +45,7 @@ resource "mgc_network_security_groups_rules" "ssh_ipv6_rule" {
 
 # VPC Resources
 resource "mgc_network_vpcs" "main_vpc" {
-  name = "main-vpc-test-tf"
+  name = "main-vpc-test-tf2"
 }
 
 data "mgc_network_vpc" "main_vpc_data" {
@@ -56,7 +56,7 @@ data "mgc_network_vpcs" "vpcs_data" {}
 
 # VPC Interfaces
 resource "mgc_network_vpcs_interfaces" "pip_interface" {
-  name       = "pip-interface"
+  name       = "pip-interface2"
   vpc_id     = data.mgc_network_vpc.main_vpc_data.id
   depends_on = [data.mgc_network_vpcs_subnet.primary_subnet_data]
 }
@@ -75,7 +75,7 @@ resource "mgc_network_security_groups_attach" "primary_sg_attachment" {
 
 #Subnetpools
 resource "mgc_network_subnetpools" "main_subnetpool" {
-  name        = "main-subnetpool"
+  name        = "main-subnetpool2"
   description = "Main Subnet Pool"
   cidr        = "172.5.0.0/16"
 }
@@ -86,7 +86,7 @@ resource "mgc_network_vpcs_subnets" "primary_subnet" {
   description     = "Primary Network Subnet"
   dns_nameservers = ["8.8.8.8", "1.1.1.1"]
   ip_version      = "IPv4"
-  name            = "primary-subnet"
+  name            = "primary-subnet2"
   subnetpool_id   = mgc_network_subnetpools.main_subnetpool.id
   vpc_id          = data.mgc_network_vpc.main_vpc_data.id
 }
@@ -117,6 +117,18 @@ data "mgc_network_subnetpools" "subnetpools_data" {}
 resource "mgc_network_public_ips_attach" "example" {
   public_ip_id = mgc_network_public_ips.example.id
   interface_id = mgc_network_vpcs_interfaces.pip_interface.id
+}
+
+# NAT Gateway
+resource "mgc_network_nat_gateway" "example" {
+  name        = "example-nat-gateway2"
+  description = "Example NAT Gateway"
+  vpc_id      = data.mgc_network_vpc.main_vpc_data.id
+  zone        = "a"
+}
+
+data "mgc_network_nat_gateway" "example" {
+  id = mgc_network_nat_gateway.example.id
 }
 
 # Outputs
@@ -162,4 +174,8 @@ output "vpcs_data" {
 
 output "vpcs_interfaces_data" {
   value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
+}
+
+output "nat_gateway_data" {
+  value = data.mgc_network_nat_gateway.example
 }
