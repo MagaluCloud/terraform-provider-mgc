@@ -7,6 +7,8 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -16,7 +18,7 @@ var (
 	_ resource.ResourceWithConfigure = &natGatewayResource{}
 )
 
-func NewNatGatewayResource() resource.Resource {
+func NewNetworkNatGatewayResource() resource.Resource {
 	return &natGatewayResource{}
 }
 
@@ -43,22 +45,37 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"id": schema.StringAttribute{
 				Description: "The ID of the NAT Gateway.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the NAT Gateway.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"description": schema.StringAttribute{
 				Description: "The description of the NAT Gateway.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"vpc_id": schema.StringAttribute{
 				Description: "The ID of the VPC where the NAT Gateway will be created.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"zone": schema.StringAttribute{
 				Description: "The zone of the NAT Gateway.",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}

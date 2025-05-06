@@ -15,7 +15,7 @@ var (
 	_ datasource.DataSourceWithConfigure = &natGatewayDataSource{}
 )
 
-func NewNatGatewayDataSource() datasource.DataSource {
+func NewDataSourceNetworkNatGateway() datasource.DataSource {
 	return &natGatewayDataSource{}
 }
 
