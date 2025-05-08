@@ -1,11 +1,3 @@
-terraform {
-  required_providers {
-    mgc = {
-      source = "MagaluCloud/mgc"
-    }
-  }
-}
-
 data "mgc_network_nat_gateway" "example" {
   id = "nat-gateway-123456"
 }
