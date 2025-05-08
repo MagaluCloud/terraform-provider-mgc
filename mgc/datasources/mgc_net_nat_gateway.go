@@ -88,10 +88,7 @@ func (d *natGatewayDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	natGateway, err := d.sdkNetwork.Get(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading NAT Gateway",
-			"Could not read NAT Gateway ID "+state.ID.ValueString()+": "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 

@@ -111,10 +111,7 @@ func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequ
 		Zone:        plan.Zone.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating NAT Gateway",
-			"Could not create NAT Gateway, unexpected error: "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -140,10 +137,7 @@ func (r *natGatewayResource) Read(ctx context.Context, req resource.ReadRequest,
 	// Get NAT Gateway
 	natGateway, err := r.sdkNetwork.Get(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading NAT Gateway",
-			"Could not read NAT Gateway ID "+state.ID.ValueString()+": "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
@@ -174,10 +168,7 @@ func (r *natGatewayResource) Delete(ctx context.Context, req resource.DeleteRequ
 	// Delete NAT Gateway
 	err := r.sdkNetwork.Delete(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting NAT Gateway",
-			"Could not delete NAT Gateway, unexpected error: "+err.Error(),
-		)
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
