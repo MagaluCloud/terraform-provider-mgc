@@ -28,12 +28,13 @@ data "mgc_dbaas_instance" "test_instance" {
 ### Read-Only
 
 - `addresses` (Attributes List) List of instance addresses (see [below for nested schema](#nestedatt--addresses))
+- `availability_zone` (String) Availability zone to use for the instance.
 - `backup_retention_days` (Number) Number of days to retain backups
 - `created_at` (String) Creation timestamp of the instance
 - `engine_id` (String) ID of the engine
 - `instance_type_id` (String) ID of the instance type
 - `name` (String) Name of the instance
-- `parameters` (Map of String) Map of parameters
+- `parameter_group` (String) ID of the parameter group to use for the instance.
 - `status` (String) Status of the instance
 - `volume_size` (Number) Size of the volume
 - `volume_type` (String) Type of the volume

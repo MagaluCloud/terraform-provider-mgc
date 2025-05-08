@@ -97,7 +97,7 @@ func (r *DataSourceDbSnapshot) Read(ctx context.Context, req datasource.ReadRequ
 
 	data.Name = types.StringValue(snapshot.Name)
 	data.Description = types.StringValue(snapshot.Description)
-	data.CreatedAt = types.StringValue(snapshot.CreatedAt)
+	data.CreatedAt = types.StringValue(*tfutil.ConvertTimeToRFC3339(&snapshot.CreatedAt))
 	data.Status = types.StringValue(string(snapshot.Status))
 	data.Size = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&snapshot.AllocatedSize))
 

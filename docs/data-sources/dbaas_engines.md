@@ -41,7 +41,6 @@ data "mgc_dbaas_engines" "all_engines" {}
 
 Read-Only:
 
-- `engine` (String) The type of the database engine
 - `id` (String) The ID of the database engine
 - `name` (String) The name of the database engine
 - `status` (String) The status of the database engine

@@ -41,9 +41,12 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Optional
 
+- `availability_zone` (String) Availability zone to use for the instance.
 - `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS'). Default is 04:00:00.
+- `parameter_group` (String) ID of the parameter group to use for the instance.
 
 ### Read-Only
 
 - `id` (String) Unique identifier for the DBaaS instance. Generated automatically on creation.
+- `status` (String) Status of the instance.

@@ -26,7 +26,6 @@ type dbEngineModel struct {
 
 type DbEngines struct {
 	ID      types.String `tfsdk:"id"`
-	Engine  types.String `tfsdk:"engine"`
 	Name    types.String `tfsdk:"name"`
 	Status  types.String `tfsdk:"status"`
 	Version types.String `tfsdk:"version"`
@@ -64,10 +63,6 @@ func (r *DataSourceDbEngines) Schema(_ context.Context, _ datasource.SchemaReque
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Description: "The ID of the database engine",
-							Computed:    true,
-						},
-						"engine": schema.StringAttribute{
-							Description: "The type of the database engine",
 							Computed:    true,
 						},
 						"name": schema.StringAttribute{
@@ -116,7 +111,6 @@ func (r *DataSourceDbEngines) Read(ctx context.Context, req datasource.ReadReque
 	for _, engine := range engines {
 		engineModels = append(engineModels, DbEngines{
 			ID:      types.StringValue(engine.ID),
-			Engine:  types.StringValue(engine.Engine),
 			Name:    types.StringValue(engine.Name),
 			Status:  types.StringValue(engine.Status),
 			Version: types.StringValue(engine.Version),

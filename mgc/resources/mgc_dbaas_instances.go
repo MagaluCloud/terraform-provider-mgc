@@ -61,6 +61,9 @@ type DBaaSInstanceModel struct {
 	VolumeSize          types.Int64  `tfsdk:"volume_size"`
 	BackupRetentionDays types.Int64  `tfsdk:"backup_retention_days"`
 	BackupStartAt       types.String `tfsdk:"backup_start_at"`
+	AvailabilityZone    types.String `tfsdk:"availability_zone"`
+	ParameterGroup      types.String `tfsdk:"parameter_group"`
+	Status              types.String `tfsdk:"status"`
 }
 
 type DBaaSInstanceResource struct {
@@ -134,6 +137,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.",
 				Required:    true,
 				Sensitive:   true,
+				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -196,13 +200,33 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 					),
 				},
 			},
+			"parameter_group": schema.StringAttribute{
+				Description: "ID of the parameter group to use for the instance.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"availability_zone": schema.StringAttribute{
+				Description: "Availability zone to use for the instance.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"status": schema.StringAttribute{
+				Description: "Status of the instance.",
+				Computed:    true,
+			},
 		},
 	}
 }
 
 func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data DBaaSInstanceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -230,6 +254,8 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		},
 		BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(data.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
+		AvailabilityZone:    data.AvailabilityZone.ValueStringPointer(),
+		ParameterGroupID:    data.ParameterGroup.ValueStringPointer(),
 	}
 
 	created, err := r.dbaasInstances.Create(ctx, params)
@@ -279,6 +305,9 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	data.VolumeSize = types.Int64Value(int64(instance.Volume.Size))
 	data.BackupRetentionDays = types.Int64Value(int64(instance.BackupRetentionDays))
 	data.BackupStartAt = types.StringValue(instance.BackupStartAt)
+	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
+	data.ParameterGroup = types.StringValue(instance.ParameterGroupID)
+	data.Status = types.StringValue(string(instance.Status))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

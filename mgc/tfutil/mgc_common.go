@@ -2,6 +2,7 @@ package tfutil
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"time"
@@ -10,6 +11,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type Stringish interface {
+	~string
+}
 
 var azRegex = regexp.MustCompile(`^([a-z]{2})-([a-z]{2})([1-9])[-]([a-z])$`)
 
@@ -96,4 +101,67 @@ func ConvertAvailabilityZoneToXZone(availabilityZone string) (string, error) {
 		return "", fmt.Errorf("invalid availability zone format: %s", availabilityZone)
 	}
 	return matches[4], nil
+}
+
+func SdkEnumToTFString[T Stringish](enum *T) *string {
+	if enum == nil {
+		return nil
+	}
+
+	str := string(*enum)
+	return &str
+}
+
+func DynamicToGo[T any](d types.Dynamic) (T, error) {
+	var zero T
+	if d.IsNull() {
+		return zero, nil
+	}
+	if d.IsUnknown() {
+		return zero, fmt.Errorf("value is unknown")
+	}
+	raw := d.UnderlyingValue()
+	switch v := raw.(type) {
+	case types.String:
+		if val, ok := any(v.ValueString()).(T); ok {
+			return val, nil
+		}
+	case types.Number:
+		bf := v.ValueBigFloat()
+		i, acc := bf.Int64()
+		if acc == big.Exact {
+			if val, ok := any(i).(T); ok {
+				return val, nil
+			}
+		}
+		f, _ := bf.Float64()
+		if val, ok := any(f).(T); ok {
+			return val, nil
+		}
+	case types.Bool:
+		if val, ok := any(v.ValueBool()).(T); ok {
+			return val, nil
+		}
+	}
+	return zero, fmt.Errorf("cannot convert dynamic to %T", zero)
+}
+
+func GoToDynamic[T any](val T) (types.Dynamic, error) {
+	switch v := any(val).(type) {
+	case string:
+		return types.DynamicValue(types.StringValue(v)), nil
+	case int:
+		return types.DynamicValue(types.Int64Value(int64(v))), nil
+	case int32:
+		return types.DynamicValue(types.Int32Value(int32(v))), nil
+	case int64:
+		return types.DynamicValue(types.Int64Value(v)), nil
+	case float64:
+		bf := big.NewFloat(v)
+		return types.DynamicValue(types.NumberValue(bf)), nil
+	case bool:
+		return types.DynamicValue(types.BoolValue(v)), nil
+	default:
+		return types.DynamicNull(), fmt.Errorf("unsupported type %T", v)
+	}
 }

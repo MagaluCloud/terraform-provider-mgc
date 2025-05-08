@@ -109,7 +109,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 			Name:        types.StringValue(snapshot.Name),
 			InstanceId:  data.InstanceId,
 			Description: types.StringValue(snapshot.Description),
-			CreatedAt:   types.StringValue(snapshot.CreatedAt),
+			CreatedAt:   types.StringValue(*tfutil.ConvertTimeToRFC3339(&snapshot.CreatedAt)),
 			Status:      types.StringValue(string(snapshot.Status)),
 			Size:        types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&snapshot.AllocatedSize)),
 		})

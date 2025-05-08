@@ -182,6 +182,9 @@ func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource 
 		resources.NewContainerRegistryRegistriesResource,
 		resources.NewVirtualMachineInterfaceAttachResource,
 		resources.NewNetworkNatGatewayResource,
+		resources.NewDBaaSParameterGroupsResource,
+		resources.NewDBaaSParameterResource,
+		resources.NewDBaaSReplicaResource,
 	}
 }
 
@@ -230,6 +233,11 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceVmSnapshots,
 		datasources.NewDataSourceKubernetesClusterList,
 		datasources.NewDataSourceNetworkNatGateway,
+		datasources.NewDataSourceDbReplicaList,
+		datasources.NewDataSourceDbReplica,
+		datasources.NewDataSourceDdbaasParameterGroup,
+		datasources.NewDataSourceDdbaasParameterGroups,
+		datasources.NewDataSourceDbParametersList,
 	}
 }
 

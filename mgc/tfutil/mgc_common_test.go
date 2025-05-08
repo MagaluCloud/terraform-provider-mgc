@@ -1,6 +1,7 @@
 package tfutil
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
@@ -364,4 +365,240 @@ func TestStructs(t *testing.T) {
 		ID: types.StringValue("test-id"),
 	}
 	assert.Equal(t, "test-id", idModel.ID.ValueString())
+}
+
+type (
+	testStatus string
+	testAccess string
+	testRole   string
+)
+
+// Satisfy the Stringish constraint
+const (
+	testStatusPending  testStatus = "PENDING"
+	testStatusFailed   testStatus = "FAILED"
+	testAccessInternal testAccess = "INTERNAL"
+	testAccessExternal testAccess = "EXTERNAL"
+	testRoleUser       testRole   = "USER"
+	testRoleAdmin      testRole   = "ADMIN"
+	testRoleDuplicate  testRole   = "INTERNAL" // Same value as testAccessInternal
+	testStatusEmpty    testStatus = ""
+)
+
+func TestSdkEnumToTFString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected *string
+	}{
+		{
+			name:     "nil status input",
+			input:    (*testStatus)(nil),
+			expected: nil,
+		},
+		{
+			name:  "valid testStatus input",
+			input: ptr(testStatusFailed),
+			expected: func() *string {
+				s := "FAILED"
+				return &s
+			}(),
+		},
+		{
+			name:  "valid testAccess input",
+			input: ptr(testAccessExternal),
+			expected: func() *string {
+				s := "EXTERNAL"
+				return &s
+			}(),
+		},
+		{
+			name:  "different type same string value",
+			input: ptr(testRoleDuplicate),
+			expected: func() *string {
+				s := "INTERNAL"
+				return &s
+			}(),
+		},
+		{
+			name:  "empty string value",
+			input: ptr(testStatusEmpty),
+			expected: func() *string {
+				s := ""
+				return &s
+			}(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var got *string
+			switch v := tc.input.(type) {
+			case *testStatus:
+				got = SdkEnumToTFString(v)
+			case *testAccess:
+				got = SdkEnumToTFString(v)
+			case *testRole:
+				got = SdkEnumToTFString(v)
+			default:
+				t.Fatalf("unsupported type %T", v)
+			}
+
+			if (got == nil) != (tc.expected == nil) {
+				t.Fatalf("Expected nil: %v, got: %v", tc.expected == nil, got == nil)
+			}
+			if got != nil && *got != *tc.expected {
+				t.Errorf("Expected %q, got %q", *tc.expected, *got)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
+
+func TestGoToDynamic(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  any
+		assert func(types.Dynamic, error)
+	}{
+		{
+			name:  "string",
+			input: "hello",
+			assert: func(d types.Dynamic, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				v, ok := d.UnderlyingValue().(types.String)
+				if !ok || v.ValueString() != "hello" {
+					t.Fatalf("expected StringValue \"hello\", got %v", d.UnderlyingValue())
+				}
+			},
+		},
+		{
+			name:  "int",
+			input: 42,
+			assert: func(d types.Dynamic, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				v, ok := d.UnderlyingValue().(types.Int64)
+				if !ok || v.ValueInt64() != 42 {
+					t.Fatalf("expected Int64Value(42), got %v", d.UnderlyingValue())
+				}
+			},
+		},
+		{
+			name:  "int32",
+			input: int32(7),
+			assert: func(d types.Dynamic, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				v, ok := d.UnderlyingValue().(types.Int32)
+				if !ok || v.ValueInt32() != 7 {
+					t.Fatalf("expected Int32Value(7), got %v", d.UnderlyingValue())
+				}
+			},
+		},
+		{
+			name:  "float64",
+			input: 3.14,
+			assert: func(d types.Dynamic, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				v, ok := d.UnderlyingValue().(types.Number)
+				if !ok {
+					t.Fatalf("expected NumberValue, got %v", d.UnderlyingValue())
+				}
+				f, _ := v.ValueBigFloat().Float64()
+				if f != 3.14 {
+					t.Fatalf("expected NumberValue(3.14), got %v", f)
+				}
+			},
+		},
+		{
+			name:  "bool",
+			input: true,
+			assert: func(d types.Dynamic, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				v, ok := d.UnderlyingValue().(types.Bool)
+				if !ok || !v.ValueBool() {
+					t.Fatalf("expected BoolValue(true), got %v", d.UnderlyingValue())
+				}
+			},
+		},
+		{
+			name:  "unsupported",
+			input: struct{}{},
+			assert: func(d types.Dynamic, err error) {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if !d.IsNull() {
+					t.Fatalf("expected null dynamic on error, got %v", d)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			d, err := GoToDynamic(tc.input)
+			tc.assert(d, err)
+		})
+	}
+}
+
+func TestDynamicToGoString(t *testing.T) {
+	out, err := DynamicToGo[string](types.DynamicValue(types.StringValue("world")))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "world" {
+		t.Fatalf("expected \"world\", got %v", out)
+	}
+}
+
+func TestDynamicToGoFloat64(t *testing.T) {
+	val := big.NewFloat(2.718)
+	out, err := DynamicToGo[float64](types.DynamicValue(types.NumberValue(val)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != 2.718 {
+		t.Fatalf("expected 2.718, got %v", out)
+	}
+}
+
+func TestDynamicToGoBool(t *testing.T) {
+	out, err := DynamicToGo[bool](types.DynamicValue(types.BoolValue(true)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out {
+		t.Fatalf("expected true, got %v", out)
+	}
+}
+
+func TestDynamicToGoNull(t *testing.T) {
+	out, err := DynamicToGo[string](types.DynamicNull())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "" {
+		t.Fatalf("expected zero value, got %v", out)
+	}
+}
+
+func TestDynamicToGoUnknown(t *testing.T) {
+	_, err := DynamicToGo[string](types.DynamicUnknown())
+	if err == nil {
+		t.Fatalf("expected error for unknown dynamic, got nil")
+	}
 }
