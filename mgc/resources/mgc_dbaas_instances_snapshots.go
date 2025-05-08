@@ -108,7 +108,7 @@ func (r *DBaaSInstanceSnapshotResource) Create(ctx context.Context, req resource
 
 	created, err := r.instanceService.CreateSnapshot(ctx, data.InstanceId.ValueString(), dbSDK.SnapshotCreateRequest{
 		Name:        data.Name.ValueString(),
-		Description: data.Description.ValueString(),
+		Description: data.Description.ValueStringPointer(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -143,10 +143,24 @@ func (r *DBaaSInstanceSnapshotResource) Read(ctx context.Context, req resource.R
 }
 
 func (r *DBaaSInstanceSnapshotResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update not supported",
-		"DBaaS instance snapshots cannot be updated after creation",
+	var planData DBaaSInstanceSnapshotModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &planData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.instanceService.UpdateSnapshot(ctx,
+		planData.InstanceId.ValueString(),
+		planData.Id.ValueString(),
+		dbSDK.SnapshotUpdateRequest{
+			Name:        planData.Name.ValueString(),
+			Description: planData.Description.ValueStringPointer(),
+		},
 	)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
 }
 
 func (r *DBaaSInstanceSnapshotResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -172,12 +186,10 @@ func (r *DBaaSInstanceSnapshotResource) ImportState(ctx context.Context, req res
 		)
 		return
 	}
-	data := DBaaSInstanceSnapshotModel{
-		InstanceId: types.StringValue(ids[0]),
-		Id:         types.StringValue(ids[1]),
-	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &DBaaSInstanceSnapshotModel{
+		InstanceId: types.StringValue(ids[0]),
+		Id:         types.StringValue(ids[1])})...)
 }
 
 func (r *DBaaSInstanceSnapshotResource) waitUntilSnapshotStatusMatches(ctx context.Context, instanceID string, snapshotID string, status DBaaSInstanceSnapshotStatus) error {

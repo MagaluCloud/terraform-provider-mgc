@@ -25,17 +25,18 @@ type dbInstanceModel struct {
 }
 
 type dbInstance struct {
-	Addresses           []InstanceAddress       `tfsdk:"addresses"`
-	BackupRetentionDays types.Int64             `tfsdk:"backup_retention_days"`
-	CreatedAt           types.String            `tfsdk:"created_at"`
-	EngineID            types.String            `tfsdk:"engine_id"`
-	ID                  types.String            `tfsdk:"id"`
-	InstanceTypeID      types.String            `tfsdk:"instance_type_id"`
-	Name                types.String            `tfsdk:"name"`
-	Parameters          map[string]types.String `tfsdk:"parameters"`
-	Status              types.String            `tfsdk:"status"`
-	VolumeSize          types.Int64             `tfsdk:"volume_size"`
-	VolumeType          types.String            `tfsdk:"volume_type"`
+	Addresses           []InstanceAddress `tfsdk:"addresses"`
+	BackupRetentionDays types.Int64       `tfsdk:"backup_retention_days"`
+	CreatedAt           types.String      `tfsdk:"created_at"`
+	EngineID            types.String      `tfsdk:"engine_id"`
+	ID                  types.String      `tfsdk:"id"`
+	InstanceTypeID      types.String      `tfsdk:"instance_type_id"`
+	Name                types.String      `tfsdk:"name"`
+	Status              types.String      `tfsdk:"status"`
+	VolumeSize          types.Int64       `tfsdk:"volume_size"`
+	VolumeType          types.String      `tfsdk:"volume_type"`
+	AvailabilityZone    types.String      `tfsdk:"availability_zone"`
+	ParameterGroup      types.String      `tfsdk:"parameter_group"`
 }
 
 type InstanceAddress struct {
@@ -114,11 +115,6 @@ func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaReq
 							Description: "Name of the instance",
 							Computed:    true,
 						},
-						"parameters": schema.MapAttribute{
-							Description: "Map of parameters",
-							Computed:    true,
-							ElementType: types.StringType,
-						},
 						"status": schema.StringAttribute{
 							Description: "Status of the instance",
 							Computed:    true,
@@ -133,6 +129,14 @@ func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaReq
 						},
 						"created_at": schema.StringAttribute{
 							Description: "Creation timestamp of the instance",
+							Computed:    true,
+						},
+						"parameter_group": schema.StringAttribute{
+							Description: "ID of the parameter group to use for the instance.",
+							Computed:    true,
+						},
+						"availability_zone": schema.StringAttribute{
+							Description: "Availability zone to use for the instance.",
 							Computed:    true,
 						},
 					},
@@ -199,10 +203,11 @@ func (r *DataSourceDbInstances) Read(ctx context.Context, req datasource.ReadReq
 			ID:                  types.StringValue(instance.ID),
 			InstanceTypeID:      types.StringValue(instance.InstanceTypeID),
 			Name:                types.StringValue(instance.Name),
-			Parameters:          convertToStringMapInstance(instance.Parameters),
 			Status:              types.StringValue(string(instance.Status)),
 			VolumeSize:          types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&instance.Volume.Size)),
 			VolumeType:          types.StringValue(string(instance.Volume.Type)),
+			AvailabilityZone:    types.StringValue(instance.AvailabilityZone),
+			ParameterGroup:      types.StringValue(instance.ParameterGroupID),
 		})
 	}
 	data.Instances = instanceModels
