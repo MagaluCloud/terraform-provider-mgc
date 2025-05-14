@@ -1,17 +1,22 @@
+resource "random_pet" "name" {
+  length    = 1
+  separator = "-"
+}
+
 # Security Groups
 resource "mgc_network_security_groups" "primary_sg" {
-  name                  = "primary-security-group-tf2"
+  name                  = "${random_pet.name.id}-primary-security-group-tf2"
   description           = "Primary security group for main services"
   disable_default_rules = true
 }
 
 resource "mgc_network_security_groups" "secondary_sg" {
-  name                  = "secondary-security-group2"
+  name                  = "${random_pet.name.id}-secondary-security-group2"
   disable_default_rules = true
 }
 
 resource "mgc_network_security_groups" "auxiliary_sg" {
-  name = "auxiliary-security-group2"
+  name = "${random_pet.name.id}-auxiliary-security-group2"
 }
 
 data "mgc_network_security_group" "primary_sg_data" {
@@ -45,7 +50,7 @@ resource "mgc_network_security_groups_rules" "ssh_ipv6_rule" {
 
 # VPC Resources
 resource "mgc_network_vpcs" "main_vpc" {
-  name = "main-vpc-test-tf2"
+  name = "${random_pet.name.id}-main-vpc-test-tf2"
 }
 
 data "mgc_network_vpc" "main_vpc_data" {
@@ -56,7 +61,7 @@ data "mgc_network_vpcs" "vpcs_data" {}
 
 # VPC Interfaces
 resource "mgc_network_vpcs_interfaces" "pip_interface" {
-  name       = "pip-interface2"
+  name       = "${random_pet.name.id}-pip-interface2"
   vpc_id     = data.mgc_network_vpc.main_vpc_data.id
   depends_on = [data.mgc_network_vpcs_subnet.primary_subnet_data]
 }
@@ -75,7 +80,7 @@ resource "mgc_network_security_groups_attach" "primary_sg_attachment" {
 
 #Subnetpools
 resource "mgc_network_subnetpools" "main_subnetpool" {
-  name        = "main-subnetpool2"
+  name        = "${random_pet.name.id}-main-subnetpool2"
   description = "Main Subnet Pool"
   cidr        = "172.5.0.0/16"
 }
@@ -89,6 +94,15 @@ resource "mgc_network_vpcs_subnets" "primary_subnet" {
   name            = "primary-subnet2"
   subnetpool_id   = mgc_network_subnetpools.main_subnetpool.id
   vpc_id          = data.mgc_network_vpc.main_vpc_data.id
+}
+
+resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
+  name              = "${random_pet.name.id}-basic-instance-tf2-with-vpc"
+  availability_zone = "br-ne1-a"
+  machine_type      = "BV1-1-40"
+  image             = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name      = "publio"
+  vpc_id            = data.mgc_network_vpc.main_vpc_data.id
 }
 
 data "mgc_network_vpcs_subnet" "primary_subnet_data" {
@@ -119,7 +133,7 @@ resource "mgc_network_public_ips_attach" "example" {
   interface_id = mgc_network_vpcs_interfaces.pip_interface.id
 }
 
-# NAT Gateway
+#NAT Gateway
 resource "mgc_network_nat_gateway" "example" {
   name        = "example-nat-gateway2"
   description = "Example NAT Gateway"
@@ -176,6 +190,6 @@ output "vpcs_interfaces_data" {
   value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
 }
 
-output "nat_gateway_data" {
-  value = data.mgc_network_nat_gateway.example
-}
+# output "nat_gateway_data" {
+#   value = data.mgc_network_nat_gateway.example
+# }
