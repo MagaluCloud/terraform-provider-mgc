@@ -122,6 +122,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "Master username for the database. Must start with a letter and contain only alphanumeric characters.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -131,7 +132,8 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 						"must start with a letter and contain only alphanumeric characters",
 					),
 				},
-				Required: true,
+				Required:  true,
+				WriteOnly: true,
 			},
 			"password": schema.StringAttribute{
 				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.",
@@ -140,6 +142,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(8),
@@ -265,6 +268,8 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	data.Id = types.StringValue(created.ID)
+	data.Password = types.StringNull()
+	data.User = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 	err = r.waitUntilInstanceStatusMatches(ctx, data.Id.ValueString(), DBaaSInstanceStatusActive.String())
 	if err != nil {
@@ -308,6 +313,8 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
 	data.ParameterGroup = types.StringValue(instance.ParameterGroupID)
 	data.Status = types.StringValue(string(instance.Status))
+	data.Password = types.StringNull()
+	data.User = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
