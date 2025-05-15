@@ -3,51 +3,79 @@ resource "random_pet" "name" {
   separator = "-"
 }
 
+# ------------------------------
+# Common Variables / Data
+# ------------------------------
 
-# DBaaS Instance resource creation
+# Active MySQL 8.0 Engine ID from your provided list
+variable "mysql_8_0_engine_id" {
+  description = "ID for MySQL 8.0 engine."
+  type        = string
+  default     = "063f3994-b6c2-4c37-96c9-bab8d82d36f7"
+}
+
+# Instance Type label for single instances
+variable "instance_type_label_single" {
+  description = "Instance type label for single DBaaS instances."
+  type        = string
+  default     = "cloud-dbaas-bs1.small"
+}
+
+# Instance Type label for cluster nodes
+variable "instance_type_label_cluster" {
+  description = "Instance type label for DBaaS cluster nodes."
+  type        = string
+  default     = "cloud-dbaas-bs1.medium" # Example, adjust if needed
+}
+
+variable "availability_zone" {
+  description = "Availability zone for resource deployment."
+  type        = string
+  default     = "br-se1-a"
+}
+
+# ------------------------------
+# DBaaS Instance Related Resources
+# ------------------------------
+
+resource "mgc_dbaas_parameter_groups" "instance_pg" {
+  engine_id   = var.mysql_8_0_engine_id
+  description = "Parameter group for test instances"
+  name        = "test-instance-pg-${random_pet.name.id}"
+}
+
 resource "mgc_dbaas_instances" "test_instance" {
   name                  = "test-instance-${random_pet.name.id}"
   user                  = "dbadmin"
-  password              = "aaaaaaaaaa"
+  password              = "aComplexP@ssw0rd!Inst"
   engine_name           = "mysql"
   engine_version        = "8.0"
-  instance_type         = "cloud-dbaas-bs1.small"
+  instance_type         = var.instance_type_label_single
   volume_size           = 60
   backup_retention_days = 10
   backup_start_at       = "16:00:00"
-  availability_zone     = "br-ne1-a"
-  parameter_group       = mgc_dbaas_parameter_groups.parameter_group.id
+  availability_zone     = var.availability_zone
+  parameter_group       = mgc_dbaas_parameter_groups.instance_pg.id
 }
 
-# Output the created instance details
-output "dbaas_instance" {
+output "dbaas_instance_details" {
   value     = mgc_dbaas_instances.test_instance
   sensitive = true
 }
 
-# DBaaS Snapshot resource creation
 resource "mgc_dbaas_instances_snapshots" "test_snapshot" {
   instance_id = mgc_dbaas_instances.test_instance.id
   name        = "test-snapshot-${random_pet.name.id}"
   description = "Test snapshot for terraform acceptance tests"
 }
 
-# Output the created snapshot details
-output "test_snapshot" {
+output "dbaas_snapshot_details" {
   value = mgc_dbaas_instances_snapshots.test_snapshot
 }
 
-# Create a snapshot for a DBaaS instance
-resource "mgc_dbaas_parameter_groups" "parameter_group" {
-  engine_id   = "063f3994-b6c2-4c37-96c9-bab8d82d36f7"
-  description = "my-description"
-  name        = "test-parameter-group-${random_pet.name.id}"
-}
-
-# Output the created parameter group details
-resource "mgc_dbaas_parameters" "example" {
-  parameter_group_id = mgc_dbaas_parameter_groups.parameter_group.id
-  name               = "MAX_CONNECTIONS"
+resource "mgc_dbaas_parameters" "instance_param_max_connections" {
+  parameter_group_id = mgc_dbaas_parameter_groups.instance_pg.id
+  name               = "MAX_CONNECTIONS" # Common parameter for MySQL
   value              = 300
 }
 
@@ -56,101 +84,170 @@ resource "mgc_dbaas_replicas" "dbaas_replica" {
   source_id = mgc_dbaas_instances.test_instance.id
 }
 
+output "dbaas_replica_details" {
+  value = mgc_dbaas_replicas.dbaas_replica
+}
+
+# ------------------------------
+# DBaaS Cluster Related Resources
+# ------------------------------
+
+resource "mgc_dbaas_parameter_groups" "cluster_pg" {
+  engine_id   = var.mysql_8_0_engine_id
+  description = "Parameter group for test clusters"
+  name        = "test-cluster-pg-${random_pet.name.id}"
+}
+
+resource "mgc_dbaas_clusters" "test_cluster_with_pg" {
+  name                  = "test-cluster-pg-${random_pet.name.id}"
+  user                  = "clusteradmin"
+  password              = "aVerySecureClu$terP@ssw0rd"
+  engine_name           = "mysql"
+  engine_version        = "8.0"
+  instance_type         = var.instance_type_label_cluster
+  volume_size           = 100
+  volume_type           = "CLOUD_NVME15K"
+  backup_retention_days = 7
+  backup_start_at       = "03:00:00"
+  parameter_group_id    = mgc_dbaas_parameter_groups.cluster_pg.id
+}
+
+resource "mgc_dbaas_clusters" "test_cluster_no_pg" {
+  name                  = "test-cluster-nopg-${random_pet.name.id}"
+  user                  = "clusteradmin2"
+  password              = "anotherS&cureP@sswordClu1"
+  engine_name           = "mysql"
+  engine_version        = "8.0"
+  instance_type         = var.instance_type_label_cluster
+  volume_size           = 50
+  backup_retention_days = 5
+  backup_start_at       = "02:00:00"
+}
+
+output "dbaas_cluster_with_pg_details" {
+  value     = mgc_dbaas_clusters.test_cluster_with_pg
+  sensitive = true
+}
+
+output "dbaas_cluster_no_pg_details" {
+  value     = mgc_dbaas_clusters.test_cluster_no_pg
+  sensitive = true
+}
+
 
 # ------------------------------
 # Data Sources
 # ------------------------------
 
-# Engine data sources
 data "mgc_dbaas_engines" "all_engines" {}
 
-# Instance Types data sources
-data "mgc_dbaas_instance_types" "default_instance_types" {}
+data "mgc_dbaas_instance_types" "all_instance_types" {}
 
-# DBaaS Instances data sources
-data "mgc_dbaas_instances" "all_instances" {}
+data "mgc_dbaas_instances" "all_db_instances" {
+  # status_filter = "ACTIVE"
+}
 
-# Get specific instance data
-data "mgc_dbaas_instance" "test_instance" {
+data "mgc_dbaas_instance" "specific_test_instance" {
   id = mgc_dbaas_instances.test_instance.id
 }
 
-# Get snapshots for the instance
-data "mgc_dbaas_instances_snapshots" "test_instance_snapshots" {
+data "mgc_dbaas_instances_snapshots" "specific_test_instance_snapshots" {
   instance_id = mgc_dbaas_instances.test_instance.id
 }
 
-# List all parameter groups
-data "mgc_dbaas_parameter_groups" "parameter_groups" {}
-
-# Get parameter group data
-data "mgc_dbaas_parameter_group" "parameter_group_resource" {
-  id = mgc_dbaas_parameter_groups.parameter_group.id
+data "mgc_dbaas_parameter_groups" "all_parameter_groups" {
+  # engine_id = var.mysql_8_0_engine_id # Example: Filter PGs by engine
 }
 
-data "mgc_dbaas_parameters" "parameters" {
-  parameter_group_id = mgc_dbaas_parameter_groups.parameter_group.id
+data "mgc_dbaas_parameter_group" "specific_instance_pg_data" {
+  id = mgc_dbaas_parameter_groups.instance_pg.id
 }
 
-# Get replica data
-data "mgc_dbaas_replica" "dbaas_replica" {
+data "mgc_dbaas_parameter_group" "specific_cluster_pg_data" {
+  id = mgc_dbaas_parameter_groups.cluster_pg.id
+}
+
+data "mgc_dbaas_parameters" "instance_pg_parameters_data" {
+  parameter_group_id = mgc_dbaas_parameter_groups.instance_pg.id
+}
+
+data "mgc_dbaas_replica" "specific_dbaas_replica_data" {
   id = mgc_dbaas_replicas.dbaas_replica.id
 }
 
-# Get all replicas data
-data "mgc_dbaas_replicas" "all_replicas" {
+data "mgc_dbaas_replicas" "all_db_replicas" {}
+
+# --- DBaaS Cluster Data Sources ---
+data "mgc_dbaas_clusters" "all_clusters" {
+  # status_filter = "ACTIVE"
+  # engine_id_filter = var.mysql_8_0_engine_id
+}
+
+data "mgc_dbaas_cluster" "specific_test_cluster_pg" {
+  id = mgc_dbaas_clusters.test_cluster_with_pg.id
+}
+
+data "mgc_dbaas_cluster" "specific_test_cluster_no_pg" {
+  id = mgc_dbaas_clusters.test_cluster_no_pg.id
 }
 
 # ------------------------------
 # Data Source Outputs
 # ------------------------------
 
-# Engines outputs
-output "all_engines" {
+output "all_engines_data" {
   value = data.mgc_dbaas_engines.all_engines.engines
 }
 
-# Instance types outputs
-output "default_instance_types" {
-  value = data.mgc_dbaas_instance_types.default_instance_types.instance_types
+output "all_instance_types_data" {
+  value = data.mgc_dbaas_instance_types.all_instance_types.instance_types
 }
 
-# Instances outputs
-output "all_instances" {
-  value = data.mgc_dbaas_instances.all_instances.instances
+output "all_db_instances_data" {
+  value = data.mgc_dbaas_instances.all_db_instances.instances
 }
 
-# Specific instance output
-output "test_instance_data" {
-  value = data.mgc_dbaas_instance.test_instance
+output "specific_test_instance_data" {
+  value = data.mgc_dbaas_instance.specific_test_instance
 }
 
-# Snapshots output
-output "test_instance_snapshots" {
-  value = data.mgc_dbaas_instances_snapshots.test_instance_snapshots
+output "specific_test_instance_snapshots_data" {
+  value = data.mgc_dbaas_instances_snapshots.specific_test_instance_snapshots
 }
 
-# Parameter group output
-output "parameter_group_data" {
-  value = data.mgc_dbaas_parameter_group.parameter_group_resource
+output "all_parameter_groups_data" {
+  value = data.mgc_dbaas_parameter_groups.all_parameter_groups
 }
 
-# Parameter groups output
-output "parameter_groups_data" {
-  value = data.mgc_dbaas_parameter_groups.parameter_groups
+output "specific_instance_pg_details_data" {
+  value = data.mgc_dbaas_parameter_group.specific_instance_pg_data
 }
 
-# Parameters output
-output "parameters_data" {
-  value = data.mgc_dbaas_parameters.parameters
+output "specific_cluster_pg_details_data" {
+  value = data.mgc_dbaas_parameter_group.specific_cluster_pg_data
 }
 
-# Replica output
-output "dbaas_replica_data" {
-  value = data.mgc_dbaas_replica.dbaas_replica
+output "instance_pg_parameters_details_data" {
+  value = data.mgc_dbaas_parameters.instance_pg_parameters_data
 }
 
-# All replicas output
-output "all_replicas_data" {
-  value = data.mgc_dbaas_replicas.all_replicas
+output "specific_dbaas_replica_details_data" {
+  value = data.mgc_dbaas_replica.specific_dbaas_replica_data
+}
+
+output "all_db_replicas_data" {
+  value = data.mgc_dbaas_replicas.all_db_replicas
+}
+
+# --- Cluster Data Source Outputs ---
+output "all_dbaas_clusters_data" {
+  value = data.mgc_dbaas_clusters.all_clusters.clusters
+}
+
+output "specific_test_cluster_pg_data" {
+  value = data.mgc_dbaas_cluster.specific_test_cluster_pg
+}
+
+output "specific_test_cluster_no_pg_data" {
+  value = data.mgc_dbaas_cluster.specific_test_cluster_no_pg
 }

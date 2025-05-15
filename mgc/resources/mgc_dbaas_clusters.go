@@ -64,7 +64,7 @@ func NewDBaaSClusterResource() resource.Resource {
 }
 
 func (r *DBaaSClusterResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_dbaas_cluster"
+	resp.TypeName = req.ProviderTypeName + "_dbaas_clusters"
 }
 
 func (r *DBaaSClusterResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -108,6 +108,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 			"user": schema.StringAttribute{
 				Description: "Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.",
 				Required:    true,
+				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -351,8 +352,8 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	converted := r.populateModelFromDetailResponse(detailedCluster)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &converted)...)
+	r.populateModelFromDetailResponse(detailedCluster, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -368,8 +369,8 @@ func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	converted := r.populateModelFromDetailResponse(detailedCluster)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &converted)...)
+	r.populateModelFromDetailResponse(detailedCluster, &state)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -435,8 +436,7 @@ func (r *DBaaSClusterResource) ImportState(ctx context.Context, req resource.Imp
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.ClusterDetailResponse) *DBaaSClusterModel {
-	var model DBaaSClusterModel
+func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.ClusterDetailResponse, model *DBaaSClusterModel) {
 	model.ID = types.StringValue(detail.ID)
 	model.Name = types.StringValue(detail.Name)
 	model.VolumeSize = types.Int64Value(int64(detail.Volume.Size))
@@ -469,7 +469,8 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 		})
 	}
 	model.Addresses = modelAddresses
-	return &model
+	model.Password = types.StringNull()
+	model.User = types.StringNull()
 }
 
 func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus) error {

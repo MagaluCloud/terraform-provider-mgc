@@ -1,0 +1,1 @@
+terraform import mgc_dbaas_clusters.my_cluster_no_parameter_group <cluster_id>

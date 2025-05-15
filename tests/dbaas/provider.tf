@@ -17,7 +17,7 @@ provider "mgc" {
 
 variable "region" {
   type    = string
-  default = "br-ne1"
+  default = "br-se1"
 }
 variable "api_key" {
   type      = string
