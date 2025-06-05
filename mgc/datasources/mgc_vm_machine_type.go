@@ -14,7 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceVmMachineType{}
 
 type DataSourceVmMachineType struct {
-	vmType vmSDK.MachineTypeService
+	vmType vmSDK.InstanceTypeService
 }
 
 type MachineTypeModel struct {
@@ -49,7 +49,7 @@ func (r *DataSourceVmMachineType) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	r.vmType = vmSDK.New(&dataConfig.CoreConfig).MachineTypes()
+	r.vmType = vmSDK.New(&dataConfig.CoreConfig).InstanceTypes()
 }
 
 func (r *DataSourceVmMachineType) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -104,7 +104,7 @@ func (r *DataSourceVmMachineType) Read(ctx context.Context, req datasource.ReadR
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.vmType.List(ctx, vmSDK.MachineTypeListOptions{})
+	sdkOutput, err := r.vmType.List(ctx, vmSDK.InstanceTypeListOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

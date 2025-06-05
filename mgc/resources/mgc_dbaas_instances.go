@@ -20,7 +20,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const instanceStatusTimeout = 90 * time.Minute
+const (
+	instanceStatusTimeout      = 90 * time.Minute
+	dbaasInstanceProductFamily = "SINGLE_INSTANCE"
+)
 
 type DBaaSInstanceStatus string
 
@@ -170,7 +173,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"instance_type": schema.StringAttribute{
-				Description: "Compute and memory capacity of the instance (e.g., 'db.t3.micro'). Can be changed to scale the instance.",
+				Description: "Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -417,18 +420,20 @@ func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engi
 
 func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string) (string, error) {
 	active := "ACTIVE"
+	maxLimit := 50
 	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
+		Limit:  &maxLimit,
 		Status: &active,
 	})
 	if err != nil {
 		return "", err
 	}
 	for _, instance := range instanceTypes {
-		if instance.Label == instanceType {
+		if instance.Label == instanceType && instance.CompatibleProduct == dbaasInstanceProductFamily {
 			return instance.ID, nil
 		}
 	}
-	return "", errors.New("instance type not found")
+	return "", errors.New("instance type not found, not active or not compatible with single instance family")
 }
 
 func (r *DBaaSInstanceResource) getEngineNameAndVersionByID(ctx context.Context, engineID string) (name string, version string, err error) {
