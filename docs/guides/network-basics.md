@@ -8,6 +8,8 @@ description: "A comprehensive guide to understanding and implementing networking
 
 This guide will help you understand and implement networking in Magalu Cloud, explaining how the various network resources work together to create secure, flexible network architectures.
 
+⚠️ Important: If you just want to assign a public IP to your VM using the default interface, there is a guide available in [Creating VMs with Public IPs](https://registry.terraform.io/providers/MagaluCloud/mgc/latest/docs/guides/vm-network)
+
 ## Core Networking Concepts in Magalu Cloud
 
 Magalu Cloud's networking follows a hierarchical model that allows you to create isolated networks with fine-grained security controls:
@@ -15,10 +17,11 @@ Magalu Cloud's networking follows a hierarchical model that allows you to create
 1. **VPCs (Virtual Private Clouds)**: Isolated virtual networks
 2. **Subnet Pools**: Collections of IP addresses that can be allocated to subnets
 3. **Subnets**: Segmented network address spaces within a VPC
-4. **Interfaces**: Connection points for Virtual Machines to a network
+4. **NAT Gateways**: Provide outbound internet access for resources in private subnets
+5. **Interfaces**: Connection points for Virtual Machines to a network
    - Also known as NICs (Network Interface Cards) or Ports
-5. **Security Groups**: Virtual firewalls for controlling inbound and outbound traffic
-6. **Public IPs**: Addresses for connecting resources to the internet
+6. **Security Groups**: Virtual firewalls for controlling inbound and outbound traffic
+7. **Public IPs**: Addresses for connecting resources to the internet
 
 Let's explore how these components work together.
 
@@ -174,6 +177,68 @@ resource "mgc_network_public_ips_attach" "web_ip_attachment" {
 }
 ```
 
+## Using NAT Gateways
+
+NAT Gateways provide a way for private subnets to access the internet while maintaining security. They allow outbound internet access for resources in private subnets without exposing them directly to the internet.
+
+### Creating a NAT Gateway
+
+To create a NAT Gateway in your VPC:
+
+```terraform
+resource "mgc_network_nat_gateway" "main_nat" {
+  name        = "main-nat-gateway"
+  description = "NAT Gateway for private subnets"
+  vpc_id      = mgc_network_vpcs.main_vpc.id
+  zone        = "a"  # Specify the zone where the NAT Gateway should be created
+}
+```
+
+### Using NAT Gateway with Private Subnets
+
+In a typical architecture, you might have:
+- Public subnets with direct internet access
+- Private subnets that need internet access through the NAT Gateway
+
+Here's an example of how to structure this:
+
+```terraform
+# Create a NAT Gateway
+resource "mgc_network_nat_gateway" "app_nat" {
+  name        = "app-nat-gateway"
+  description = "NAT Gateway for application private subnets"
+  vpc_id      = mgc_network_vpcs.app_vpc.id
+  zone        = "zone-1"
+}
+
+# Create a public subnet for the NAT Gateway
+resource "mgc_network_vpcs_subnets" "public_subnet" {
+  name            = "public-subnet"
+  description     = "Public subnet for NAT Gateway"
+  vpc_id          = mgc_network_vpcs.app_vpc.id
+  subnetpool_id   = mgc_network_subnetpools.app_subnet_pool.id
+  cidr_block      = "10.0.0.0/24"
+  ip_version      = "IPv4"
+  dns_nameservers = ["8.8.8.8", "1.1.1.1"]
+}
+
+# Create a private subnet that will use the NAT Gateway
+resource "mgc_network_vpcs_subnets" "private_subnet" {
+  name            = "private-subnet"
+  description     = "Private subnet using NAT Gateway"
+  vpc_id          = mgc_network_vpcs.app_vpc.id
+  subnetpool_id   = mgc_network_subnetpools.app_subnet_pool.id
+  cidr_block      = "10.0.1.0/24"
+  ip_version      = "IPv4"
+  dns_nameservers = ["8.8.8.8", "1.1.1.1"]
+}
+```
+
+With this setup:
+1. Resources in the public subnet can have direct internet access
+2. Resources in the private subnet can access the internet through the NAT Gateway
+3. The NAT Gateway provides outbound internet access while maintaining security
+
 ## Complete Network Architecture Example
 
 Here's a comprehensive example showing all networking components working together:
@@ -223,7 +288,15 @@ resource "mgc_network_vpcs_subnets" "db_subnet" {
   dns_nameservers = ["8.8.8.8", "1.1.1.1"]
 }
 
-# 4. Create security groups
+# 4. Create NAT Gateway
+resource "mgc_network_nat_gateway" "app_nat" {
+  name        = "app-nat-gateway"
+  description = "NAT Gateway for application private subnets"
+  vpc_id      = mgc_network_vpcs.app_vpc.id
+  zone        = "zone-1"
+}
+
+# 5. Create security groups
 resource "mgc_network_security_groups" "web_sg" {
   name        = "web-security-group"
   description = "Security group for web servers"
@@ -239,7 +312,7 @@ resource "mgc_network_security_groups" "db_sg" {
   description = "Security group for database servers"
 }
 
-# 5. Create security group rules
+# 6. Create security group rules
 # Web tier rules
 resource "mgc_network_security_groups_rules" "web_http" {
   description       = "Allow HTTP traffic"
@@ -287,7 +360,7 @@ resource "mgc_network_security_groups_rules" "db_from_app" {
   security_group_id = mgc_network_security_groups.db_sg.id
 }
 
-# 6. Create network interfaces
+# 7. Create network interfaces
 resource "mgc_network_vpcs_interfaces" "web_interface" {
   name   = "web-interface"
   vpc_id = mgc_network_vpcs.app_vpc.id
@@ -309,7 +382,7 @@ resource "mgc_network_vpcs_interfaces" "db_interface" {
   depends_on = [mgc_network_vpcs_subnets.db_subnet]
 }
 
-# 7. Attach security groups to interfaces
+# 8. Attach security groups to interfaces
 resource "mgc_network_security_groups_attach" "web_sg_attach" {
   security_group_id = mgc_network_security_groups.web_sg.id
   interface_id      = mgc_network_vpcs_interfaces.web_interface.id
@@ -325,7 +398,7 @@ resource "mgc_network_security_groups_attach" "db_sg_attach" {
   interface_id      = mgc_network_vpcs_interfaces.db_interface.id
 }
 
-# 8. Create and attach public IP for web tier only
+# 9. Create and attach public IP for web tier only
 resource "mgc_network_public_ips" "web_public_ip" {
   description = "Public IP for web server"
   vpc_id      = mgc_network_vpcs.app_vpc.id
@@ -336,7 +409,7 @@ resource "mgc_network_public_ips_attach" "web_public_ip_attach" {
   interface_id = mgc_network_vpcs_interfaces.web_interface.id
 }
 
-# Output the public IP
+# 10. Output the public IP
 output "web_public_ip" {
   value = mgc_network_public_ips.web_public_ip.public_ip
 }
@@ -349,9 +422,10 @@ The networking components in Magalu Cloud follow a hierarchical relationship:
 1. **VPC** is the parent container for all other network resources
 2. **Subnet Pool** defines the IP address range available for allocation
 3. **Subnet** segments the network within a VPC and uses addresses from the subnet pool
-4. **Network Interface** connects to a subnet and provides network connectivity
-5. **Security Group** attaches to interfaces to control traffic
-6. **Public IP** attaches to interfaces to provide internet connectivity
+4. **NAT Gateway** provides outbound internet access for resources in private subnets
+5. **Network Interface** connects to a subnet and provides network connectivity
+6. **Security Group** attaches to interfaces to control traffic
+7. **Public IP** attaches to interfaces to provide internet connectivity
 
 ## Best Practices for Magalu Cloud Networking
 

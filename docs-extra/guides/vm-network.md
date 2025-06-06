@@ -188,6 +188,10 @@ resource "mgc_virtual_machine_interface_attach" "attach_interface" {
 
 Now your VM has a custom interface with a public IP attached!
 
+### Step 7: Configure Virtual Machine settings
+
+In order to correct use the new interface in your virtual machine operational system, you now need to define your network router rules.
+
 ---
 
 ## Which Method Should You Choose?
