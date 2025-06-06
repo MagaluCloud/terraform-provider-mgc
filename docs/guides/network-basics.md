@@ -8,6 +8,8 @@ description: "A comprehensive guide to understanding and implementing networking
 
 This guide will help you understand and implement networking in Magalu Cloud, explaining how the various network resources work together to create secure, flexible network architectures.
 
+⚠️ Important: If you just want to assign a public IP to your VM using the default interface, there is a guide available in [Creating VMs with Public IPs](https://registry.terraform.io/providers/MagaluCloud/mgc/latest/docs/guides/vm-network)
+
 ## Core Networking Concepts in Magalu Cloud
 
 Magalu Cloud's networking follows a hierarchical model that allows you to create isolated networks with fine-grained security controls:
