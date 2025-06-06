@@ -22,7 +22,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const clusterStatusTimeout = 90 * time.Minute
+const (
+	clusterStatusTimeout  = 90 * time.Minute
+	clusterInstanceFamily = "CLUSTER"
+)
 
 type DBaaSClusterAddressModel struct {
 	Access  types.String `tfsdk:"access"`
@@ -155,7 +158,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"instance_type": schema.StringAttribute{
-				Description: "Compute and memory capacity of the cluster nodes (e.g., 'db.t3.micro'). Cannot be changed after creation.",
+				Description: "Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -519,16 +522,18 @@ func (r *DBaaSClusterResource) validateAndGetEngineID(ctx context.Context, engin
 
 func (r *DBaaSClusterResource) validateAndGetInstanceTypeID(ctx context.Context, instanceTypeLabel string) (string, error) {
 	activeStatus := "ACTIVE"
+	maxLimit := 50
 	instanceTypes, err := r.instanceTypeService.List(ctx, dbSDK.ListInstanceTypeOptions{
 		Status: &activeStatus,
+		Limit:  &maxLimit,
 	})
 	if err != nil {
 		return "", fmt.Errorf("listing instance types: %w", err)
 	}
 	for _, itype := range instanceTypes {
-		if itype.Label == instanceTypeLabel {
+		if itype.Label == instanceTypeLabel && itype.CompatibleProduct == clusterInstanceFamily {
 			return itype.ID, nil
 		}
 	}
-	return "", fmt.Errorf("instance type '%s' not found or not active", instanceTypeLabel)
+	return "", fmt.Errorf("instance type '%s' not found, not active or not compatible with cluster instance family", instanceTypeLabel)
 }

@@ -47,7 +47,7 @@ resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
 
 - `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.
 - `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.
-- `instance_type` (String) Compute and memory capacity of the cluster nodes (e.g., 'db.t3.micro'). Cannot be changed after creation.
+- `instance_type` (String) Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.
 - `name` (String) Name of the DBaaS cluster. Must be unique. Cannot be changed after creation.
 - `password` (String, Sensitive) Master password for the database cluster. Must be at least 8 characters long.
 - `user` (String) Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.
