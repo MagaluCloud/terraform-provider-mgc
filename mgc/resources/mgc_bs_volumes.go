@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -56,7 +57,7 @@ func (s VolumeStatus) String() string {
 }
 
 func (s VolumeStatus) isError() bool {
-	return strings.HasSuffix(s.String(), "error")
+	return strings.Contains(s.String(), "error")
 }
 
 func NewBlockStorageVolumesResource() resource.Resource {
@@ -85,17 +86,18 @@ func (r *bsVolumes) Configure(ctx context.Context, req resource.ConfigureRequest
 }
 
 type bsVolumesResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	SnapshotID       types.String `tfsdk:"snapshot_id"`
-	AvailabilityZone types.String `tfsdk:"availability_zone"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	Size             types.Int64  `tfsdk:"size"`
-	Type             types.String `tfsdk:"type"`
-	Encrypted        types.Bool   `tfsdk:"encrypted"`
+	ID               types.String   `tfsdk:"id"`
+	Name             types.String   `tfsdk:"name"`
+	SnapshotID       types.String   `tfsdk:"snapshot_id"`
+	AvailabilityZone types.String   `tfsdk:"availability_zone"`
+	CreatedAt        types.String   `tfsdk:"created_at"`
+	Size             types.Int64    `tfsdk:"size"`
+	Type             types.String   `tfsdk:"type"`
+	Encrypted        types.Bool     `tfsdk:"encrypted"`
+	Timeouts         timeouts.Value `tfsdk:"timeouts"`
 }
 
-func (r *bsVolumes) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *bsVolumes) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Block storage volumes are storage devices that can be attached to virtual machines. They are used to store data and can be detached and attached to other virtual machines.",
 		Attributes: map[string]schema.Attribute{
@@ -152,6 +154,11 @@ func (r *bsVolumes) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
 		},
 	}
 
@@ -178,6 +185,14 @@ func (r *bsVolumes) Create(ctx context.Context, req resource.CreateRequest, resp
 		return
 	}
 
+	createTimeout, errTimeout := state.Timeouts.Create(ctx, BsVolumeStatusTimeout)
+	if errTimeout != nil {
+		resp.Diagnostics = errTimeout
+		return
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
+
 	createParam := storageSDK.CreateVolumeRequest{
 		Name:      state.Name.ValueString(),
 		Size:      int(state.Size.ValueInt64()),
@@ -195,12 +210,12 @@ func (r *bsVolumes) Create(ctx context.Context, req resource.CreateRequest, resp
 		createParam.AvailabilityZone = state.AvailabilityZone.ValueStringPointer()
 	}
 
-	createResult, err := r.bsVolumes.Create(ctx, createParam)
+	createResult, err := r.bsVolumes.Create(timeoutCtx, createParam)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	getResult, err := r.waitUntilVolumeStatusMatches(ctx, createResult, Completed)
+	getResult, err := r.waitUntilVolumeStatusMatches(timeoutCtx, createResult, Completed)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -299,12 +314,10 @@ func (r *bsVolumes) toTerraformModel(volume storageSDK.Volume, snapshotId *strin
 }
 
 func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID string, status VolumeStatus) (*storageSDK.Volume, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, BsVolumeStatusTimeout)
-	defer cancel()
 
 	for {
 		select {
-		case <-timeoutCtx.Done():
+		case <-ctx.Done():
 			return nil, fmt.Errorf("timeout waiting for volume %s to reach status %s", volumeID, status)
 		case <-time.After(10 * time.Second):
 			volume, err := r.bsVolumes.Get(ctx, volumeID, []string{storageSDK.VolumeTypeExpand})
