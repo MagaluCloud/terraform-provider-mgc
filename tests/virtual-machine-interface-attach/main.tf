@@ -1,11 +1,13 @@
 resource "mgc_network_vpcs" "main_vpc" {
   name = "main-vpc-test-tf-attach-vm"
+
 }
 
 resource "mgc_network_subnetpools" "main_subnetpool" {
   name        = "main-subnetpool"
   description = "Main Subnet Pool"
   cidr        = "172.29.0.0/16"
+
 }
 
 resource "mgc_network_vpcs_subnets" "primary_subnet" {
@@ -25,6 +27,18 @@ resource "mgc_network_vpcs_interfaces" "primary_interface" {
   vpc_id = mgc_network_vpcs.main_vpc.id
 
   depends_on = [mgc_network_vpcs_subnets.primary_subnet]
+}
+
+resource "mgc_network_public_ips" "public_ip" {
+  vpc_id = mgc_network_vpcs.main_vpc.id
+  description = "Public IP for attach VM"
+  depends_on = [mgc_network_vpcs.main_vpc]
+}
+
+resource "mgc_network_public_ips_attach" "public_ip_attach" {
+  interface_id = mgc_network_vpcs_interfaces.primary_interface.id
+  public_ip_id = mgc_network_public_ips.public_ip.id
+  depends_on = [mgc_network_public_ips.public_ip]
 }
 
 resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
