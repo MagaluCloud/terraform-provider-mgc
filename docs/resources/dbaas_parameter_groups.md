@@ -15,8 +15,9 @@ Manages a DBaaS parameters groups
 ```terraform
 # Create a snapshot for a DBaaS instance
 resource "mgc_dbaas_parameter_groups" "example" {
-  engine_id = "db-engine-id"
-  name      = "my-custom-parameters"
+  engine_name    = "mysql"
+  engine_version = "8.0"
+  name           = "my-custom-parameters"
 }
 ```
 
