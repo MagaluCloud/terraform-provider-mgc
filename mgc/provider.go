@@ -7,7 +7,10 @@ import (
 	"runtime"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
+	dbaasdsv1 "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources/dbaas_v1"
 	resources "github.com/MagaluCloud/terraform-provider-mgc/mgc/resources"
+	dbaasrscv1 "github.com/MagaluCloud/terraform-provider-mgc/mgc/resources/dbaas_v1"
+
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -177,15 +180,15 @@ func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource 
 		resources.NewNetworkPublicIPAttachResource,
 		resources.NewNetworkVpcsSubnetsResource,
 		resources.NewNetworkSubnetpoolsResource,
-		resources.NewDBaaSInstanceResource,
-		resources.NewDBaaSInstanceSnapshotResource,
+		dbaasrscv1.NewDBaaSInstanceResource,
+		dbaasrscv1.NewDBaaSInstanceSnapshotResource,
 		resources.NewContainerRegistryRegistriesResource,
 		resources.NewVirtualMachineInterfaceAttachResource,
-		// resources.NewNetworkNatGatewayResource,
-		resources.NewDBaaSParameterGroupsResource,
-		resources.NewDBaaSParameterResource,
-		resources.NewDBaaSReplicaResource,
-		resources.NewDBaaSClusterResource,
+		resources.NewNetworkNatGatewayResource,
+		// resources.NewDBaaSParameterGroupsResource,
+		// resources.NewDBaaSParameterResource,
+		// resources.NewDBaaSReplicaResource,
+		// resources.NewDBaaSClusterResource,
 	}
 }
 
@@ -217,12 +220,12 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceBSSnapshot,
 		datasources.NewDataSourceBsVolume,
 		datasources.NewDataSourceBsVolumeTypes,
-		datasources.NewDataSourceDbaasEngines,
-		datasources.NewDataSourceDbaasInstanceTypes,
-		datasources.NewDataSourceDbaasInstances,
-		datasources.NewDataSourceDbaasInstance,
-		datasources.NewDataSourceDbaasInstancesSnapshots,
-		datasources.NewDataSourceDbaasInstancesSnapshot,
+		dbaasdsv1.NewDataSourceDbaasEngines,
+		dbaasdsv1.NewDataSourceDbaasInstanceTypes,
+		dbaasdsv1.NewDataSourceDbaasInstances,
+		dbaasdsv1.NewDataSourceDbaasInstance,
+		dbaasdsv1.NewDataSourceDbaasInstancesSnapshots,
+		dbaasdsv1.NewDataSourceDbaasInstancesSnapshot,
 		datasources.NewDataSourceAvailabilityZones,
 		datasources.NewDataSourceCRImages,
 		datasources.NewDataSourceCRRepositories,
@@ -233,14 +236,14 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDatasourceBuckets,
 		datasources.NewDataSourceVmSnapshots,
 		datasources.NewDataSourceKubernetesClusterList,
-		// datasources.NewDataSourceNetworkNatGateway,
-		datasources.NewDataSourceDbReplicaList,
-		datasources.NewDataSourceDbReplica,
-		datasources.NewDataSourceDdbaasParameterGroup,
-		datasources.NewDataSourceDdbaasParameterGroups,
-		datasources.NewDataSourceDbParametersList,
-		datasources.NewDBaaSClusterDataSource,
-		datasources.NewDBaaSClustersDataSource,
+		datasources.NewDataSourceNetworkNatGateway,
+		// datasources.NewDataSourceDbReplicaList,
+		// datasources.NewDataSourceDbReplica,
+		// datasources.NewDataSourceDdbaasParameterGroup,
+		// datasources.NewDataSourceDdbaasParameterGroups,
+		// datasources.NewDataSourceDbParametersList,
+		// datasources.NewDBaaSClusterDataSource,
+		// datasources.NewDBaaSClustersDataSource,
 	}
 }
 

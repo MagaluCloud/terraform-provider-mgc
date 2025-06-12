@@ -3,7 +3,7 @@ package datasources
 import (
 	"context"
 
-	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas/v1"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -109,7 +109,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 			Name:        types.StringValue(snapshot.Name),
 			InstanceId:  data.InstanceId,
 			Description: types.StringValue(snapshot.Description),
-			CreatedAt:   types.StringValue(*tfutil.ConvertTimeToRFC3339(&snapshot.CreatedAt)),
+			CreatedAt:   types.StringValue(snapshot.CreatedAt),
 			Status:      types.StringValue(string(snapshot.Status)),
 			Size:        types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&snapshot.AllocatedSize)),
 		})
