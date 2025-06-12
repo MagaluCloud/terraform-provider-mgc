@@ -36,7 +36,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 - `description` (String) A brief description of the Kubernetes cluster.
 - `enabled_bastion` (Boolean, Deprecated) Enables the use of a bastion host for secure access to the cluster.
 - `enabled_server_group` (Boolean) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools.
-- `service_ip_v4_cidr` (String) The IP address range of the Kubernetes cluster service.
+- `services_ip_v4_cidr` (String) The IP address range of the Kubernetes cluster service.
 - `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format.
 - `zone` (String) Identifier of the zone where the Kubernetes cluster is located.
 
