@@ -3,7 +3,7 @@ package datasources
 import (
 	"context"
 
-	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas/v1"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -18,18 +18,17 @@ type DataSourceDbInstance struct {
 }
 
 type dbInstanceDataSourceModel struct {
-	ID                  types.String      `tfsdk:"id"`
-	Addresses           []InstanceAddress `tfsdk:"addresses"`
-	BackupRetentionDays types.Int64       `tfsdk:"backup_retention_days"`
-	CreatedAt           types.String      `tfsdk:"created_at"`
-	EngineID            types.String      `tfsdk:"engine_id"`
-	InstanceTypeID      types.String      `tfsdk:"instance_type_id"`
-	Name                types.String      `tfsdk:"name"`
-	Status              types.String      `tfsdk:"status"`
-	VolumeSize          types.Int64       `tfsdk:"volume_size"`
-	VolumeType          types.String      `tfsdk:"volume_type"`
-	AvailabilityZone    types.String      `tfsdk:"availability_zone"`
-	ParameterGroup      types.String      `tfsdk:"parameter_group"`
+	ID                  types.String            `tfsdk:"id"`
+	Addresses           []InstanceAddress       `tfsdk:"addresses"`
+	BackupRetentionDays types.Int64             `tfsdk:"backup_retention_days"`
+	CreatedAt           types.String            `tfsdk:"created_at"`
+	EngineID            types.String            `tfsdk:"engine_id"`
+	InstanceTypeID      types.String            `tfsdk:"instance_type_id"`
+	Name                types.String            `tfsdk:"name"`
+	Parameters          map[string]types.String `tfsdk:"parameters"`
+	Status              types.String            `tfsdk:"status"`
+	VolumeSize          types.Int64             `tfsdk:"volume_size"`
+	VolumeType          types.String            `tfsdk:"volume_type"`
 }
 
 func NewDataSourceDbaasInstance() datasource.DataSource {
@@ -101,6 +100,11 @@ func (r *DataSourceDbInstance) Schema(_ context.Context, _ datasource.SchemaRequ
 				Description: "Name of the instance",
 				Computed:    true,
 			},
+			"parameters": schema.MapAttribute{
+				Description: "Map of parameters",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"status": schema.StringAttribute{
 				Description: "Status of the instance",
 				Computed:    true,
@@ -111,14 +115,6 @@ func (r *DataSourceDbInstance) Schema(_ context.Context, _ datasource.SchemaRequ
 			},
 			"volume_type": schema.StringAttribute{
 				Description: "Type of the volume",
-				Computed:    true,
-			},
-			"parameter_group": schema.StringAttribute{
-				Description: "ID of the parameter group to use for the instance.",
-				Computed:    true,
-			},
-			"availability_zone": schema.StringAttribute{
-				Description: "Availability zone to use for the instance.",
 				Computed:    true,
 			},
 		},
@@ -144,10 +140,9 @@ func (r *DataSourceDbInstance) Read(ctx context.Context, req datasource.ReadRequ
 	data.EngineID = types.StringValue(instance.EngineID)
 	data.InstanceTypeID = types.StringValue(instance.InstanceTypeID)
 	data.Name = types.StringValue(instance.Name)
+	data.Parameters = convertToStringMapInstance(instance.Parameters)
 	data.Status = types.StringValue(string(instance.Status))
 	data.VolumeSize = types.Int64PointerValue(tfutil.ConvertIntPointerToInt64Pointer(&instance.Volume.Size))
 	data.VolumeType = types.StringValue(string(instance.Volume.Type))
-	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
-	data.ParameterGroup = types.StringValue(instance.ParameterGroupID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

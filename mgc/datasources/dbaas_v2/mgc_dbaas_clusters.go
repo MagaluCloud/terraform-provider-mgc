@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas/v2"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"

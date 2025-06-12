@@ -3,7 +3,7 @@ package datasources
 import (
 	"context"
 
-	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
+	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas/v1"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
