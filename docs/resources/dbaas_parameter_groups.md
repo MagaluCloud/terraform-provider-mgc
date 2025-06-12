@@ -25,7 +25,8 @@ resource "mgc_dbaas_parameter_groups" "example" {
 
 ### Required
 
-- `engine_id` (String) Unique identifier for the engine
+- `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.
+- `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name.
 - `name` (String) Name of the parameters group
 
 ### Optional
