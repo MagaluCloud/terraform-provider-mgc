@@ -164,7 +164,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"service_ip_v4_cidr": schema.StringAttribute{
+			"services_ip_v4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster service.",
 				Optional:    true,
 				Computed:    true,
