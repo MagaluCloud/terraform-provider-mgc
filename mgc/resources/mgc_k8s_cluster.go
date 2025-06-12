@@ -39,6 +39,8 @@ type KubernetesClusterCreateResourceModel struct {
 	ID                 types.String   `tfsdk:"id"`
 	EnabledBastion     types.Bool     `tfsdk:"enabled_bastion"` // Deprecated
 	Zone               types.String   `tfsdk:"zone"`
+	ServicesIpV4CIDR   types.String   `tfsdk:"services_ip_v4_cidr"`
+	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ip_v4_cidr"`
 }
 
 type k8sClusterResource struct {
@@ -153,6 +155,24 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"cluster_ip_v4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"service_ip_v4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster service.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -192,6 +212,8 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		Name:               data.Name.ValueString(),
 		Version:            data.Version.ValueStringPointer(),
 		EnabledServerGroup: data.EnabledServerGroup.ValueBoolPointer(),
+		ClusterIPv4CIDR:    data.ClusterIPv4CIDR.ValueStringPointer(),
+		ServicesIpV4CIDR:   data.ServicesIpV4CIDR.ValueStringPointer(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -310,10 +332,12 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 	}
 
 	tfModel := &KubernetesClusterCreateResourceModel{
-		Name:      types.StringValue(sdkResult.Name),
-		ID:        types.StringValue(sdkResult.ID),
-		Version:   types.StringValue(sdkResult.Version),
-		CreatedAt: types.StringPointerValue(tfutil.ConvertTimeToRFC3339(sdkResult.CreatedAt)),
+		Name:             types.StringValue(sdkResult.Name),
+		ID:               types.StringValue(sdkResult.ID),
+		Version:          types.StringValue(sdkResult.Version),
+		CreatedAt:        types.StringPointerValue(tfutil.ConvertTimeToRFC3339(sdkResult.CreatedAt)),
+		ServicesIpV4CIDR: types.StringPointerValue(sdkResult.ServicesIpV4CIDR),
+		ClusterIPv4CIDR:  types.StringPointerValue(sdkResult.ClusterIPv4CIDR),
 	}
 
 	if sdkResult.Description != nil {

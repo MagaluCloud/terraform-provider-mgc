@@ -35,6 +35,8 @@ type FlattenedGetResult struct {
 	Tags                       []types.String `tfsdk:"tags"`
 	Taints                     []tfutil.Taint `tfsdk:"taints"`
 	Zone                       []types.String `tfsdk:"zone"`
+	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
+	AvailabilityZones          []types.String `tfsdk:"availability_zones"`
 }
 
 type DataSourceKubernetesNodepool struct {
@@ -157,6 +159,10 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 				Computed:           true,
 				DeprecationMessage: "The tags attribute is deprecated and will be removed in a future release.",
 			},
+			"max_pods_per_node": schema.Int64Attribute{
+				Description: "Maximum number of pods per node.",
+				Computed:    true,
+			},
 			"taints": schema.ListNestedAttribute{
 				Description: "List of taints.",
 				Computed:    true,
@@ -179,6 +185,11 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 			},
 			"zone": schema.ListAttribute{
 				Description: "List of zones.",
+				ElementType: types.StringType,
+				Computed:    true,
+			},
+			"availability_zones": schema.ListAttribute{
+				Description: "List of availability zones.",
 				ElementType: types.StringType,
 				Computed:    true,
 			},
@@ -227,6 +238,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		InstanceTemplateFlavorSize: types.Int64Value(int64(original.InstanceTemplate.Flavor.Size)),
 		InstanceTemplateFlavorVcpu: types.Int64Value(int64(original.InstanceTemplate.Flavor.VCPU)),
 		StatusState:                types.StringValue(original.Status.State),
+		MaxPodsPerNode:             types.Int64Value(int64(*original.MaxPodsPerNode)),
 	}
 
 	if original.AutoScale != nil {
@@ -276,6 +288,13 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		flattened.Zone = make([]types.String, len(*original.Zone))
 		for i, zone := range *original.Zone {
 			flattened.Zone[i] = types.StringValue(zone)
+		}
+	}
+
+	if original.AvailabilityZones != nil && len(*original.AvailabilityZones) > 0 {
+		flattened.AvailabilityZones = make([]types.String, len(*original.AvailabilityZones))
+		for i, zone := range *original.AvailabilityZones {
+			flattened.AvailabilityZones[i] = types.StringValue(zone)
 		}
 	}
 

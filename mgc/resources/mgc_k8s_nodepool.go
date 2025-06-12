@@ -120,6 +120,24 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"max_pods_per_node": schema.Int64Attribute{
+				Description: "Maximum number of pods per node.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"availability_zones": schema.ListAttribute{
+				Description: "List of availability zones where the node pool is deployed.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+					listplanmodifier.UseStateForUnknown(),
+				},
+				ElementType: types.StringType,
+			},
 			"taints": schema.ListNestedAttribute{
 				Description: "Property associating a set of nodes.",
 				Optional:    true,
@@ -175,12 +193,19 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 	if data.Tags != nil {
 		tags = convertStringArrayTFToSliceString(data.Tags)
 	}
+
+	var availabilityZones *[]string
+	if data.AvailabilityZones != nil {
+		availabilityZones = convertStringArrayTFToSliceString(data.AvailabilityZones)
+	}
+
 	createParams := k8sSDK.CreateNodePoolRequest{
-		Flavor:   data.Flavor.ValueString(),
-		Name:     data.Name.ValueString(),
-		Replicas: int(data.Replicas.ValueInt64()),
-		Tags:     tags,
-		Taints:   convertTaintsNP(data.Taints),
+		Flavor:            data.Flavor.ValueString(),
+		Name:              data.Name.ValueString(),
+		Replicas:          int(data.Replicas.ValueInt64()),
+		Tags:              tags,
+		Taints:            convertTaintsNP(data.Taints),
+		AvailabilityZones: availabilityZones,
 	}
 
 	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {

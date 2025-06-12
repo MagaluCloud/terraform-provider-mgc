@@ -6,16 +6,18 @@ import (
 )
 
 type NodePool struct {
-	Flavor      types.String    `tfsdk:"flavor_name"`
-	Name        types.String    `tfsdk:"name"`
-	Replicas    types.Int64     `tfsdk:"replicas"`
-	MaxReplicas types.Int64     `tfsdk:"max_replicas"`
-	MinReplicas types.Int64     `tfsdk:"min_replicas"`
-	Tags        *[]types.String `tfsdk:"tags"`
-	CreatedAt   types.String    `tfsdk:"created_at"`
-	UpdatedAt   types.String    `tfsdk:"updated_at"`
-	ID          types.String    `tfsdk:"id"`
-	Taints      *[]Taint        `tfsdk:"taints"`
+	Flavor            types.String    `tfsdk:"flavor_name"`
+	Name              types.String    `tfsdk:"name"`
+	Replicas          types.Int64     `tfsdk:"replicas"`
+	MaxReplicas       types.Int64     `tfsdk:"max_replicas"`
+	MinReplicas       types.Int64     `tfsdk:"min_replicas"`
+	Tags              *[]types.String `tfsdk:"tags"`
+	CreatedAt         types.String    `tfsdk:"created_at"`
+	UpdatedAt         types.String    `tfsdk:"updated_at"`
+	ID                types.String    `tfsdk:"id"`
+	Taints            *[]Taint        `tfsdk:"taints"`
+	MaxPodsPerNode    types.Int64     `tfsdk:"max_pods_per_node"`
+	AvailabilityZones *[]types.String `tfsdk:"availability_zones"`
 }
 
 type Taint struct {
@@ -35,6 +37,18 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
 		CreatedAt: types.StringPointerValue(ConvertTimeToRFC3339(np.CreatedAt)),
 		UpdatedAt: types.StringPointerValue(ConvertTimeToRFC3339(np.UpdatedAt)),
 		ID:        types.StringValue(np.ID),
+	}
+
+	if np.AvailabilityZones != nil {
+		availabilityZones := make([]types.String, len(*np.AvailabilityZones))
+		for i, zone := range *np.AvailabilityZones {
+			availabilityZones[i] = types.StringValue(zone)
+		}
+		nodePool.AvailabilityZones = &availabilityZones
+	}
+
+	if np.MaxPodsPerNode != nil {
+		nodePool.MaxPodsPerNode = types.Int64Value(int64(*np.MaxPodsPerNode))
 	}
 
 	if np.AutoScale.MaxReplicas != nil {
