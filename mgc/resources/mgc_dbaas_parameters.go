@@ -143,20 +143,27 @@ func (r *DBaaSParameterResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
+	var currentData DBaaSParameterModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	s, err := tfutil.DynamicToGo[any](data.Value)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("value"), "Invalid attribute type", "Invalid attribute type for field `value`, allowed values are [string, bool and numbers]")
 		return
 	}
 
-	_, err = r.ParameterService.Update(ctx, data.ParameterGroupID.ValueString(), data.ID.ValueString(), dbSDK.ParameterUpdateRequest{
+	currentData.Value = data.Value
+	_, err = r.ParameterService.Update(ctx, currentData.ParameterGroupID.ValueString(), currentData.ID.ValueString(), dbSDK.ParameterUpdateRequest{
 		Value: s,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
 func (r *DBaaSParameterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
