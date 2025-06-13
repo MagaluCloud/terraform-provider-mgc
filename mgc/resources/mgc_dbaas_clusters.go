@@ -343,19 +343,13 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 
 	plan.ID = types.StringValue(clusterResp.ID)
 
-	err = r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
+	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
 	if err != nil {
 		resp.Diagnostics.AddError("Cluster Creation Error", fmt.Sprintf("Error waiting for cluster %s to become active: %s", clusterResp.ID, err.Error()))
 		return
 	}
 
-	detailedCluster, err := r.clusterService.Get(ctx, clusterResp.ID)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to read cluster after creation", fmt.Sprintf("Could not retrieve cluster %s: %s", clusterResp.ID, err.Error()))
-		return
-	}
-
-	r.populateModelFromDetailResponse(detailedCluster, &plan)
+	r.populateModelFromDetailResponse(getCluster, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -395,14 +389,17 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if !plan.ParameterGroupID.Equal(state.ParameterGroupID) {
 		updateReq.ParameterGroupID = plan.ParameterGroupID.ValueStringPointer()
+		state.ParameterGroupID = plan.ParameterGroupID
 		changed = true
 	}
 	if !plan.BackupRetentionDays.Equal(state.BackupRetentionDays) {
 		updateReq.BackupRetentionDays = tfutil.ConvertInt64PointerToIntPointer(plan.BackupRetentionDays.ValueInt64Pointer())
+		state.BackupRetentionDays = plan.BackupRetentionDays
 		changed = true
 	}
 	if !plan.BackupStartAt.Equal(state.BackupStartAt) {
 		updateReq.BackupStartAt = plan.BackupStartAt.ValueStringPointer()
+		state.BackupStartAt = plan.BackupStartAt
 		changed = true
 	}
 
@@ -412,13 +409,13 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
-		err = r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive)
+		_, err = r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive)
 		if err != nil {
 			resp.Diagnostics.AddError("Cluster Update Error", fmt.Sprintf("Error waiting for cluster %s to become stable after update: %s", clusterID, err.Error()))
 			return
 		}
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DBaaSClusterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -476,17 +473,17 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	model.User = types.StringNull()
 }
 
-func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus) error {
+func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus) (*dbSDK.ClusterDetailResponse, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, clusterStatusTimeout)
 	defer cancel()
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return fmt.Errorf("timeout waiting for cluster %s to reach status %s", clusterID, targetStatus)
+			return nil, fmt.Errorf("timeout waiting for cluster %s to reach status %s", clusterID, targetStatus)
 		case <-time.After(15 * time.Second):
 			cluster, err := r.clusterService.Get(ctx, clusterID)
 			if err != nil {
-				return fmt.Errorf("failed to get cluster %s during status wait: %w", clusterID, err)
+				return nil, fmt.Errorf("failed to get cluster %s during status wait: %w", clusterID, err)
 			}
 
 			currentStatus := cluster.Status
@@ -494,11 +491,11 @@ func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context
 				if targetStatus == dbSDK.ClusterStatusActive && cluster.ApplyParametersPending {
 					continue
 				}
-				return nil
+				return cluster, nil
 			}
 
 			if strings.Contains(strings.ToLower(string(currentStatus)), "error") {
-				return fmt.Errorf("cluster %s entered error state: %s", clusterID, currentStatus)
+				return nil, fmt.Errorf("cluster %s entered error state: %s", clusterID, currentStatus)
 			}
 		}
 	}
@@ -523,9 +520,11 @@ func (r *DBaaSClusterResource) validateAndGetEngineID(ctx context.Context, engin
 func (r *DBaaSClusterResource) validateAndGetInstanceTypeID(ctx context.Context, instanceTypeLabel string) (string, error) {
 	activeStatus := "ACTIVE"
 	maxLimit := 50
+	offset := 0
 	instanceTypes, err := r.instanceTypeService.List(ctx, dbSDK.ListInstanceTypeOptions{
 		Status: &activeStatus,
 		Limit:  &maxLimit,
+		Offset: &offset,
 	})
 	if err != nil {
 		return "", fmt.Errorf("listing instance types: %w", err)
