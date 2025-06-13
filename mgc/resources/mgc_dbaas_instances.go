@@ -213,6 +213,9 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"availability_zone": schema.StringAttribute{
 				Description: "Availability zone to use for the instance.",

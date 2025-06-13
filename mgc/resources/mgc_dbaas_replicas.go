@@ -149,16 +149,24 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	var currentData DBaaSReplicaModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	currentData.InstanceTypeID = plan.InstanceTypeID
 	if plan.InstanceTypeID.ValueString() != "" {
 		_, err := r.service.Resize(ctx, plan.ID.ValueString(), dbSDK.ReplicaResizeRequest{
-			InstanceTypeID: plan.InstanceTypeID.ValueString(),
+			InstanceTypeID: currentData.InstanceTypeID.ValueString(),
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
 func (r *DBaaSReplicaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

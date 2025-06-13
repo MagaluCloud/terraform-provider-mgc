@@ -154,7 +154,15 @@ func (r *DBaaSParameterGroupsResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	_, err := r.ParametersService.Update(ctx, data.ID.ValueString(), dbSDK.ParameterGroupUpdateRequest{
+	var currentData DBaaSParametersModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	currentData.Description = data.Description
+	currentData.Name = data.Name
+	_, err := r.ParametersService.Update(ctx, currentData.ID.ValueString(), dbSDK.ParameterGroupUpdateRequest{
 		Name:        data.Name.ValueStringPointer(),
 		Description: data.Description.ValueStringPointer(),
 	})
@@ -162,7 +170,7 @@ func (r *DBaaSParameterGroupsResource) Update(ctx context.Context, req resource.
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
 func (r *DBaaSParameterGroupsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -149,9 +149,18 @@ func (r *DBaaSInstanceSnapshotResource) Update(ctx context.Context, req resource
 		return
 	}
 
+	var currentData DBaaSInstanceSnapshotModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	currentData.Name = planData.Name
+	currentData.Description = planData.Description
+
 	_, err := r.instanceService.UpdateSnapshot(ctx,
-		planData.InstanceId.ValueString(),
-		planData.Id.ValueString(),
+		currentData.InstanceId.ValueString(),
+		currentData.Id.ValueString(),
 		dbSDK.SnapshotUpdateRequest{
 			Name:        planData.Name.ValueString(),
 			Description: planData.Description.ValueStringPointer(),
@@ -161,6 +170,8 @@ func (r *DBaaSInstanceSnapshotResource) Update(ctx context.Context, req resource
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
 func (r *DBaaSInstanceSnapshotResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
