@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -124,6 +125,9 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Description: "Maximum number of pods per node.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
@@ -131,11 +135,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"availability_zones": schema.ListAttribute{
 				Description: "List of availability zones where the node pool is deployed.",
 				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
-					listplanmodifier.UseStateForUnknown(),
-				},
+				WriteOnly:   true,
 				ElementType: types.StringType,
 			},
 			"taints": schema.ListNestedAttribute{
@@ -184,7 +184,7 @@ func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest
 
 func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data NodePoolResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -194,30 +194,29 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		tags = convertStringArrayTFToSliceString(data.Tags)
 	}
 
-	var availabilityZones *[]string
-	if data.AvailabilityZones != nil {
-		availabilityZones = convertStringArrayTFToSliceString(data.AvailabilityZones)
-	}
-
 	createParams := k8sSDK.CreateNodePoolRequest{
-		Flavor:            data.Flavor.ValueString(),
-		Name:              data.Name.ValueString(),
-		Replicas:          int(data.Replicas.ValueInt64()),
-		Tags:              tags,
-		Taints:            convertTaintsNP(data.Taints),
-		AvailabilityZones: availabilityZones,
+		Flavor:         data.Flavor.ValueString(),
+		Name:           data.Name.ValueString(),
+		Replicas:       int(data.Replicas.ValueInt64()),
+		Tags:           tags,
+		Taints:         convertTaintsNP(data.Taints),
+		MaxPodsPerNode: tfutil.ConvertInt64PointerToIntPointer(data.MaxPodsPerNode.ValueInt64Pointer()),
 	}
 
-	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
+	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
 		createParams.AutoScale = &k8sSDK.AutoScale{}
 	}
 
-	if !data.MaxReplicas.IsUnknown() {
+	if !data.MaxReplicas.IsNull() {
 		createParams.AutoScale.MaxReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MaxReplicas.ValueInt64Pointer())
 	}
 
-	if !data.MinReplicas.IsUnknown() {
+	if !data.MinReplicas.IsNull() {
 		createParams.AutoScale.MinReplicas = tfutil.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
+	}
+
+	if data.AvailabilityZones != nil {
+		createParams.AvailabilityZones = convertStringArrayTFToSliceString(data.AvailabilityZones)
 	}
 
 	nodepool, err := r.sdkNodepool.Create(ctx, data.ClusterID.ValueString(), createParams)
