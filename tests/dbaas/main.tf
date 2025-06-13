@@ -18,14 +18,14 @@ variable "mysql_8_0_engine_id" {
 variable "instance_type_label_single" {
   description = "Instance type label for single DBaaS instances."
   type        = string
-  default     = "cloud-dbaas-bs1.small"
+  default     = "BV1-4-10"
 }
 
 # Instance Type label for cluster nodes
 variable "instance_type_label_cluster" {
   description = "Instance type label for DBaaS cluster nodes."
   type        = string
-  default     = "cloud-dbaas-bs1.medium" # Example, adjust if needed
+  default     = "DP2-16-40" # Example, adjust if needed
 }
 
 variable "availability_zone" {
@@ -39,9 +39,10 @@ variable "availability_zone" {
 # ------------------------------
 
 resource "mgc_dbaas_parameter_groups" "instance_pg" {
-  engine_id   = var.mysql_8_0_engine_id
-  description = "Parameter group for test instances"
-  name        = "test-instance-pg-${random_pet.name.id}"
+  engine_name    = "mysql"
+  engine_version = "8.0"
+  description    = "Parameter group for test instances"
+  name           = "test-instance-pg-${random_pet.name.id}"
 }
 
 resource "mgc_dbaas_instances" "test_instance" {
@@ -93,9 +94,10 @@ output "dbaas_replica_details" {
 # ------------------------------
 
 resource "mgc_dbaas_parameter_groups" "cluster_pg" {
-  engine_id   = var.mysql_8_0_engine_id
-  description = "Parameter group for test clusters"
-  name        = "test-cluster-pg-${random_pet.name.id}"
+  engine_name    = "mysql"
+  engine_version = "8.0"
+  description    = "Parameter group for test clusters"
+  name           = "test-cluster-pg-${random_pet.name.id}"
 }
 
 resource "mgc_dbaas_clusters" "test_cluster_with_pg" {
