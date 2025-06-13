@@ -276,12 +276,13 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 	data.Id = types.StringValue(created.ID)
 	data.Password = types.StringNull()
 	data.User = types.StringNull()
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-	err = r.waitUntilInstanceStatusMatches(ctx, data.Id.ValueString(), DBaaSInstanceStatusActive.String())
+	result, err := r.waitUntilInstanceStatusMatches(ctx, data.Id.ValueString(), DBaaSInstanceStatusActive.String())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
+	data.Status = types.StringValue(string(result.Status))
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -338,6 +339,7 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
+		currentData.InstanceType = planData.InstanceType
 		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, planData.InstanceType.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -351,9 +353,15 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
+
+		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.Id.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 
 	if planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+		currentData.VolumeSize = planData.VolumeSize
 		_, err := r.dbaasInstances.Resize(ctx, currentData.Id.ValueString(), dbSDK.InstanceResizeRequest{
 			Volume: &dbSDK.InstanceVolumeResizeRequest{
 				Size: *tfutil.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
@@ -363,9 +371,17 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
+
+		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.Id.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 
 	if (planData.BackupRetentionDays.ValueInt64() != currentData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != currentData.BackupStartAt.ValueString()) {
+		currentData.BackupRetentionDays = planData.BackupRetentionDays
+		currentData.BackupStartAt = planData.BackupStartAt
+
 		_, err := r.dbaasInstances.Update(ctx, planData.Id.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
 			BackupStartAt:       planData.BackupStartAt.ValueStringPointer(),
@@ -374,15 +390,14 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
+
+		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.Id.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 
-	err := r.waitUntilInstanceStatusMatches(ctx, planData.Id.ValueString(), DBaaSInstanceStatusActive.String())
-	if err != nil {
-		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &planData)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
 func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -455,24 +470,24 @@ func (r *DBaaSInstanceResource) getInstanceTypeNameByID(ctx context.Context, ins
 	return instanceType.Label, nil
 }
 
-func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status string) error {
+func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status string) (*dbSDK.InstanceDetail, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
 	defer cancel()
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
+			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
 			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			currentStatus := DBaaSInstanceStatus(instance.Status)
 			if currentStatus.String() == status {
-				return nil
+				return instance, nil
 			}
 			if currentStatus.IsError() {
-				return fmt.Errorf("instance %s is in error state", instanceID)
+				return nil, fmt.Errorf("instance %s is in error state", instanceID)
 			}
 		}
 	}
