@@ -14,7 +14,7 @@ An array representing a set of nodes within a Kubernetes cluster.
 
 ```terraform
 resource "mgc_kubernetes_nodepool" "nodepool" {
-  name         = "Gandalf"
+  name         = "gandalf"
   cluster_id   = mgc_kubernetes_cluster.cluster_with_nodepool.id
   flavor_name  = kubernetes_flavor.flavors[0].name
   replicas     = 1
