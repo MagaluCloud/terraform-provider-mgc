@@ -3,7 +3,6 @@ package mgc
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 
 	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
@@ -22,7 +21,11 @@ import (
 	sdk "github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
-const providerTypeName = "mgc"
+const (
+	providerTypeName = "mgc"
+	defaultRegion    = "br-se1"
+	defaultEnv       = "prod"
+)
 
 type mgcProvider struct {
 	version string
@@ -70,7 +73,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 			},
 			"api_key": schema.StringAttribute{
 				Description: "The Magalu API Key for authentication.",
-				Optional:    true,
+				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -81,10 +84,10 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 				Attributes: map[string]schema.Attribute{
 					"key_pair": schema.SingleNestedAttribute{
 						Description: "Bucket Key Pair configuration",
-						Optional:    true,
+						Required:    true,
 						Attributes: map[string]schema.Attribute{
 							"key_id": schema.StringAttribute{
-								Description: "The API Key ID.",
+								Description: "The API Key Access ID.",
 								Required:    true,
 							},
 							"key_secret": schema.StringAttribute{
@@ -107,49 +110,18 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 		return
 	}
 
-	if plan.ApiKey.ValueString() == "" {
-		if apiKeyFromOS := os.Getenv("MGC_API_KEY"); apiKeyFromOS != "" {
-			resp.Diagnostics.AddWarning("The ´MGC_API_KEY´ environment variable is deprecated. Please use the ´api_key´ provider configuration instead.", "The environment variable ´MGC_API_KEY´ is deprecated. Please use the ´api_key´ provider configuration instead. This environment variable will be removed in a future release.")
-			plan.ApiKey = types.StringValue(apiKeyFromOS)
-		}
-	}
-
 	if plan.Env.ValueString() == "" {
-		if envFromOS := os.Getenv("MGC_ENV"); envFromOS != "" {
-			resp.Diagnostics.AddWarning("The ´MGC_ENV´ environment variable is deprecated. Please use the ´env´ provider configuration instead.", "The environment variable ´MGC_ENV´ is deprecated. Please use the ´env´ provider configuration instead. This environment variable will be removed in a future release.")
-			plan.Env = types.StringValue(envFromOS)
-		} else {
-			plan.Env = types.StringValue("prod")
-		}
+		plan.Env = types.StringValue(defaultEnv)
 	}
 
 	if plan.Region.ValueString() == "" {
-		if regionFromOS := os.Getenv("MGC_REGION"); regionFromOS != "" {
-			resp.Diagnostics.AddWarning("The ´MGC_REGION´ environment variable is deprecated. Please use the ´region´ provider configuration instead.", "The environment variable ´MGC_REGION´ is deprecated. Please use the ´region´ provider configuration instead. This environment variable will be removed in a future release.")
-			plan.Region = types.StringValue(regionFromOS)
-		} else {
-			plan.Region = types.StringValue("br-se1")
-		}
+		plan.Region = types.StringValue(defaultRegion)
 	}
 
 	if plan.ObjectStorage == nil {
 		plan.ObjectStorage = &ObjectStorageModel{
-			ObjectKeyPair: &KeyPairModel{},
+			&KeyPairModel{},
 		}
-		if os.Getenv("MGC_OBJ_KEY_ID") != "" && os.Getenv("MGC_OBJ_KEY_SECRET") != "" {
-			resp.Diagnostics.AddWarning("The ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ environment variables are deprecated. Please use the ´object_storage´ provider configuration instead.", "The environment variables ´MGC_OBJ_KEY_ID´ and ´MGC_OBJ_KEY_SECRET´ are deprecated. Please use the ´object_storage´ provider configuration instead. These environment variables will be removed in a future release.")
-			plan.ObjectStorage = &ObjectStorageModel{
-				ObjectKeyPair: &KeyPairModel{
-					KeyID:     types.StringValue(os.Getenv("MGC_OBJ_KEY_ID")),
-					KeySecret: types.StringValue(os.Getenv("MGC_OBJ_KEY_SECRET")),
-				},
-			}
-		}
-	}
-
-	// remove when deprecating MGC_API_KEY
-	if plan.ApiKey.ValueString() == "" {
-		resp.Diagnostics.AddError("The ´api_key´ provider configuration is required.", "The ´api_key´ provider configuration is required.")
 	}
 
 	resourceOut := NewConfigData(plan, p.version)

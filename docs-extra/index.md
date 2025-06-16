@@ -77,8 +77,8 @@ Optional:
 
 Required:
 
-- `key_id` (String) The API Key ID.
-- `key_secret` (String) The API Key Secret.
+- `key_id` (String) The Key Pair Access ID.
+- `key_secret` (String) The Key Pair Access Secret.
 
 ## Contributing
 
