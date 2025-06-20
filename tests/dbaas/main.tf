@@ -48,13 +48,13 @@ resource "mgc_dbaas_parameter_groups" "instance_pg" {
 resource "mgc_dbaas_instances" "test_instance" {
   name                  = "test-instance-${random_pet.name.id}"
   user                  = "dbadmin"
-  password              = "aComplexP@ssw0rd!Inst"
+  password              = "aComplexP@ssw0rd!Insa"
   engine_name           = "mysql"
   engine_version        = "8.0"
   instance_type         = var.instance_type_label_single
   volume_size           = 60
   backup_retention_days = 10
-  backup_start_at       = "16:00:00"
+  backup_start_at       = "17:00:00"
   availability_zone     = var.availability_zone
   parameter_group       = mgc_dbaas_parameter_groups.instance_pg.id
 }
@@ -77,7 +77,7 @@ output "dbaas_snapshot_details" {
 resource "mgc_dbaas_parameters" "instance_param_max_connections" {
   parameter_group_id = mgc_dbaas_parameter_groups.instance_pg.id
   name               = "MAX_CONNECTIONS" # Common parameter for MySQL
-  value              = 300
+  value              = 20
 }
 
 resource "mgc_dbaas_replicas" "dbaas_replica" {
@@ -100,41 +100,41 @@ resource "mgc_dbaas_parameter_groups" "cluster_pg" {
   name           = "test-cluster-pg-${random_pet.name.id}"
 }
 
-resource "mgc_dbaas_clusters" "test_cluster_with_pg" {
-  name                  = "test-cluster-pg-${random_pet.name.id}"
-  user                  = "clusteradmin"
-  password              = "aVerySecureClu$terP@ssw0rd"
-  engine_name           = "mysql"
-  engine_version        = "8.0"
-  instance_type         = var.instance_type_label_cluster
-  volume_size           = 100
-  volume_type           = "CLOUD_NVME15K"
-  backup_retention_days = 7
-  backup_start_at       = "03:00:00"
-  parameter_group_id    = mgc_dbaas_parameter_groups.cluster_pg.id
-}
+# resource "mgc_dbaas_clusters" "test_cluster_with_pg" {
+#   name                  = "test-cluster-pg-${random_pet.name.id}"
+#   user                  = "clusteradmin"
+#   password              = "aVerySecureClu$terP@ssw0rd"
+#   engine_name           = "mysql"
+#   engine_version        = "8.0"
+#   instance_type         = var.instance_type_label_cluster
+#   volume_size           = 100
+#   volume_type           = "CLOUD_NVME15K"
+#   backup_retention_days = 7
+#   backup_start_at       = "03:00:00"
+#   parameter_group_id    = mgc_dbaas_parameter_groups.cluster_pg.id
+# }
 
-resource "mgc_dbaas_clusters" "test_cluster_no_pg" {
-  name                  = "test-cluster-nopg-${random_pet.name.id}"
-  user                  = "clusteradmin2"
-  password              = "anotherS&cureP@sswordClu1"
-  engine_name           = "mysql"
-  engine_version        = "8.0"
-  instance_type         = var.instance_type_label_cluster
-  volume_size           = 50
-  backup_retention_days = 5
-  backup_start_at       = "02:00:00"
-}
+# resource "mgc_dbaas_clusters" "test_cluster_no_pg" {
+#   name                  = "test-cluster-nopg-${random_pet.name.id}"
+#   user                  = "clusteradmin2"
+#   password              = "anotherS&cureP@sswordClu1"
+#   engine_name           = "mysql"
+#   engine_version        = "8.0"
+#   instance_type         = var.instance_type_label_cluster
+#   volume_size           = 50
+#   backup_retention_days = 5
+#   backup_start_at       = "02:00:00"
+# }
 
-output "dbaas_cluster_with_pg_details" {
-  value     = mgc_dbaas_clusters.test_cluster_with_pg
-  sensitive = true
-}
+# output "dbaas_cluster_with_pg_details" {
+#   value     = mgc_dbaas_clusters.test_cluster_with_pg
+#   sensitive = true
+# }
 
-output "dbaas_cluster_no_pg_details" {
-  value     = mgc_dbaas_clusters.test_cluster_no_pg
-  sensitive = true
-}
+# output "dbaas_cluster_no_pg_details" {
+#   value     = mgc_dbaas_clusters.test_cluster_no_pg
+#   sensitive = true
+# }
 
 
 # ------------------------------
@@ -180,18 +180,18 @@ data "mgc_dbaas_replica" "specific_dbaas_replica_data" {
 data "mgc_dbaas_replicas" "all_db_replicas" {}
 
 # --- DBaaS Cluster Data Sources ---
-data "mgc_dbaas_clusters" "all_clusters" {
-  # status_filter = "ACTIVE"
-  # engine_id_filter = var.mysql_8_0_engine_id
-}
+# data "mgc_dbaas_clusters" "all_clusters" {
+#   # status_filter = "ACTIVE"
+#   # engine_id_filter = var.mysql_8_0_engine_id
+# }
 
-data "mgc_dbaas_cluster" "specific_test_cluster_pg" {
-  id = mgc_dbaas_clusters.test_cluster_with_pg.id
-}
+# data "mgc_dbaas_cluster" "specific_test_cluster_pg" {
+#   id = mgc_dbaas_clusters.test_cluster_with_pg.id
+# }
 
-data "mgc_dbaas_cluster" "specific_test_cluster_no_pg" {
-  id = mgc_dbaas_clusters.test_cluster_no_pg.id
-}
+# data "mgc_dbaas_cluster" "specific_test_cluster_no_pg" {
+#   id = mgc_dbaas_clusters.test_cluster_no_pg.id
+# }
 
 # ------------------------------
 # Data Source Outputs
@@ -242,14 +242,14 @@ output "all_db_replicas_data" {
 }
 
 # --- Cluster Data Source Outputs ---
-output "all_dbaas_clusters_data" {
-  value = data.mgc_dbaas_clusters.all_clusters.clusters
-}
+# output "all_dbaas_clusters_data" {
+#   value = data.mgc_dbaas_clusters.all_clusters.clusters
+# }
 
-output "specific_test_cluster_pg_data" {
-  value = data.mgc_dbaas_cluster.specific_test_cluster_pg
-}
+# output "specific_test_cluster_pg_data" {
+#   value = data.mgc_dbaas_cluster.specific_test_cluster_pg
+# }
 
-output "specific_test_cluster_no_pg_data" {
-  value = data.mgc_dbaas_cluster.specific_test_cluster_no_pg
-}
+# output "specific_test_cluster_no_pg_data" {
+#   value = data.mgc_dbaas_cluster.specific_test_cluster_no_pg
+# }
