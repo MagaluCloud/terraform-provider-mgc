@@ -249,7 +249,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, data.InstanceType.ValueString())
+	instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, data.InstanceType.ValueString(), engineID)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid instance type", err.Error())
 		return
@@ -341,9 +341,15 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	engineID, err := r.validateAndGetEngineID(ctx, currentData.EngineName.ValueString(), currentData.EngineVersion.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid engine name", err.Error())
+		return
+	}
+
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
 		currentData.InstanceType = planData.InstanceType
-		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, planData.InstanceType.ValueString())
+		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, planData.InstanceType.ValueString(), engineID)
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
@@ -439,12 +445,13 @@ func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engi
 	return "", errors.New("engine not found")
 }
 
-func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string) (string, error) {
+func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string, engineID string) (string, error) {
 	active := "ACTIVE"
 	maxLimit := 50
 	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
-		Limit:  &maxLimit,
-		Status: &active,
+		Limit:    &maxLimit,
+		Status:   &active,
+		EngineID: &engineID,
 	})
 	if err != nil {
 		return "", err
