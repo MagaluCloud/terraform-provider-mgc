@@ -30,14 +30,12 @@ const (
 
 type KubernetesClusterCreateResourceModel struct {
 	Name               types.String   `tfsdk:"name"`
-	AsyncCreation      types.Bool     `tfsdk:"async_creation"`
 	AllowedCidrs       []types.String `tfsdk:"allowed_cidrs"`
 	Description        types.String   `tfsdk:"description"`
 	EnabledServerGroup types.Bool     `tfsdk:"enabled_server_group"`
 	Version            types.String   `tfsdk:"version"`
 	CreatedAt          types.String   `tfsdk:"created_at"`
 	ID                 types.String   `tfsdk:"id"`
-	EnabledBastion     types.Bool     `tfsdk:"enabled_bastion"` // Deprecated
 	Zone               types.String   `tfsdk:"zone"`
 	ServicesIpV4CIDR   types.String   `tfsdk:"services_ip_v4_cidr"`
 	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ip_v4_cidr"`
@@ -73,24 +71,6 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Description: "Kubernetes cluster resource in MGC",
 		Attributes: map[string]schema.Attribute{
-			"enabled_bastion": schema.BoolAttribute{
-				Description:        "Enables the use of a bastion host for secure access to the cluster.",
-				Optional:           true,
-				DeprecationMessage: "This field is deprecated and will be removed in a future version.",
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"async_creation": schema.BoolAttribute{
-				Description: "Enables asynchronous creation of the Kubernetes cluster.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-					boolplanmodifier.RequiresReplace(),
-				},
-				DeprecationMessage: "This field is deprecated and will be removed in a future version.",
-			},
 			"name": schema.StringAttribute{
 				Description: "Kubernetes cluster name. Must be unique within a namespace and follow naming rules.",
 				Required:    true,
@@ -155,6 +135,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+				DeprecationMessage: "Deprecated field, will be removed in a future release.",
 			},
 			"cluster_ip_v4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster.",
@@ -192,8 +173,6 @@ func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	out := convertSDKCreateResultToTerraformCreateClsuterModel(cluster)
-	out.EnabledBastion = data.EnabledBastion
-	out.AsyncCreation = data.AsyncCreation
 	out.EnabledServerGroup = data.EnabledServerGroup
 	out.Zone = data.Zone
 
@@ -226,7 +205,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, data.AsyncCreation.ValueBool())
+	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		data.ID = types.StringValue(cluster.ID)
@@ -235,15 +214,13 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	newState := convertSDKCreateResultToTerraformCreateClsuterModel(&createdCluster)
-	newState.EnabledBastion = data.EnabledBastion
-	newState.AsyncCreation = data.AsyncCreation
 	newState.EnabledServerGroup = data.EnabledServerGroup
 	newState.Zone = data.Zone
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
-func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string, isAssync bool) (k8sSDK.Cluster, error) {
+func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string) (k8sSDK.Cluster, error) {
 	var result *k8sSDK.Cluster
 	var err error
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
@@ -254,7 +231,7 @@ func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId st
 		}
 		state := strings.ToLower(result.Status.State)
 
-		if state == "running" || state == "provisioned" || isAssync {
+		if state == "running" || state == "provisioned" {
 			return *result, nil
 		}
 		if state == "failed" {

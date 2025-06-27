@@ -1,6 +1,6 @@
 # Data source to get the latest Kubernetes version
 variable "cluster-version" {
-  default = "v1.30.2"
+  default = "v1.32.3"
 }
 
 variable "cluster-flavor" {

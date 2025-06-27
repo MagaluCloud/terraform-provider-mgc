@@ -78,8 +78,9 @@ func (d *DataSourceKubernetesClusters) Schema(ctx context.Context, req datasourc
 							Computed:    true,
 						},
 						"zone": schema.StringAttribute{
-							Description: "Identifier of the zone where the Kubernetes cluster is located.",
-							Computed:    true,
+							Description:        "Identifier of the zone where the Kubernetes cluster is located.",
+							Computed:           true,
+							DeprecationMessage: "Deprecated. Field 'zone' is deprecated.",
 						},
 						"region": schema.StringAttribute{
 							Description: "Identifier of the region where the Kubernetes cluster is located.",
