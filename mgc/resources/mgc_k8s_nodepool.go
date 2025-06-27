@@ -100,12 +100,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					int64validator.AtLeast(0),
 				},
 			},
-			"tags": schema.ListAttribute{
-				Description:        "List of tags applied to the node pool.",
-				DeprecationMessage: "Tags are deprecated and will be removed in a future release.",
-				Optional:           true,
-				ElementType:        types.StringType,
-			},
 			"created_at": schema.StringAttribute{
 				Description: "Date of creation of the Kubernetes Node.",
 				Computed:    true,
@@ -189,16 +183,10 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	var tags *[]string
-	if data.Tags != nil {
-		tags = convertStringArrayTFToSliceString(data.Tags)
-	}
-
 	createParams := k8sSDK.CreateNodePoolRequest{
 		Flavor:         data.Flavor.ValueString(),
 		Name:           data.Name.ValueString(),
 		Replicas:       int(data.Replicas.ValueInt64()),
-		Tags:           tags,
 		Taints:         convertTaintsNP(data.Taints),
 		MaxPodsPerNode: tfutil.ConvertInt64PointerToIntPointer(data.MaxPodsPerNode.ValueInt64Pointer()),
 	}

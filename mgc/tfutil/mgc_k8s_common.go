@@ -11,7 +11,6 @@ type NodePool struct {
 	Replicas          types.Int64     `tfsdk:"replicas"`
 	MaxReplicas       types.Int64     `tfsdk:"max_replicas"`
 	MinReplicas       types.Int64     `tfsdk:"min_replicas"`
-	Tags              *[]types.String `tfsdk:"tags"`
 	CreatedAt         types.String    `tfsdk:"created_at"`
 	UpdatedAt         types.String    `tfsdk:"updated_at"`
 	ID                types.String    `tfsdk:"id"`
@@ -61,16 +60,6 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
 
 	if np.InstanceTemplate.Flavor.Name != "" {
 		nodePool.Flavor = types.StringValue(np.InstanceTemplate.Flavor.Name)
-	}
-
-	if np.Tags != nil {
-		tags := make([]types.String, len(*np.Tags))
-		for i, tag := range *np.Tags {
-			tags[i] = types.StringValue(tag)
-		}
-		if len(tags) > 0 {
-			nodePool.Tags = &tags
-		}
 	}
 
 	if np.Taints != nil {

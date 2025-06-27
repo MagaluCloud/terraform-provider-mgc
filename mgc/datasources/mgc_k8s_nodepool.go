@@ -32,7 +32,6 @@ type FlattenedGetResult struct {
 	SecurityGroups             []types.String `tfsdk:"security_groups"`
 	StatusState                types.String   `tfsdk:"status_state"`
 	StatusMessages             []types.String `tfsdk:"status_messages"`
-	Tags                       []types.String `tfsdk:"tags"`
 	Taints                     []tfutil.Taint `tfsdk:"taints"`
 	Zone                       []types.String `tfsdk:"zone"`
 	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
@@ -153,12 +152,6 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 				ElementType: types.StringType,
 				Computed:    true,
 			},
-			"tags": schema.ListAttribute{
-				Description:        "List of tags.",
-				ElementType:        types.StringType,
-				Computed:           true,
-				DeprecationMessage: "The tags attribute is deprecated and will be removed in a future release.",
-			},
 			"max_pods_per_node": schema.Int64Attribute{
 				Description: "Maximum number of pods per node.",
 				Computed:    true,
@@ -184,9 +177,10 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 				},
 			},
 			"zone": schema.ListAttribute{
-				Description: "List of zones.",
-				ElementType: types.StringType,
-				Computed:    true,
+				Description:        "List of zones.",
+				ElementType:        types.StringType,
+				Computed:           true,
+				DeprecationMessage: "Deprecated field, will be removed in the next release",
 			},
 			"availability_zones": schema.ListAttribute{
 				Description: "List of availability zones.",
@@ -264,13 +258,6 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	flattened.StatusMessages = make([]types.String, 1)
 	for i, msg := range original.Status.Messages {
 		flattened.StatusMessages[i] = types.StringValue(msg)
-	}
-
-	if original.Tags != nil && len(*original.Tags) > 0 {
-		flattened.Tags = make([]types.String, len(*original.Tags))
-		for i, tag := range *original.Tags {
-			flattened.Tags[i] = types.StringValue(tag)
-		}
 	}
 
 	if original.Taints != nil && len(*original.Taints) > 0 {

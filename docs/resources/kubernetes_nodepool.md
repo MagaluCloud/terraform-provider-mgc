@@ -39,7 +39,6 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
-- `tags` (List of String, Deprecated) List of tags applied to the node pool.
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
 
 ### Read-Only

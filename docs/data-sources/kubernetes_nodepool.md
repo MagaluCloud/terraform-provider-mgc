@@ -52,10 +52,9 @@ output "nodepool" {
 - `security_groups` (List of String) List of security groups.
 - `status_messages` (List of String) Status messages.
 - `status_state` (String) Current state of the nodepool.
-- `tags` (List of String, Deprecated) List of tags.
 - `taints` (Attributes List) List of taints. (see [below for nested schema](#nestedatt--taints))
 - `updated_at` (String) Last update timestamp.
-- `zone` (List of String) List of zones.
+- `zone` (List of String, Deprecated) List of zones.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`
