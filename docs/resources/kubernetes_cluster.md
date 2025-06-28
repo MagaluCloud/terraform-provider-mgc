@@ -26,7 +26,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 ### Required
 
-- `name` (String) Kubernetes cluster name. Must be unique within a namespace and follow naming rules.
+- `name` (String) Kubernetes cluster name. Must be unique within a namespace and contain only letters (uppercase and lowercase), numbers, dashes and dots.
 
 ### Optional
 
