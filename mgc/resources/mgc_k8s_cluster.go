@@ -14,8 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -36,7 +34,6 @@ type KubernetesClusterCreateResourceModel struct {
 	Version            types.String   `tfsdk:"version"`
 	CreatedAt          types.String   `tfsdk:"created_at"`
 	ID                 types.String   `tfsdk:"id"`
-	Zone               types.String   `tfsdk:"zone"`
 	ServicesIpV4CIDR   types.String   `tfsdk:"services_ip_v4_cidr"`
 	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ip_v4_cidr"`
 }
@@ -98,13 +95,9 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"enabled_server_group": schema.BoolAttribute{
-				Description: "Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools.",
+				Description: "Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.",
 				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
+				WriteOnly:   true,
 			},
 			"version": schema.StringAttribute{
 				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format.",
@@ -129,20 +122,12 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"zone": schema.StringAttribute{
-				Description: "Identifier of the zone where the Kubernetes cluster is located.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				DeprecationMessage: "Deprecated field, will be removed in a future release.",
-			},
 			"cluster_ip_v4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -151,7 +136,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -173,9 +158,6 @@ func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	out := convertSDKCreateResultToTerraformCreateClsuterModel(cluster)
-	out.EnabledServerGroup = data.EnabledServerGroup
-	out.Zone = data.Zone
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &out)...)
 }
 
@@ -184,6 +166,10 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if data.EnabledServerGroup.IsNull() {
+		data.EnabledServerGroup = types.BoolValue(true)
 	}
 
 	cluster, err := r.k8sCluster.Create(ctx, k8sSDK.ClusterRequest{
@@ -200,11 +186,6 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	if cluster.ID == "" {
-		resp.Diagnostics.AddError("Failed to create Kubernetes cluster", "ID is empty")
-		return
-	}
-
 	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -214,9 +195,6 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	newState := convertSDKCreateResultToTerraformCreateClsuterModel(&createdCluster)
-	newState.EnabledServerGroup = data.EnabledServerGroup
-	newState.Zone = data.Zone
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -251,12 +229,20 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	var state KubernetesClusterCreateResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	state.AllowedCidrs = data.AllowedCidrs
+
 	cidrs := []string{}
-	for _, c := range data.AllowedCidrs {
+	for _, c := range state.AllowedCidrs {
 		cidrs = append(cidrs, c.ValueString())
 	}
 
-	_, err := r.k8sCluster.Update(ctx, data.ID.ValueString(), k8sSDK.AllowedCIDRsUpdateRequest{
+	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.AllowedCIDRsUpdateRequest{
 		AllowedCIDRs: cidrs,
 	})
 	if err != nil {
@@ -264,7 +250,7 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

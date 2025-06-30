@@ -19,7 +19,6 @@ type KubernetesCluster struct {
 	Description                types.String      `tfsdk:"description"`
 	EnabledServerGroup         types.Bool        `tfsdk:"enabled_server_group"`
 	Version                    types.String      `tfsdk:"version"`
-	Zone                       types.String      `tfsdk:"zone"`
 	AddonsLoadbalance          types.String      `tfsdk:"addons_loadbalance"`
 	AddonsSecrets              types.String      `tfsdk:"addons_secrets"`
 	AddonsVolume               types.String      `tfsdk:"addons_volume"`
@@ -298,11 +297,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 						Description: "Date of the last change to the Kubernetes cluster.",
 						Computed:    true,
 					},
-					"zone": schema.ListAttribute{
-						Description: "Availability zone for creating the Kubernetes cluster.",
-						Computed:    true,
-						ElementType: types.StringType,
-					},
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -385,7 +379,6 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 		EnabledBastion:     types.BoolNull(),
 		EnabledServerGroup: types.BoolNull(),
 		Version:            types.StringValue(getResult.Version),
-		Zone:               types.StringNull(),
 		Description:        types.StringPointerValue(getResult.Description),
 		CreatedAt:          types.StringPointerValue(tfutil.ConvertTimeToRFC3339(getResult.CreatedAt)),
 		Region:             types.StringValue(*getResult.Region),
