@@ -430,10 +430,7 @@ func (r *DBaaSInstanceResource) ImportState(ctx context.Context, req resource.Im
 }
 
 func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	active := "ACTIVE"
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{
-		Status: &active,
-	})
+	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -446,11 +443,9 @@ func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engi
 }
 
 func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string, engineID string) (string, error) {
-	active := "ACTIVE"
 	maxLimit := 50
 	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
 		Limit:    &maxLimit,
-		Status:   &active,
 		EngineID: &engineID,
 	})
 	if err != nil {
