@@ -56,7 +56,7 @@ func (s VolumeStatus) String() string {
 }
 
 func (s VolumeStatus) isError() bool {
-	return strings.HasSuffix(s.String(), "error")
+	return strings.Contains(s.String(), "error")
 }
 
 func NewBlockStorageVolumesResource() resource.Resource {
