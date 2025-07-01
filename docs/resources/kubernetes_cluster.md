@@ -14,7 +14,7 @@ Kubernetes cluster resource in MGC
 
 ```terraform
 resource "mgc_kubernetes_cluster" "cluster" {
-  name                 = "my_cluster"
+  name                 = "my-cluster"
   version              = mgc_kubernetes_version.versions[0].version
   enabled_server_group = false
   description          = "Cluster Example"
@@ -26,7 +26,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 ### Required
 
-- `name` (String) Kubernetes cluster name. Must be unique within a namespace and follow naming rules.
+- `name` (String) Kubernetes cluster name. Must be unique within a namespace and contain only letters (uppercase and lowercase), numbers, dashes and dots.
 
 ### Optional
 

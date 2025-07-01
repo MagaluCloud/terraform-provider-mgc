@@ -30,7 +30,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 - `cluster_id` (String) UUID of the Kubernetes cluster.
 - `flavor_name` (String) Definition of the CPU, RAM, and storage capacity of the nodes.
-- `name` (String) Name of the node pool.
+- `name` (String) Name of the node pool. Must contain only letters (uppercase and lowercase), numbers, dashes and dots.
 - `replicas` (Number) Number of replicas of the nodes in the node pool.
 
 ### Optional
