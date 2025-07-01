@@ -29,7 +29,7 @@ resource "mgc_dbaas_replicas" "dbaas_replica" {
 
 ### Optional
 
-- `instance_type_id` (String) Instance type ID
+- `instance_type` (String) Instance type
 
 ### Read-Only
 
