@@ -15,7 +15,6 @@ type KubernetesClusterReducedModel struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 	Version     types.String `tfsdk:"version"`
-	Zone        types.String `tfsdk:"zone"`
 	Region      types.String `tfsdk:"region"`
 	State       types.String `tfsdk:"state"`
 }
@@ -77,11 +76,6 @@ func (d *DataSourceKubernetesClusters) Schema(ctx context.Context, req datasourc
 							Description: "The native Kubernetes version of the cluster.",
 							Computed:    true,
 						},
-						"zone": schema.StringAttribute{
-							Description:        "Identifier of the zone where the Kubernetes cluster is located.",
-							Computed:           true,
-							DeprecationMessage: "Deprecated. Field 'zone' is deprecated.",
-						},
 						"region": schema.StringAttribute{
 							Description: "Identifier of the region where the Kubernetes cluster is located.",
 							Computed:    true,
@@ -116,7 +110,6 @@ func (d *DataSourceKubernetesClusters) Read(ctx context.Context, req datasource.
 			ID:          types.StringValue(c.ID),
 			Name:        types.StringValue(c.Name),
 			Version:     types.StringPointerValue(c.Version),
-			Zone:        types.StringPointerValue(c.Region),
 			Description: types.StringPointerValue(c.Description),
 			Region:      types.StringPointerValue(c.Region),
 			State:       types.StringValue(c.Status.State),

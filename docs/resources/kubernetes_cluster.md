@@ -33,10 +33,9 @@ resource "mgc_kubernetes_cluster" "cluster" {
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
 - `cluster_ip_v4_cidr` (String) The IP address range of the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.
-- `enabled_server_group` (Boolean) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools.
+- `enabled_server_group` (Boolean) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.
 - `services_ip_v4_cidr` (String) The IP address range of the Kubernetes cluster service.
 - `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format.
-- `zone` (String, Deprecated) Identifier of the zone where the Kubernetes cluster is located.
 
 ### Read-Only
 

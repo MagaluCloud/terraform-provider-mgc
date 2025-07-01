@@ -42,4 +42,3 @@ Read-Only:
 - `region` (String) Identifier of the region where the Kubernetes cluster is located.
 - `state` (String) Current state of the cluster or node.
 - `version` (String) The native Kubernetes version of the cluster.
-- `zone` (String, Deprecated) Identifier of the zone where the Kubernetes cluster is located.
