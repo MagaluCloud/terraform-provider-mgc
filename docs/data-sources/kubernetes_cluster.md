@@ -79,7 +79,6 @@ Read-Only:
 - `tags` (List of String) List of tags applied to the node pool.
 - `taints` (Attributes List) Property for associating a set of nodes. (see [below for nested schema](#nestedatt--controlplane--taints))
 - `updated_at` (String) Date of the last change to the Kubernetes cluster.
-- `zone` (List of String) Availability zone for creating the Kubernetes cluster.
 
 <a id="nestedatt--controlplane--taints"></a>
 ### Nested Schema for `controlplane.taints`
