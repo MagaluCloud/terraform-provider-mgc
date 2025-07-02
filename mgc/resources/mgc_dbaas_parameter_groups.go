@@ -192,10 +192,7 @@ func (r *DBaaSParameterGroupsResource) ImportState(ctx context.Context, req reso
 }
 
 func (r *DBaaSParameterGroupsResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	active := "ACTIVE"
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{
-		Status: &active,
-	})
+	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{})
 	if err != nil {
 		return "", err
 	}

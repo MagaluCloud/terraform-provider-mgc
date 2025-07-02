@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,17 +16,23 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const (
+	dbaasReplicaProductFamily = "SINGLE_INSTANCE_REPLICA"
+)
+
 type DBaaSReplicaModel struct {
-	ID             types.String `tfsdk:"id"`
-	SourceID       types.String `tfsdk:"source_id"`
-	Name           types.String `tfsdk:"name"`
-	EngineID       types.String `tfsdk:"engine_id"`
-	InstanceTypeID types.String `tfsdk:"instance_type_id"`
-	Status         types.String `tfsdk:"status"`
+	ID           types.String `tfsdk:"id"`
+	SourceID     types.String `tfsdk:"source_id"`
+	Name         types.String `tfsdk:"name"`
+	EngineID     types.String `tfsdk:"engine_id"`
+	InstanceType types.String `tfsdk:"instance_type"`
+	Status       types.String `tfsdk:"status"`
 }
 
 type DBaaSReplicaResource struct {
-	service dbSDK.ReplicaService
+	dbaasReplicas      dbSDK.ReplicaService
+	dbaasInstances     dbSDK.InstanceService
+	dbaasInstanceTypes dbSDK.InstanceTypeService
 }
 
 func NewDBaaSReplicaResource() resource.Resource {
@@ -45,7 +52,9 @@ func (r *DBaaSReplicaResource) Configure(_ context.Context, req resource.Configu
 		resp.Diagnostics.AddError("invalid provider data", "expected tfutil.DataConfig")
 		return
 	}
-	r.service = dbSDK.New(&cfg.CoreConfig).Replicas()
+	r.dbaasReplicas = dbSDK.New(&cfg.CoreConfig).Replicas()
+	r.dbaasInstances = dbSDK.New(&cfg.CoreConfig).Instances()
+	r.dbaasInstanceTypes = dbSDK.New(&cfg.CoreConfig).InstanceTypes()
 }
 
 func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -70,10 +79,10 @@ func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"instance_type_id": schema.StringAttribute{
+			"instance_type": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Instance type ID",
+				Description: "Instance type",
 			},
 			"engine_id": schema.StringAttribute{
 				Computed:    true,
@@ -93,12 +102,25 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	var ptrTypeID *string
-	if !data.InstanceTypeID.IsNull() && data.InstanceTypeID.ValueString() != "" {
-		v := data.InstanceTypeID.ValueString()
+	if !data.InstanceType.IsNull() && data.InstanceType.ValueString() != "" {
+		sourceData, err := r.dbaasInstances.Get(ctx, data.SourceID.ValueString(), dbSDK.GetInstanceOptions{})
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
+
+		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, data.InstanceType.ValueString(), sourceData.EngineID)
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
+
+		v := instanceTypeID
 		ptrTypeID = &v
 	}
-	created, err := r.service.Create(ctx, dbSDK.ReplicaCreateRequest{
+	created, err := r.dbaasReplicas.Create(ctx, dbSDK.ReplicaCreateRequest{
 		SourceID:       data.SourceID.ValueString(),
 		Name:           data.Name.ValueString(),
 		InstanceTypeID: ptrTypeID,
@@ -107,6 +129,7 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
+
 	data.ID = types.StringValue(created.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
@@ -119,7 +142,14 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 	data.SourceID = types.StringValue(found.SourceID)
 	data.Name = types.StringValue(found.Name)
 	data.EngineID = types.StringValue(found.EngineID)
-	data.InstanceTypeID = types.StringValue(found.InstanceTypeID)
+
+	instanceTypeName, err := r.getInstanceTypeNameByID(ctx, found.InstanceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	data.InstanceType = types.StringValue(instanceTypeName)
 	data.Status = types.StringValue(string(found.Status))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -130,15 +160,24 @@ func (r *DBaaSReplicaResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	detail, err := r.service.Get(ctx, data.ID.ValueString())
+
+	detail, err := r.dbaasReplicas.Get(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
+
 	data.SourceID = types.StringValue(detail.SourceID)
 	data.Name = types.StringValue(detail.Name)
 	data.EngineID = types.StringValue(detail.EngineID)
-	data.InstanceTypeID = types.StringValue(detail.InstanceTypeID)
+
+	instanceType, err := r.dbaasInstanceTypes.Get(ctx, detail.InstanceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	data.InstanceType = types.StringValue(instanceType.Label)
 	data.Status = types.StringValue(string(detail.Status))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -156,16 +195,28 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	currentData.InstanceTypeID = plan.InstanceTypeID
-	if plan.InstanceTypeID.ValueString() != "" {
-		_, err := r.service.Resize(ctx, plan.ID.ValueString(), dbSDK.ReplicaResizeRequest{
-			InstanceTypeID: currentData.InstanceTypeID.ValueString(),
+	if plan.InstanceType.ValueString() != "" && currentData.InstanceType.ValueString() != plan.InstanceType.ValueString() {
+		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, plan.InstanceType.ValueString(), currentData.EngineID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
+
+		_, err = r.dbaasReplicas.Resize(ctx, currentData.ID.ValueString(), dbSDK.ReplicaResizeRequest{
+			InstanceTypeID: instanceTypeID,
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
+
+		if _, err := r.waitUntilReplicaStatusMatches(ctx, currentData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
+			resp.Diagnostics.AddError("Error waiting for replica to be active", err.Error())
+			return
+		}
 	}
+
+	currentData.InstanceType = plan.InstanceType
 	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
@@ -175,7 +226,8 @@ func (r *DBaaSReplicaResource) Delete(ctx context.Context, req resource.DeleteRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.service.Delete(ctx, data.ID.ValueString()); err != nil {
+
+	if err := r.dbaasReplicas.Delete(ctx, data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
 }
@@ -192,7 +244,7 @@ func (r *DBaaSReplicaResource) waitUntilReplicaStatusMatches(ctx context.Context
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for replica %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
-			instance, err := r.service.Get(ctx, instanceID)
+			instance, err := r.dbaasReplicas.Get(ctx, instanceID)
 			if err != nil {
 				return nil, err
 			}
@@ -205,4 +257,29 @@ func (r *DBaaSReplicaResource) waitUntilReplicaStatusMatches(ctx context.Context
 			}
 		}
 	}
+}
+
+func (r *DBaaSReplicaResource) getInstanceTypeNameByID(ctx context.Context, instanceTypeID string) (string, error) {
+	instanceType, err := r.dbaasInstanceTypes.Get(ctx, instanceTypeID)
+	if err != nil {
+		return "", err
+	}
+	return instanceType.Label, nil
+}
+
+func (r *DBaaSReplicaResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string, engineID string) (string, error) {
+	maxLimit := 50
+	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
+		Limit:    &maxLimit,
+		EngineID: &engineID,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, instance := range instanceTypes {
+		if instance.Label == instanceType && instance.CompatibleProduct == dbaasReplicaProductFamily {
+			return instance.ID, nil
+		}
+	}
+	return "", errors.New("instance type not found, not compatible with replica family")
 }

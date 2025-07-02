@@ -17,7 +17,7 @@ type DataSourceDbSnapshot struct {
 
 type dbSnapshotModel struct {
 	ID          types.String `tfsdk:"id"`
-	InstanceId  types.String `tfsdk:"instance_id"`
+	InstanceID  types.String `tfsdk:"instance_id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 	CreatedAt   types.String `tfsdk:"created_at"`
@@ -89,7 +89,7 @@ func (r *DataSourceDbSnapshot) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	snapshot, err := r.snapshots.GetSnapshot(ctx, data.InstanceId.ValueString(), data.ID.ValueString())
+	snapshot, err := r.snapshots.GetSnapshot(ctx, data.InstanceID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

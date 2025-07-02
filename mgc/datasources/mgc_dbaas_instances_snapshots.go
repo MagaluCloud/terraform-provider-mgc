@@ -16,7 +16,7 @@ type DataSourceDbSnapshots struct {
 }
 
 type dbSnapshotsModel struct {
-	InstanceId types.String      `tfsdk:"instance_id"`
+	InstanceID types.String      `tfsdk:"instance_id"`
 	Snapshots  []dbSnapshotModel `tfsdk:"snapshots"`
 }
 
@@ -96,7 +96,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	snapshots, err := r.snapshots.ListSnapshots(ctx, data.InstanceId.ValueString(), dbSDK.ListSnapshotOptions{})
+	snapshots, err := r.snapshots.ListSnapshots(ctx, data.InstanceID.ValueString(), dbSDK.ListSnapshotOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -107,7 +107,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		snapshotModels = append(snapshotModels, dbSnapshotModel{
 			ID:          types.StringValue(snapshot.ID),
 			Name:        types.StringValue(snapshot.Name),
-			InstanceId:  data.InstanceId,
+			InstanceID:  data.InstanceID,
 			Description: types.StringValue(snapshot.Description),
 			CreatedAt:   types.StringValue(*tfutil.ConvertTimeToRFC3339(&snapshot.CreatedAt)),
 			Status:      types.StringValue(string(snapshot.Status)),
