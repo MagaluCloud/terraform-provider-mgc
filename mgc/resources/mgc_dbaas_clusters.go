@@ -54,6 +54,8 @@ type DBaaSClusterModel struct {
 	UpdatedAt              types.String               `tfsdk:"updated_at"`
 	StartedAt              types.String               `tfsdk:"started_at"`
 	FinishedAt             types.String               `tfsdk:"finished_at"`
+	InstanceTypeID         types.String               `tfsdk:"instance_type_id"`
+	EngineID               types.String               `tfsdk:"engine_id"`
 }
 
 type DBaaSClusterResource struct {
@@ -157,6 +159,13 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
+			"engine_id": schema.StringAttribute{
+				Description: "ID of the database engine.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"instance_type": schema.StringAttribute{
 				Description: "Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.",
 				Required:    true,
@@ -165,6 +174,13 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"instance_type_id": schema.StringAttribute{
+				Description: "ID of the instance type.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"volume_size": schema.Int64Attribute{
@@ -308,13 +324,13 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	engineID, err := r.validateAndGetEngineID(ctx, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
+	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.engineService.List, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Engine", fmt.Sprintf("Failed to validate engine '%s' version '%s': %s", plan.EngineName.ValueString(), plan.EngineVersion.ValueString(), err.Error()))
 		return
 	}
 
-	instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, plan.InstanceType.ValueString())
+	instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.instanceTypeService.List, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Instance Type", fmt.Sprintf("Failed to validate instance type '%s': %s", plan.InstanceType.ValueString(), err.Error()))
 		return
@@ -342,6 +358,8 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.ID = types.StringValue(clusterResp.ID)
+	plan.EngineID = types.StringValue(engineID)
+	plan.InstanceTypeID = types.StringValue(instanceTypeID)
 
 	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
 	if err != nil {
@@ -449,6 +467,8 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	model.BackupStartAt = types.StringValue(detail.BackupStartAt)
 	model.Status = types.StringValue(string(detail.Status))
 	model.ApplyParametersPending = types.BoolValue(detail.ApplyParametersPending)
+	model.InstanceTypeID = types.StringValue(detail.InstanceTypeID)
+	model.EngineID = types.StringValue(detail.EngineID)
 
 	model.CreatedAt = types.StringValue(detail.CreatedAt.Format(time.RFC3339))
 	if detail.UpdatedAt != nil {
@@ -499,40 +519,4 @@ func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context
 			}
 		}
 	}
-}
-
-func (r *DBaaSClusterResource) validateAndGetEngineID(ctx context.Context, engineName, engineVersion string) (string, error) {
-	activeStatus := "ACTIVE"
-	engines, err := r.engineService.List(ctx, dbSDK.ListEngineOptions{
-		Status: &activeStatus,
-	})
-	if err != nil {
-		return "", fmt.Errorf("listing engines: %w", err)
-	}
-	for _, engine := range engines {
-		if engine.Name == engineName && engine.Version == engineVersion {
-			return engine.ID, nil
-		}
-	}
-	return "", fmt.Errorf("engine '%s' version '%s' not found or not active", engineName, engineVersion)
-}
-
-func (r *DBaaSClusterResource) validateAndGetInstanceTypeID(ctx context.Context, instanceTypeLabel string) (string, error) {
-	activeStatus := "ACTIVE"
-	maxLimit := 50
-	offset := 0
-	instanceTypes, err := r.instanceTypeService.List(ctx, dbSDK.ListInstanceTypeOptions{
-		Status: &activeStatus,
-		Limit:  &maxLimit,
-		Offset: &offset,
-	})
-	if err != nil {
-		return "", fmt.Errorf("listing instance types: %w", err)
-	}
-	for _, itype := range instanceTypes {
-		if itype.Label == instanceTypeLabel && itype.CompatibleProduct == clusterInstanceFamily {
-			return itype.ID, nil
-		}
-	}
-	return "", fmt.Errorf("instance type '%s' not found, not active or not compatible with cluster instance family", instanceTypeLabel)
 }

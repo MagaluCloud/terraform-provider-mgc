@@ -48,5 +48,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Read-Only
 
+- `engine_id` (String) Unique identifier for the database engine.
 - `id` (String) Unique identifier for the DBaaS instance. Generated automatically on creation.
+- `instance_type_id` (String) Unique identifier for the instance.
 - `status` (String) Status of the instance.
