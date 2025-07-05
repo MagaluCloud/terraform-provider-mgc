@@ -3,6 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
@@ -231,6 +234,24 @@ func (r *DBaaSReplicaResource) Delete(ctx context.Context, req resource.DeleteRe
 	if err := r.dbaasReplicas.Delete(ctx, data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
+
+	instanceID := data.ID.ValueString()
+	replica, err := r.dbaasReplicas.Get(ctx, instanceID)
+
+	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+		return
+	}
+	if DBaaSInstanceStatus(replica.Status) != DBaaSInstanceStatusDeleting {
+		err := r.dbaasInstances.Delete(ctx, string(instanceID))
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		}
+	}
+
+	if _, err := r.waitUntilReplicaIsDeleted(ctx, instanceID); err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
 }
 
 func (r *DBaaSReplicaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -253,8 +274,31 @@ func (r *DBaaSReplicaResource) waitUntilReplicaStatusMatches(ctx context.Context
 			if currentStatus.String() == status {
 				return instance, nil
 			}
-			if currentStatus.IsError() {
-				return nil, fmt.Errorf("replica %s is in error state", instanceID)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("replica %s is in error status %s", instanceID, string(currentStatus))
+			}
+		}
+	}
+}
+
+func (r *DBaaSReplicaResource) waitUntilReplicaIsDeleted(ctx context.Context, instanceID string) (*dbSDK.ReplicaDetailResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
+		case <-time.After(10 * time.Second):
+			replica, err := r.dbaasReplicas.Get(ctx, instanceID)
+			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+				return nil, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			currentStatus := DBaaSInstanceStatus(replica.Status)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("replica %s is in error status %s", instanceID, string(currentStatus))
 			}
 		}
 	}

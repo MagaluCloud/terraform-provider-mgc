@@ -3,7 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,7 +50,15 @@ func (s DBaaSInstanceStatus) String() string {
 	return string(s)
 }
 
-func (s DBaaSInstanceStatus) IsError() bool {
+func (s DBaaSInstanceStatus) IsActive() bool {
+	return string(s) == "ACTIVE"
+}
+
+func (s DBaaSInstanceStatus) IsErrorDeleting() bool {
+	return string(s) == "ERROR_DELETING"
+}
+
+func (s DBaaSInstanceStatus) IsAnyError() bool {
 	return strings.Contains(string(s), "ERROR")
 }
 
@@ -430,8 +440,21 @@ func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.dbaasInstances.Delete(ctx, data.ID.ValueString())
-	if err != nil {
+	instanceID := data.ID.ValueString()
+	instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
+	resp.Diagnostics.AddWarning(string(DBaaSInstanceStatus(instance.Status)), string(DBaaSInstanceStatus(instance.Status)))
+
+	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+		return
+	}
+	if DBaaSInstanceStatus(instance.Status) != DBaaSInstanceStatusDeleting {
+		err := r.dbaasInstances.Delete(ctx, string(instanceID))
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		}
+	}
+
+	if _, err := r.waitUntilInstanceIsDeleted(ctx, instanceID); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
@@ -459,8 +482,31 @@ func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Conte
 			if currentStatus.String() == status {
 				return instance, nil
 			}
-			if currentStatus.IsError() {
+			if currentStatus.IsAnyError() {
 				return nil, fmt.Errorf("instance %s is in error state", instanceID)
+			}
+		}
+	}
+}
+
+func (r *DBaaSInstanceResource) waitUntilInstanceIsDeleted(ctx context.Context, instanceID string) (*dbSDK.InstanceDetail, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
+		case <-time.After(10 * time.Second):
+			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
+			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+				return nil, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			currentStatus := DBaaSInstanceStatus(instance.Status)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("instance %s is in error status %s", instanceID, string(currentStatus))
 			}
 		}
 	}
