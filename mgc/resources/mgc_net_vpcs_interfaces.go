@@ -8,19 +8,22 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type NetworkVPCInterfaceModel struct {
-	Id    types.String `tfsdk:"id"`
-	VpcId types.String `tfsdk:"vpc_id"`
-	Name  types.String `tfsdk:"name"`
+	Id               types.String   `tfsdk:"id"`
+	VpcId            types.String   `tfsdk:"vpc_id"`
+	Name             types.String   `tfsdk:"name"`
+	AvailabilityZone types.String   `tfsdk:"availability_zone"`
+	SubnetsIds       []types.String `tfsdk:"subnet_ids"`
 }
 
 type NetworkVPCInterfaceResource struct {
 	networkVpcsPorts netSDK.VPCService
 	networkPorts     netSDK.PortService
-	region           string
 }
 
 func NewNetworkVPCInterfaceResource() resource.Resource {
@@ -43,7 +46,6 @@ func (r *NetworkVPCInterfaceResource) Configure(ctx context.Context, req resourc
 
 	r.networkVpcsPorts = netSDK.New(&dataConfig.CoreConfig).VPCs()
 	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
-	r.region = dataConfig.Region
 }
 
 func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -57,10 +59,33 @@ func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.Schem
 			"vpc_id": schema.StringAttribute{
 				Description: "The ID of the VPC",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "The name of the VPC Interface",
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+				},
+			},
+			"subnet_ids": schema.ListAttribute{
+				Description: "The IDs of the subnets",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+				},
+			},
+			"availability_zone": schema.StringAttribute{
+				Description: "The availability zone of the VPC Interface",
+				Computed:    true,
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					tfutil.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+				},
 			},
 		},
 	}
@@ -82,27 +107,64 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 	model.Name = types.StringPointerValue(vpcInterface.Name)
 	model.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 
+	if vpcInterface.IPAddress != nil {
+		var subnets []types.String
+		for _, subnet := range *vpcInterface.IPAddress {
+			subnets = append(subnets, types.StringValue(subnet.SubnetID))
+		}
+		model.SubnetsIds = subnets
+	}
+	model.AvailabilityZone = types.StringPointerValue(vpcInterface.Network.AvailabilityZone)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
 func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var model NetworkVPCInterfaceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &model)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	defaultRules := false
-	createdVPCInterface, err := r.networkVpcsPorts.CreatePort(ctx, model.VpcId.ValueString(), netSDK.PortCreateRequest{
+	createNic := netSDK.PortCreateRequest{
 		Name:   model.Name.ValueString(),
 		HasPIP: &defaultRules,
 		HasSG:  &defaultRules,
-	}, netSDK.PortCreateOptions{})
+	}
+
+	if model.SubnetsIds != nil {
+		var subnets []string
+		for _, subnetId := range model.SubnetsIds {
+			subnets = append(subnets, subnetId.ValueString())
+		}
+		createNic.Subnets = &subnets
+	}
+
+	createdVPCInterface, err := r.networkVpcsPorts.CreatePort(ctx, model.VpcId.ValueString(), createNic,
+		netSDK.PortCreateOptions{
+			Zone: model.AvailabilityZone.ValueStringPointer(),
+		})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
+	createdVPCGet, err := r.networkPorts.Get(ctx, createdVPCInterface)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	if createdVPCGet.IPAddress != nil {
+		var subnets []types.String
+		for _, subnetId := range *createdVPCGet.IPAddress {
+			subnets = append(subnets, types.StringValue(subnetId.SubnetID))
+		}
+		model.SubnetsIds = subnets
+	}
+
+	model.AvailabilityZone = types.StringPointerValue(createdVPCGet.Network.AvailabilityZone)
 	model.Id = types.StringValue(createdVPCInterface)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
