@@ -14,7 +14,7 @@ import (
 )
 
 type DBaaSClustersDataSource struct {
-	clusterService dbSDK.ClusterService
+	dbaasClusters dbSDK.ClusterService
 }
 
 type dbaasClustersDataSourceModel struct {
@@ -41,7 +41,7 @@ func (ds *DBaaSClustersDataSource) Configure(ctx context.Context, req datasource
 		resp.Diagnostics.AddError("Failed to get provider data", "Provider data has unexpected type")
 		return
 	}
-	ds.clusterService = dbSDK.New(&dataConfig.CoreConfig).Clusters()
+	ds.dbaasClusters = dbSDK.New(&dataConfig.CoreConfig).Clusters()
 }
 
 func (ds *DBaaSClustersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -101,7 +101,7 @@ func (ds *DBaaSClustersDataSource) Read(ctx context.Context, req datasource.Read
 	listOpts.Limit = &limiteTop
 
 	for {
-		sdkClustersPage, err := ds.clusterService.List(ctx, listOpts)
+		sdkClustersPage, err := ds.dbaasClusters.List(ctx, listOpts)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to list clusters", fmt.Sprintf("Error: %s", err.Error()))
 			return
