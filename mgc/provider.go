@@ -157,7 +157,7 @@ func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource 
 		resources.NewDBaaSParameterGroupsResource,
 		resources.NewDBaaSParameterResource,
 		resources.NewDBaaSReplicaResource,
-		// resources.NewDBaaSClusterResource,
+		resources.NewDBaaSClusterResource,
 	}
 }
 
