@@ -442,7 +442,6 @@ func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 
 	instanceID := data.ID.ValueString()
 	instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
-	resp.Diagnostics.AddWarning(string(DBaaSInstanceStatus(instance.Status)), string(DBaaSInstanceStatus(instance.Status)))
 
 	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
 		return
