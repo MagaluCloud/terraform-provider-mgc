@@ -12,7 +12,7 @@ import (
 )
 
 type DataSourceDbParameter struct {
-	parameteres dbSDK.ParameterGroupService
+	dbaasParameterGroups dbSDK.ParameterGroupService
 }
 
 func NewDataSourceDdbaasParameterGroup() datasource.DataSource {
@@ -33,7 +33,7 @@ func (r *DataSourceDbParameter) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.parameteres = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
+	r.dbaasParameterGroups = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
 }
 
 func (r *DataSourceDbParameter) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -71,7 +71,7 @@ func (r *DataSourceDbParameter) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	parameter, err := r.parameteres.Get(ctx, data.ID.ValueString())
+	parameter, err := r.dbaasParameterGroups.Get(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
