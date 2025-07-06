@@ -72,8 +72,8 @@ func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClust
 func dbaasClusterAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Description: "Unique identifier for the DBaaS cluster.",
-			Computed:    true,
+			Description: "ID of the cluster to fetch",
+			Required:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "Name of the DBaaS cluster.",
