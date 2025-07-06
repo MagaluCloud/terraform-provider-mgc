@@ -3,7 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,33 +37,46 @@ type DBaaSClusterAddressModel struct {
 }
 
 type DBaaSClusterModel struct {
-	ID                     types.String               `tfsdk:"id"`
-	Name                   types.String               `tfsdk:"name"`
-	User                   types.String               `tfsdk:"user"`
-	Password               types.String               `tfsdk:"password"`
-	EngineName             types.String               `tfsdk:"engine_name"`
-	EngineVersion          types.String               `tfsdk:"engine_version"`
-	InstanceType           types.String               `tfsdk:"instance_type"`
-	VolumeSize             types.Int64                `tfsdk:"volume_size"`
-	VolumeType             types.String               `tfsdk:"volume_type"`
-	ParameterGroupID       types.String               `tfsdk:"parameter_group_id"`
-	BackupRetentionDays    types.Int64                `tfsdk:"backup_retention_days"`
-	BackupStartAt          types.String               `tfsdk:"backup_start_at"`
-	Status                 types.String               `tfsdk:"status"`
-	Addresses              []DBaaSClusterAddressModel `tfsdk:"addresses"`
-	ApplyParametersPending types.Bool                 `tfsdk:"apply_parameters_pending"`
-	CreatedAt              types.String               `tfsdk:"created_at"`
-	UpdatedAt              types.String               `tfsdk:"updated_at"`
-	StartedAt              types.String               `tfsdk:"started_at"`
-	FinishedAt             types.String               `tfsdk:"finished_at"`
-	InstanceTypeID         types.String               `tfsdk:"instance_type_id"`
-	EngineID               types.String               `tfsdk:"engine_id"`
+	ID                     types.String `tfsdk:"id"`
+	Name                   types.String `tfsdk:"name"`
+	User                   types.String `tfsdk:"user"`
+	Password               types.String `tfsdk:"password"`
+	EngineName             types.String `tfsdk:"engine_name"`
+	EngineVersion          types.String `tfsdk:"engine_version"`
+	InstanceType           types.String `tfsdk:"instance_type"`
+	VolumeSize             types.Int64  `tfsdk:"volume_size"`
+	VolumeType             types.String `tfsdk:"volume_type"`
+	ParameterGroup         types.String `tfsdk:"parameter_group"`
+	BackupRetentionDays    types.Int64  `tfsdk:"backup_retention_days"`
+	BackupStartAt          types.String `tfsdk:"backup_start_at"`
+	Status                 types.String `tfsdk:"status"`
+	ApplyParametersPending types.Bool   `tfsdk:"apply_parameters_pending"`
+	CreatedAt              types.String `tfsdk:"created_at"`
+	UpdatedAt              types.String `tfsdk:"updated_at"`
+	StartedAt              types.String `tfsdk:"started_at"`
+	FinishedAt             types.String `tfsdk:"finished_at"`
+	InstanceTypeID         types.String `tfsdk:"instance_type_id"`
+	EngineID               types.String `tfsdk:"engine_id"`
 }
 
 type DBaaSClusterResource struct {
-	clusterService      dbSDK.ClusterService
-	engineService       dbSDK.EngineService
-	instanceTypeService dbSDK.InstanceTypeService
+	dbaasClusters      dbSDK.ClusterService
+	dbaasEngines       dbSDK.EngineService
+	dbaasInstanceTypes dbSDK.InstanceTypeService
+}
+
+type DBaaSClusterStatus string
+
+func (s DBaaSClusterStatus) IsActive() bool {
+	return string(s) == "ACTIVE"
+}
+
+func (s DBaaSClusterStatus) IsErrorDeleting() bool {
+	return string(s) == "ERROR_DELETING"
+}
+
+func (s DBaaSClusterStatus) IsAnyError() bool {
+	return strings.Contains(string(s), "ERROR")
 }
 
 func NewDBaaSClusterResource() resource.Resource {
@@ -83,9 +98,9 @@ func (r *DBaaSClusterResource) Configure(ctx context.Context, req resource.Confi
 	}
 
 	sdkClient := dbSDK.New(&dataConfig.CoreConfig)
-	r.clusterService = sdkClient.Clusters()
-	r.engineService = sdkClient.Engines()
-	r.instanceTypeService = sdkClient.InstanceTypes()
+	r.dbaasClusters = sdkClient.Clusters()
+	r.dbaasEngines = sdkClient.Engines()
+	r.dbaasInstanceTypes = sdkClient.InstanceTypes()
 }
 
 func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -111,7 +126,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"user": schema.StringAttribute{
-				Description: "Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.",
+				Description: "Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.  Cannot be changed after creation.",
 				Required:    true,
 				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
@@ -127,7 +142,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"password": schema.StringAttribute{
-				Description: "Master password for the database cluster. Must be at least 8 characters long.",
+				Description: "Master password for the database cluster. Must be at least 8 characters long.  Cannot be changed after creation.",
 				Required:    true,
 				Sensitive:   true,
 				WriteOnly:   true,
@@ -194,7 +209,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"volume_type": schema.StringAttribute{
-				Description: "Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K').",
+				Description: "Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -202,8 +217,8 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"parameter_group_id": schema.StringAttribute{
-				Description: "ID of the parameter group to associate with the cluster.",
+			"parameter_group": schema.StringAttribute{
+				Description: "ID of the parameter group to associate with the cluster.  Cannot be changed after creation.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -240,42 +255,6 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"addresses": schema.ListNestedAttribute{
-				Description: "Network addresses for connecting to the cluster.",
-				Computed:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"access": schema.StringAttribute{
-							Description: "Access type (e.g., 'public', 'private').",
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"type": schema.StringAttribute{
-							Description: "Address type (e.g., 'read-write', 'read-only').",
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"address": schema.StringAttribute{
-							Description: "The IP address or hostname.",
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-						"port": schema.StringAttribute{
-							Description: "The port number.",
-							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
-					},
 				},
 			},
 			"apply_parameters_pending": schema.BoolAttribute{
@@ -324,13 +303,13 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.engineService.List, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
+	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.dbaasEngines.List, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Engine", fmt.Sprintf("Failed to validate engine '%s' version '%s': %s", plan.EngineName.ValueString(), plan.EngineVersion.ValueString(), err.Error()))
 		return
 	}
 
-	instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.instanceTypeService.List, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
+	instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Instance Type", fmt.Sprintf("Failed to validate instance type '%s': %s", plan.InstanceType.ValueString(), err.Error()))
 		return
@@ -346,12 +325,12 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 			Size: int(plan.VolumeSize.ValueInt64()),
 			Type: plan.VolumeType.ValueStringPointer(),
 		},
-		ParameterGroupID:    plan.ParameterGroupID.ValueStringPointer(),
+		ParameterGroupID:    plan.ParameterGroup.ValueStringPointer(),
 		BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(plan.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       plan.BackupStartAt.ValueStringPointer(),
 	}
 
-	clusterResp, err := r.clusterService.Create(ctx, createReq)
+	clusterResp, err := r.dbaasClusters.Create(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -378,7 +357,7 @@ func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	detailedCluster, err := r.clusterService.Get(ctx, state.ID.ValueString())
+	detailedCluster, err := r.dbaasClusters.Get(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -405,9 +384,9 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 	updateReq := dbSDK.ClusterUpdateRequest{}
 	changed := false
 
-	if !plan.ParameterGroupID.Equal(state.ParameterGroupID) {
-		updateReq.ParameterGroupID = plan.ParameterGroupID.ValueStringPointer()
-		state.ParameterGroupID = plan.ParameterGroupID
+	if !plan.ParameterGroup.Equal(state.ParameterGroup) {
+		updateReq.ParameterGroupID = plan.ParameterGroup.ValueStringPointer()
+		state.ParameterGroup = plan.ParameterGroup
 		changed = true
 	}
 	if !plan.BackupRetentionDays.Equal(state.BackupRetentionDays) {
@@ -422,7 +401,7 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if changed {
-		_, err := r.clusterService.Update(ctx, clusterID, updateReq)
+		_, err := r.dbaasClusters.Update(ctx, clusterID, updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
@@ -443,8 +422,20 @@ func (r *DBaaSClusterResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.clusterService.Delete(ctx, state.ID.ValueString())
-	if err != nil {
+	clusterID := state.ID.ValueString()
+	cluster, err := r.dbaasClusters.Get(ctx, clusterID)
+
+	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+		return
+	}
+	if string(cluster.Status) != string(dbSDK.ClusterStatusDeleting) {
+		err := r.dbaasClusters.Delete(ctx, string(clusterID))
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		}
+	}
+
+	if _, err := r.waitUntilClusterIsDeleted(ctx, clusterID); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
@@ -459,9 +450,9 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	model.Name = types.StringValue(detail.Name)
 	model.VolumeSize = types.Int64Value(int64(detail.Volume.Size))
 	model.VolumeType = types.StringValue(detail.Volume.Type)
-	model.ParameterGroupID = types.StringValue(detail.ParameterGroupID)
+	model.ParameterGroup = types.StringValue(detail.ParameterGroupID)
 	if detail.ParameterGroupID == "" {
-		model.ParameterGroupID = types.StringNull()
+		model.ParameterGroup = types.StringNull()
 	}
 	model.BackupRetentionDays = types.Int64Value(int64(detail.BackupRetentionDays))
 	model.BackupStartAt = types.StringValue(detail.BackupStartAt)
@@ -478,17 +469,6 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	}
 	model.StartedAt = types.StringPointerValue(detail.StartedAt)
 	model.FinishedAt = types.StringPointerValue(detail.FinishedAt)
-
-	var modelAddresses []DBaaSClusterAddressModel
-	for _, lba := range detail.Addresses {
-		modelAddresses = append(modelAddresses, DBaaSClusterAddressModel{
-			Address: types.StringValue(lba.Address),
-			Port:    types.StringValue(lba.Port),
-			Access:  types.StringValue(string(lba.Access)),
-			Type:    types.StringValue(string(lba.Type)),
-		})
-	}
-	model.Addresses = modelAddresses
 	model.Password = types.StringNull()
 	model.User = types.StringNull()
 }
@@ -501,21 +481,41 @@ func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for cluster %s to reach status %s", clusterID, targetStatus)
 		case <-time.After(15 * time.Second):
-			cluster, err := r.clusterService.Get(ctx, clusterID)
+			cluster, err := r.dbaasClusters.Get(ctx, clusterID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get cluster %s during status wait: %w", clusterID, err)
 			}
 
 			currentStatus := cluster.Status
 			if currentStatus == targetStatus {
-				if targetStatus == dbSDK.ClusterStatusActive && cluster.ApplyParametersPending {
-					continue
-				}
 				return cluster, nil
 			}
 
 			if strings.Contains(strings.ToLower(string(currentStatus)), "error") {
 				return nil, fmt.Errorf("cluster %s entered error state: %s", clusterID, currentStatus)
+			}
+		}
+	}
+}
+
+func (r *DBaaSClusterResource) waitUntilClusterIsDeleted(ctx context.Context, clusterID string) (*dbSDK.ClusterDetailResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for cluster %s to be deleted", clusterID)
+		case <-time.After(10 * time.Second):
+			cluster, err := r.dbaasClusters.Get(ctx, clusterID)
+			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+				return nil, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			currentStatus := DBaaSClusterStatus(cluster.Status)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("cluster %s is in error status %s", clusterID, string(currentStatus))
 			}
 		}
 	}
