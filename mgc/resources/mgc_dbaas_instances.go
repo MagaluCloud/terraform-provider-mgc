@@ -133,7 +133,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"user": schema.StringAttribute{
-				Description: "Master username for the database. Must start with a letter and contain only alphanumeric characters.",
+				Description: "Master username for the database. Must start with a letter and contain only alphanumeric characters. Cannot be changed after creation.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
@@ -150,7 +150,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				WriteOnly: true,
 			},
 			"password": schema.StringAttribute{
-				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.",
+				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.  Cannot be changed after creation.",
 				Required:    true,
 				Sensitive:   true,
 				WriteOnly:   true,
@@ -174,7 +174,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"engine_version": schema.StringAttribute{
-				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name.",
+				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -232,7 +232,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"parameter_group": schema.StringAttribute{
-				Description: "ID of the parameter group to use for the instance.",
+				Description: "ID of the parameter group to use for the instance. Cannot be changed after creation.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -243,7 +243,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"availability_zone": schema.StringAttribute{
-				Description: "Availability zone to use for the instance.",
+				Description: "Availability zone to use for the instance. Cannot be changed after creation.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
