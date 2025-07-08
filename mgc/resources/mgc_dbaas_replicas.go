@@ -2,8 +2,10 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
@@ -111,7 +113,8 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
-		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, data.InstanceType.ValueString(), sourceData.EngineID)
+		instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, data.InstanceType.ValueString(),
+			sourceData.EngineID, dbaasReplicaProductFamily)
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
@@ -143,7 +146,7 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 	data.Name = types.StringValue(found.Name)
 	data.EngineID = types.StringValue(found.EngineID)
 
-	instanceTypeName, err := r.getInstanceTypeNameByID(ctx, found.InstanceTypeID)
+	instanceTypeName, err := tfutil.GetInstanceTypeNameByID(ctx, r.dbaasInstanceTypes.Get, found.InstanceTypeID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -196,7 +199,8 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if plan.InstanceType.ValueString() != "" && currentData.InstanceType.ValueString() != plan.InstanceType.ValueString() {
-		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, plan.InstanceType.ValueString(), currentData.EngineID.ValueString())
+		instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(),
+			currentData.EngineID.ValueString(), dbaasReplicaProductFamily)
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
@@ -230,6 +234,24 @@ func (r *DBaaSReplicaResource) Delete(ctx context.Context, req resource.DeleteRe
 	if err := r.dbaasReplicas.Delete(ctx, data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
+
+	instanceID := data.ID.ValueString()
+	replica, err := r.dbaasReplicas.Get(ctx, instanceID)
+
+	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+		return
+	}
+	if DBaaSInstanceStatus(replica.Status) != DBaaSInstanceStatusDeleting {
+		err := r.dbaasInstances.Delete(ctx, string(instanceID))
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		}
+	}
+
+	if _, err := r.waitUntilReplicaIsDeleted(ctx, instanceID); err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
 }
 
 func (r *DBaaSReplicaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -252,34 +274,32 @@ func (r *DBaaSReplicaResource) waitUntilReplicaStatusMatches(ctx context.Context
 			if currentStatus.String() == status {
 				return instance, nil
 			}
-			if currentStatus.IsError() {
-				return nil, fmt.Errorf("replica %s is in error state", instanceID)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("replica %s is in error status %s", instanceID, string(currentStatus))
 			}
 		}
 	}
 }
 
-func (r *DBaaSReplicaResource) getInstanceTypeNameByID(ctx context.Context, instanceTypeID string) (string, error) {
-	instanceType, err := r.dbaasInstanceTypes.Get(ctx, instanceTypeID)
-	if err != nil {
-		return "", err
-	}
-	return instanceType.Label, nil
-}
-
-func (r *DBaaSReplicaResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string, engineID string) (string, error) {
-	maxLimit := 50
-	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
-		Limit:    &maxLimit,
-		EngineID: &engineID,
-	})
-	if err != nil {
-		return "", err
-	}
-	for _, instance := range instanceTypes {
-		if instance.Label == instanceType && instance.CompatibleProduct == dbaasReplicaProductFamily {
-			return instance.ID, nil
+func (r *DBaaSReplicaResource) waitUntilReplicaIsDeleted(ctx context.Context, instanceID string) (*dbSDK.ReplicaDetailResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
+		case <-time.After(10 * time.Second):
+			replica, err := r.dbaasReplicas.Get(ctx, instanceID)
+			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+				return nil, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			currentStatus := DBaaSInstanceStatus(replica.Status)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("replica %s is in error status %s", instanceID, string(currentStatus))
+			}
 		}
 	}
-	return "", errors.New("instance type not found, not compatible with replica family")
 }

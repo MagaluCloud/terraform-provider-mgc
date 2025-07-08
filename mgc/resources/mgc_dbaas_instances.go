@@ -2,9 +2,10 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,7 +50,15 @@ func (s DBaaSInstanceStatus) String() string {
 	return string(s)
 }
 
-func (s DBaaSInstanceStatus) IsError() bool {
+func (s DBaaSInstanceStatus) IsActive() bool {
+	return string(s) == "ACTIVE"
+}
+
+func (s DBaaSInstanceStatus) IsErrorDeleting() bool {
+	return string(s) == "ERROR_DELETING"
+}
+
+func (s DBaaSInstanceStatus) IsAnyError() bool {
 	return strings.Contains(string(s), "ERROR")
 }
 
@@ -67,6 +76,8 @@ type DBaaSInstanceModel struct {
 	AvailabilityZone    types.String `tfsdk:"availability_zone"`
 	ParameterGroup      types.String `tfsdk:"parameter_group"`
 	Status              types.String `tfsdk:"status"`
+	InstanceTypeId      types.String `tfsdk:"instance_type_id"`
+	EngineID            types.String `tfsdk:"engine_id"`
 }
 
 type DBaaSInstanceResource struct {
@@ -172,11 +183,25 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
+			"engine_id": schema.StringAttribute{
+				Description: "Unique identifier for the database engine.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"instance_type": schema.StringAttribute{
 				Description: "Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"instance_type_id": schema.StringAttribute{
+				Description: "Unique identifier for the instance.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"volume_size": schema.Int64Attribute{
@@ -243,13 +268,13 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	engineID, err := r.validateAndGetEngineID(ctx, data.EngineName.ValueString(), data.EngineVersion.ValueString())
+	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.dbaasEngines.List, data.EngineName.ValueString(), data.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engine name", err.Error())
 		return
 	}
 
-	instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, data.InstanceType.ValueString(), engineID)
+	instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, data.InstanceType.ValueString(), engineID, dbaasInstanceProductFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid instance type", err.Error())
 		return
@@ -276,6 +301,8 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
+	data.EngineID = types.StringValue(engineID)
+	data.InstanceTypeId = types.StringValue(instanceTypeID)
 	data.ID = types.StringValue(created.ID)
 	data.Password = types.StringNull()
 	data.User = types.StringNull()
@@ -301,18 +328,20 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	engineName, engineVersion, err := r.getEngineNameAndVersionByID(ctx, instance.EngineID)
+	engineName, engineVersion, err := tfutil.GetEngineNameAndVersionByID(ctx, r.dbaasEngines.Get, instance.EngineID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	instanceTypeName, err := r.getInstanceTypeNameByID(ctx, instance.InstanceTypeID)
+	instanceTypeName, err := tfutil.GetInstanceTypeNameByID(ctx, r.dbaasInstanceTypes.Get, instance.InstanceTypeID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
+	data.InstanceTypeId = types.StringValue(instance.InstanceTypeID)
+	data.EngineID = types.StringValue(instance.EngineID)
 	data.Name = types.StringValue(instance.Name)
 	data.EngineName = types.StringValue(engineName)
 	data.EngineVersion = types.StringValue(engineVersion)
@@ -341,20 +370,15 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	engineID, err := r.validateAndGetEngineID(ctx, currentData.EngineName.ValueString(), currentData.EngineVersion.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Invalid engine name", err.Error())
-		return
-	}
-
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
 		currentData.InstanceType = planData.InstanceType
-		instanceTypeID, err := r.validateAndGetInstanceTypeID(ctx, planData.InstanceType.ValueString(), engineID)
+		instanceTypeID, err := tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(),
+			currentData.EngineID.ValueString(), dbaasInstanceProductFamily)
 		if err != nil {
 			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 			return
 		}
-
+		currentData.InstanceTypeId = types.StringValue(instanceTypeID)
 		_, err = r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
 			InstanceTypeID: &instanceTypeID,
 		})
@@ -416,8 +440,20 @@ func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.dbaasInstances.Delete(ctx, data.ID.ValueString())
-	if err != nil {
+	instanceID := data.ID.ValueString()
+	instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
+
+	if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+		return
+	}
+	if DBaaSInstanceStatus(instance.Status) != DBaaSInstanceStatusDeleting {
+		err := r.dbaasInstances.Delete(ctx, string(instanceID))
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		}
+	}
+
+	if _, err := r.waitUntilInstanceIsDeleted(ctx, instanceID); err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
@@ -427,52 +463,6 @@ func (r *DBaaSInstanceResource) ImportState(ctx context.Context, req resource.Im
 	data := DBaaSInstanceModel{}
 	data.ID = types.StringValue(req.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *DBaaSInstanceResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, engine := range engines {
-		if engine.Name == engineName && engine.Version == engineVersion {
-			return engine.ID, nil
-		}
-	}
-	return "", errors.New("engine not found")
-}
-
-func (r *DBaaSInstanceResource) validateAndGetInstanceTypeID(ctx context.Context, instanceType string, engineID string) (string, error) {
-	maxLimit := 50
-	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
-		Limit:    &maxLimit,
-		EngineID: &engineID,
-	})
-	if err != nil {
-		return "", err
-	}
-	for _, instance := range instanceTypes {
-		if instance.Label == instanceType && instance.CompatibleProduct == dbaasInstanceProductFamily {
-			return instance.ID, nil
-		}
-	}
-	return "", errors.New("instance type not found, not active or not compatible with single instance family")
-}
-
-func (r *DBaaSInstanceResource) getEngineNameAndVersionByID(ctx context.Context, engineID string) (name string, version string, err error) {
-	engine, err := r.dbaasEngines.Get(ctx, engineID)
-	if err != nil {
-		return "", "", err
-	}
-	return engine.Name, engine.Version, nil
-}
-
-func (r *DBaaSInstanceResource) getInstanceTypeNameByID(ctx context.Context, instanceTypeID string) (string, error) {
-	instanceType, err := r.dbaasInstanceTypes.Get(ctx, instanceTypeID)
-	if err != nil {
-		return "", err
-	}
-	return instanceType.Label, nil
 }
 
 func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status string) (*dbSDK.InstanceDetail, error) {
@@ -491,8 +481,31 @@ func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Conte
 			if currentStatus.String() == status {
 				return instance, nil
 			}
-			if currentStatus.IsError() {
+			if currentStatus.IsAnyError() {
 				return nil, fmt.Errorf("instance %s is in error state", instanceID)
+			}
+		}
+	}
+}
+
+func (r *DBaaSInstanceResource) waitUntilInstanceIsDeleted(ctx context.Context, instanceID string) (*dbSDK.InstanceDetail, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
+		case <-time.After(10 * time.Second):
+			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
+			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
+				return nil, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			currentStatus := DBaaSInstanceStatus(instance.Status)
+			if currentStatus.IsAnyError() {
+				return nil, fmt.Errorf("instance %s is in error status %s", instanceID, string(currentStatus))
 			}
 		}
 	}
