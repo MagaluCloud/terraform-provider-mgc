@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
@@ -155,14 +156,17 @@ func (r *DBaaSParameterResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	currentData.Value = data.Value
-	_, err = r.ParameterService.Update(ctx, currentData.ParameterGroupID.ValueString(), currentData.ID.ValueString(), dbSDK.ParameterUpdateRequest{
-		Value: s,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-		return
+	updatedValue := fmt.Sprintf("%v", s)
+	if updatedValue != currentData.Value.String() {
+		_, err = r.ParameterService.Update(ctx, currentData.ParameterGroupID.ValueString(), currentData.ID.ValueString(), dbSDK.ParameterUpdateRequest{
+			Value: s,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
+	currentData.Value = data.Value
 	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
