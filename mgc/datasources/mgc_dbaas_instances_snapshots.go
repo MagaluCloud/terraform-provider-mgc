@@ -12,7 +12,7 @@ import (
 )
 
 type DataSourceDbSnapshots struct {
-	snapshots dbSDK.InstanceService
+	dbaasInstances dbSDK.InstanceService
 }
 
 type dbSnapshotsModel struct {
@@ -38,7 +38,7 @@ func (r *DataSourceDbSnapshots) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.snapshots = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbSnapshots) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -96,7 +96,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	snapshots, err := r.snapshots.ListSnapshots(ctx, data.InstanceID.ValueString(), dbSDK.ListSnapshotOptions{})
+	snapshots, err := r.dbaasInstances.ListSnapshots(ctx, data.InstanceID.ValueString(), dbSDK.ListSnapshotOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

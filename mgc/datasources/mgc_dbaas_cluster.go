@@ -159,7 +159,7 @@ func dbaasClusterAttributes() map[string]schema.Attribute {
 }
 
 type DBaaSClusterDataSource struct {
-	clusterService dbSDK.ClusterService
+	dbaasClusters dbSDK.ClusterService
 }
 
 type dbaasClusterDataSourceModel struct {
@@ -198,7 +198,7 @@ func (ds *DBaaSClusterDataSource) Configure(ctx context.Context, req datasource.
 		resp.Diagnostics.AddError("Failed to get provider data", "Provider data has unexpected type")
 		return
 	}
-	ds.clusterService = dbSDK.New(&dataConfig.CoreConfig).Clusters()
+	ds.dbaasClusters = dbSDK.New(&dataConfig.CoreConfig).Clusters()
 }
 
 func (ds *DBaaSClusterDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -220,7 +220,7 @@ func (ds *DBaaSClusterDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	sdkCluster, err := ds.clusterService.Get(ctx, config.ID.ValueString())
+	sdkCluster, err := ds.dbaasClusters.Get(ctx, config.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

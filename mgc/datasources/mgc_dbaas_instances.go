@@ -16,7 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbInstances{}
 
 type DataSourceDbInstances struct {
-	instances dbSDK.InstanceService
+	dbaasInstances dbSDK.InstanceService
 }
 
 type dbInstanceModel struct {
@@ -63,7 +63,7 @@ func (r *DataSourceDbInstances) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.instances = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -158,7 +158,7 @@ func (r *DataSourceDbInstances) getAllInstances(ctx context.Context, params dbSD
 	var allResults []dbSDK.InstanceDetail
 	params.Offset = new(int)
 	for {
-		instances, err := r.instances.List(ctx, params)
+		instances, err := r.dbaasInstances.List(ctx, params)
 		if err != nil {
 			return nil, err
 		}
