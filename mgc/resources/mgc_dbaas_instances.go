@@ -186,9 +186,6 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"engine_id": schema.StringAttribute{
 				Description: "Unique identifier for the database engine.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"instance_type": schema.StringAttribute{
 				Description: "Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.",
@@ -200,9 +197,6 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"instance_type_id": schema.StringAttribute{
 				Description: "Unique identifier for the instance.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"volume_size": schema.Int64Attribute{
 				Description: "Size of the storage volume in GB. Can be increased but not decreased after creation.",
