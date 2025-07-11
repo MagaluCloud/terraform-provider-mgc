@@ -8,7 +8,6 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -73,11 +72,8 @@ func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.Schem
 			"subnet_ids": schema.ListAttribute{
 				Description: "The IDs of the subnets",
 				Optional:    true,
-				Computed:    true,
+				WriteOnly:   true,
 				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
-				},
 			},
 			"availability_zone": schema.StringAttribute{
 				Description: "The availability zone of the VPC Interface",
@@ -106,14 +102,6 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 
 	model.Name = types.StringPointerValue(vpcInterface.Name)
 	model.VpcId = types.StringPointerValue(vpcInterface.VPCID)
-
-	if vpcInterface.IPAddress != nil {
-		var subnets []types.String
-		for _, subnet := range *vpcInterface.IPAddress {
-			subnets = append(subnets, types.StringValue(subnet.SubnetID))
-		}
-		model.SubnetsIds = subnets
-	}
 	model.AvailabilityZone = types.StringPointerValue(vpcInterface.Network.AvailabilityZone)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
@@ -156,14 +144,7 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	if createdVPCGet.IPAddress != nil {
-		var subnets []types.String
-		for _, subnetId := range *createdVPCGet.IPAddress {
-			subnets = append(subnets, types.StringValue(subnetId.SubnetID))
-		}
-		model.SubnetsIds = subnets
-	}
-
+	model.SubnetsIds = nil
 	model.AvailabilityZone = types.StringPointerValue(createdVPCGet.Network.AvailabilityZone)
 	model.Id = types.StringValue(createdVPCInterface)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)

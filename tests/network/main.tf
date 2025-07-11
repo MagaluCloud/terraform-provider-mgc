@@ -63,7 +63,7 @@ data "mgc_network_vpcs" "vpcs_data" {}
 resource "mgc_network_vpcs_interfaces" "pip_interface" {
   name       = "${random_pet.name.id}-pip-interface2"
   vpc_id     = data.mgc_network_vpc.main_vpc_data.id
-  subnet_ids = ["14fd751d-3b60-4d06-aed6-e80176d0db9e", "397c057e-90a5-4093-bee4-99dd0caf1bd2"]
+  subnet_ids = [data.mgc_network_vpcs_subnet.primary_subnet_data.id]
   depends_on = [data.mgc_network_vpcs_subnet.primary_subnet_data]
 }
 
@@ -135,16 +135,16 @@ resource "mgc_network_public_ips_attach" "example" {
 }
 
 #NAT Gateway
-# resource "mgc_network_nat_gateway" "example" {
-#   name        = "example-nat-gateway2"
-#   description = "Example NAT Gateway"
-#   vpc_id      = data.mgc_network_vpc.main_vpc_data.id
-#   zone        = "a"
-# }
+resource "mgc_network_nat_gateway" "example" {
+  name        = "example-nat-gateway2"
+  description = "Example NAT Gateway"
+  vpc_id      = data.mgc_network_vpc.main_vpc_data.id
+  availability_zone = "br-ne1-a"
+}
 
-# data "mgc_network_nat_gateway" "example" {
-#   id = mgc_network_nat_gateway.example.id
-# }
+data "mgc_network_nat_gateway" "example" {
+  id = mgc_network_nat_gateway.example.id
+}
 
 # Outputs
 output "primary_security_group_data" {
@@ -191,6 +191,6 @@ output "vpcs_interfaces_data" {
   value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
 }
 
-# output "nat_gateway_data" {
-#   value = data.mgc_network_nat_gateway.example
-# }
+output "nat_gateway_data" {
+  value = data.mgc_network_nat_gateway.example
+}

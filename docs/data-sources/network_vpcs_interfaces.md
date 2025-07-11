@@ -29,6 +29,7 @@ data "mgc_network_vpcs_interfaces" "example" {
 
 Read-Only:
 
+- `availability_zone` (String) Availability zone of the VPC interface
 - `created_at` (String) Creation timestamp of the VPC interface
 - `description` (String) Description of the VPC interface
 - `id` (String) The ID of the VPC interface

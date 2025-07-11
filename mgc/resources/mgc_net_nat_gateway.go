@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -24,14 +23,15 @@ func NewNetworkNatGatewayResource() resource.Resource {
 
 type natGatewayResource struct {
 	sdkNetwork network.NatGatewayService
+	region     string
 }
 
 type natGatewayResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	VPCID       types.String `tfsdk:"vpc_id"`
-	Zone        types.String `tfsdk:"zone"`
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	Description      types.String `tfsdk:"description"`
+	VPCID            types.String `tfsdk:"vpc_id"`
+	AvailabilityZone types.String `tfsdk:"availability_zone"`
 }
 
 func (r *natGatewayResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -70,9 +70,10 @@ func (r *natGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"zone": schema.StringAttribute{
-				Description: "The zone of the NAT Gateway.",
-				Required:    true,
+			"availability_zone": schema.StringAttribute{
+				Description: "The availability zone of the NAT Gateway.",
+				Computed:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -93,37 +94,42 @@ func (r *natGatewayResource) Configure(_ context.Context, req resource.Configure
 	}
 
 	r.sdkNetwork = network.New(&dataConfig.CoreConfig).NatGateways()
+	r.region = dataConfig.Region
 }
 
 func (r *natGatewayResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan natGatewayResourceModel
-	diags := req.Plan.Get(ctx, &plan)
+	diags := req.Config.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create NAT Gateway
+	var azparsed string
+	if !plan.AvailabilityZone.IsUnknown() {
+		az, err := tfutil.ConvertAvailabilityZoneToXZone(plan.AvailabilityZone.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Availability Zone", err.Error())
+			return
+		}
+		azparsed = az
+	}
+
 	natGateway, err := r.sdkNetwork.Create(ctx, network.CreateNatGatewayRequest{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueStringPointer(),
 		VPCID:       plan.VPCID.ValueString(),
-		Zone:        plan.Zone.ValueString(),
+		Zone:        azparsed,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	// Map response body to schema and populate Computed attribute values
 	plan.ID = types.StringValue(natGateway)
 
-	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 }
 
 func (r *natGatewayResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -134,7 +140,6 @@ func (r *natGatewayResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// Get NAT Gateway
 	natGateway, err := r.sdkNetwork.Get(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
@@ -144,7 +149,9 @@ func (r *natGatewayResource) Read(ctx context.Context, req resource.ReadRequest,
 	state.Name = types.StringValue(*natGateway.Name)
 	state.Description = types.StringValue(*natGateway.Description)
 	state.VPCID = types.StringValue(*natGateway.VPCID)
-	state.Zone = types.StringValue(*natGateway.Zone)
+	if natGateway.Zone != nil {
+		state.AvailabilityZone = types.StringValue(tfutil.ConvertXZoneToAvailabilityZone(r.region, *natGateway.Zone))
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -165,14 +172,9 @@ func (r *natGatewayResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	// Delete NAT Gateway
 	err := r.sdkNetwork.Delete(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-
-	tflog.Info(ctx, "NAT Gateway deleted", map[string]interface{}{
-		"id": state.ID.ValueString(),
-	})
 }

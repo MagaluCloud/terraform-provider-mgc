@@ -31,6 +31,7 @@ output "datasource_vpcs_interface" {
 
 ### Read-Only
 
+- `availability_zone` (String) Availability zone of the VPC interface
 - `created_at` (String) Creation timestamp of the VPC interface
 - `description` (String) Description of the VPC interface
 - `ip_address` (Attributes List) The IP addresses associated with the VPC interface (see [below for nested schema](#nestedatt--ip_address))
