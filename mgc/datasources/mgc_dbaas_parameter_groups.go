@@ -24,7 +24,7 @@ type ParameterGroupModel struct {
 }
 
 type DataSourceDbParameterList struct {
-	parameteres dbSDK.ParameterGroupService
+	dbaasParameterGroups dbSDK.ParameterGroupService
 }
 
 func NewDataSourceDdbaasParameterGroups() datasource.DataSource {
@@ -45,7 +45,7 @@ func (r *DataSourceDbParameterList) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	r.parameteres = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
+	r.dbaasParameterGroups = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
 }
 
 func (r *DataSourceDbParameterList) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -90,7 +90,7 @@ func (r *DataSourceDbParameterList) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	parameters, err := r.parameteres.List(ctx, dbSDK.ListParameterGroupsOptions{})
+	parameters, err := r.dbaasParameterGroups.List(ctx, dbSDK.ListParameterGroupsOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

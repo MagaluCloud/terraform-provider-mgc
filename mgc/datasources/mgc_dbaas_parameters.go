@@ -23,7 +23,7 @@ type ParameterElement struct {
 }
 
 type DataSourceDbParametersList struct {
-	service dbSDK.ParameterService
+	dbaasParameters dbSDK.ParameterService
 }
 
 func NewDataSourceDbParametersList() datasource.DataSource {
@@ -43,7 +43,7 @@ func (r *DataSourceDbParametersList) Configure(ctx context.Context, req datasour
 		resp.Diagnostics.AddError("Failed to get provider data", "Expected tfutil.DataConfig")
 		return
 	}
-	r.service = dbSDK.New(&cfg.CoreConfig).Parameters()
+	r.dbaasParameters = dbSDK.New(&cfg.CoreConfig).Parameters()
 }
 
 func (r *DataSourceDbParametersList) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -84,7 +84,7 @@ func (r *DataSourceDbParametersList) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	list, err := r.service.List(ctx, dbSDK.ListParametersOptions{
+	list, err := r.dbaasParameters.List(ctx, dbSDK.ListParametersOptions{
 		ParameterGroupID: data.ParameterGroupID.ValueString(),
 	})
 	if err != nil {

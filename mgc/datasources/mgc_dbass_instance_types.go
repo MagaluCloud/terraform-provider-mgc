@@ -16,7 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbInstanceTypes{}
 
 type DataSourceDbInstanceTypes struct {
-	instanceTypes dbSDK.InstanceTypeService
+	dbaasInstanceTypes dbSDK.InstanceTypeService
 }
 
 type dbInstanceTypeModel struct {
@@ -50,7 +50,7 @@ func (r *DataSourceDbInstanceTypes) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	r.instanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
+	r.dbaasInstanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
 }
 
 func (r *DataSourceDbInstanceTypes) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -103,7 +103,7 @@ func (r *DataSourceDbInstanceTypes) Read(ctx context.Context, req datasource.Rea
 	}
 
 	limit := 50
-	instanceTypes, err := r.instanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
+	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
 		Status: data.Status.ValueStringPointer(),
 		Limit:  &limit,
 	})

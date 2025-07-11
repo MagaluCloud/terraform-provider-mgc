@@ -36,7 +36,7 @@ type DBaaSReplicaGetModel struct {
 }
 
 type DataSourceDbReplica struct {
-	service dbSDK.ReplicaService
+	dbaasReplicas dbSDK.ReplicaService
 }
 
 func NewDataSourceDbReplica() datasource.DataSource {
@@ -56,7 +56,7 @@ func (r *DataSourceDbReplica) Configure(_ context.Context, req datasource.Config
 		resp.Diagnostics.AddError("invalid provider data", "expected tfutil.DataConfig")
 		return
 	}
-	r.service = dbSDK.New(&cfg.CoreConfig).Replicas()
+	r.dbaasReplicas = dbSDK.New(&cfg.CoreConfig).Replicas()
 }
 
 func (r *DataSourceDbReplica) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -149,7 +149,7 @@ func (r *DataSourceDbReplica) Read(ctx context.Context, req datasource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	d, err := r.service.Get(ctx, data.ID.ValueString())
+	d, err := r.dbaasReplicas.Get(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
