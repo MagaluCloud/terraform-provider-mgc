@@ -23,6 +23,7 @@ type NetworkVPCInterfaceModel struct {
 	SecurityGroups        []types.String                      `tfsdk:"security_groups"`
 	Updated               types.String                        `tfsdk:"updated"`
 	VpcId                 types.String                        `tfsdk:"vpc_id"`
+	AvailabilityZone      types.String                        `tfsdk:"availability_zone"`
 }
 
 type NetworkVPCInterfaceIpAddressModel struct {
@@ -123,6 +124,10 @@ func (r *NetworkVPCInterfaceDatasource) Schema(_ context.Context, req datasource
 			},
 			"vpc_id": schema.StringAttribute{
 				Description: "ID of the VPC this interface belongs to",
+				Computed:    true,
+			},
+			"availability_zone": schema.StringAttribute{
+				Description: "Availability zone of the VPC interface",
 				Computed:    true,
 			},
 		},

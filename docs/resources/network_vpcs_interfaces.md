@@ -27,6 +27,11 @@ resource "mgc_network_vpcs_interfaces" "interface_example" {
 - `name` (String) The name of the VPC Interface
 - `vpc_id` (String) The ID of the VPC
 
+### Optional
+
+- `availability_zone` (String) The availability zone of the VPC Interface
+- `subnet_ids` (List of String) The IDs of the subnets
+
 ### Read-Only
 
 - `id` (String) The ID of the VPC Interface

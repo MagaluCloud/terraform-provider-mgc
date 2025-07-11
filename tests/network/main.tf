@@ -63,6 +63,7 @@ data "mgc_network_vpcs" "vpcs_data" {}
 resource "mgc_network_vpcs_interfaces" "pip_interface" {
   name       = "${random_pet.name.id}-pip-interface2"
   vpc_id     = data.mgc_network_vpc.main_vpc_data.id
+  subnet_ids = [data.mgc_network_vpcs_subnet.primary_subnet_data.id]
   depends_on = [data.mgc_network_vpcs_subnet.primary_subnet_data]
 }
 
@@ -96,14 +97,14 @@ resource "mgc_network_vpcs_subnets" "primary_subnet" {
   vpc_id          = data.mgc_network_vpc.main_vpc_data.id
 }
 
-resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
-  name              = "${random_pet.name.id}-basic-instance-tf2-with-vpc"
-  availability_zone = "br-ne1-a"
-  machine_type      = "BV1-1-40"
-  image             = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name      = "publio"
-  vpc_id            = data.mgc_network_vpc.main_vpc_data.id
-}
+# resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
+#   name              = "${random_pet.name.id}-basic-instance-tf2-with-vpc"
+#   availability_zone = "br-ne1-a"
+#   machine_type      = "BV1-1-40"
+#   image             = "cloud-ubuntu-24.04 LTS"
+#   ssh_key_name      = "publio"
+#   vpc_id            = data.mgc_network_vpc.main_vpc_data.id
+# }
 
 data "mgc_network_vpcs_subnet" "primary_subnet_data" {
   id = mgc_network_vpcs_subnets.primary_subnet.id
@@ -138,7 +139,7 @@ resource "mgc_network_nat_gateway" "example" {
   name        = "example-nat-gateway2"
   description = "Example NAT Gateway"
   vpc_id      = data.mgc_network_vpc.main_vpc_data.id
-  zone        = "a"
+  availability_zone = "br-ne1-a"
 }
 
 data "mgc_network_nat_gateway" "example" {
@@ -190,6 +191,6 @@ output "vpcs_interfaces_data" {
   value = data.mgc_network_vpcs_interfaces.vpcs_interfaces_data
 }
 
-# output "nat_gateway_data" {
-#   value = data.mgc_network_nat_gateway.example
-# }
+output "nat_gateway_data" {
+  value = data.mgc_network_nat_gateway.example
+}

@@ -108,6 +108,10 @@ func (r *NetworkVPCInterfacesDatasource) Schema(_ context.Context, req datasourc
 							Description: "ID of the VPC this interface belongs to",
 							Computed:    true,
 						},
+						"availability_zone": schema.StringAttribute{
+							Description: "Availability zone of the VPC interface",
+							Computed:    true,
+						},
 					},
 				},
 			},
@@ -188,6 +192,7 @@ func toNetworkVPCInterfaceModel(vpcInterface netSDK.PortResponse) NetworkVPCInte
 		data.Updated = types.StringValue(vpcInterface.Updated.String())
 	}
 	data.Description = types.StringPointerValue(vpcInterface.Description)
+	data.AvailabilityZone = types.StringPointerValue(vpcInterface.Network.AvailabilityZone)
 
 	return data
 }

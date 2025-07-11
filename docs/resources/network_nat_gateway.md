@@ -36,10 +36,10 @@ resource "mgc_network_nat_gateway" "my_ngateway" {
 
 - `name` (String) The name of the NAT Gateway.
 - `vpc_id` (String) The ID of the VPC where the NAT Gateway will be created.
-- `zone` (String) The zone of the NAT Gateway.
 
 ### Optional
 
+- `availability_zone` (String) The availability zone of the NAT Gateway.
 - `description` (String) The description of the NAT Gateway.
 
 ### Read-Only
