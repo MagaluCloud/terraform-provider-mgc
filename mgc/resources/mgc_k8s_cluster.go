@@ -34,8 +34,8 @@ type KubernetesClusterCreateResourceModel struct {
 	Version            types.String   `tfsdk:"version"`
 	CreatedAt          types.String   `tfsdk:"created_at"`
 	ID                 types.String   `tfsdk:"id"`
-	ServicesIpV4CIDR   types.String   `tfsdk:"services_ip_v4_cidr"`
-	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ip_v4_cidr"`
+	ServicesIpV4CIDR   types.String   `tfsdk:"services_ipv4_cidr"`
+	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ipv4_cidr"`
 }
 
 type k8sClusterResource struct {
@@ -122,7 +122,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"cluster_ip_v4_cidr": schema.StringAttribute{
+			"cluster_ipv4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster.",
 				Optional:    true,
 				Computed:    true,
@@ -131,7 +131,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"services_ip_v4_cidr": schema.StringAttribute{
+			"services_ipv4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster service.",
 				Optional:    true,
 				Computed:    true,
