@@ -16,8 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -34,29 +34,31 @@ type DBaaSClusterAddressModel struct {
 	Type    types.String `tfsdk:"type"`
 	Address types.String `tfsdk:"address"`
 	Port    types.String `tfsdk:"port"`
+	Purpose types.String `tfsdk:"purpose"`
 }
 
 type DBaaSClusterModel struct {
-	ID                     types.String `tfsdk:"id"`
-	Name                   types.String `tfsdk:"name"`
-	User                   types.String `tfsdk:"user"`
-	Password               types.String `tfsdk:"password"`
-	EngineName             types.String `tfsdk:"engine_name"`
-	EngineVersion          types.String `tfsdk:"engine_version"`
-	InstanceType           types.String `tfsdk:"instance_type"`
-	VolumeSize             types.Int64  `tfsdk:"volume_size"`
-	VolumeType             types.String `tfsdk:"volume_type"`
-	ParameterGroup         types.String `tfsdk:"parameter_group"`
-	BackupRetentionDays    types.Int64  `tfsdk:"backup_retention_days"`
-	BackupStartAt          types.String `tfsdk:"backup_start_at"`
-	Status                 types.String `tfsdk:"status"`
-	ApplyParametersPending types.Bool   `tfsdk:"apply_parameters_pending"`
-	CreatedAt              types.String `tfsdk:"created_at"`
-	UpdatedAt              types.String `tfsdk:"updated_at"`
-	StartedAt              types.String `tfsdk:"started_at"`
-	FinishedAt             types.String `tfsdk:"finished_at"`
-	InstanceTypeID         types.String `tfsdk:"instance_type_id"`
-	EngineID               types.String `tfsdk:"engine_id"`
+	ID                     types.String               `tfsdk:"id"`
+	Name                   types.String               `tfsdk:"name"`
+	User                   types.String               `tfsdk:"user"`
+	Password               types.String               `tfsdk:"password"`
+	EngineName             types.String               `tfsdk:"engine_name"`
+	EngineVersion          types.String               `tfsdk:"engine_version"`
+	InstanceType           types.String               `tfsdk:"instance_type"`
+	VolumeSize             types.Int64                `tfsdk:"volume_size"`
+	VolumeType             types.String               `tfsdk:"volume_type"`
+	ParameterGroup         types.String               `tfsdk:"parameter_group"`
+	BackupRetentionDays    types.Int64                `tfsdk:"backup_retention_days"`
+	BackupStartAt          types.String               `tfsdk:"backup_start_at"`
+	Status                 types.String               `tfsdk:"status"`
+	Addresses              []DBaaSClusterAddressModel `tfsdk:"addresses"`
+	ApplyParametersPending types.Bool                 `tfsdk:"apply_parameters_pending"`
+	CreatedAt              types.String               `tfsdk:"created_at"`
+	UpdatedAt              types.String               `tfsdk:"updated_at"`
+	StartedAt              types.String               `tfsdk:"started_at"`
+	FinishedAt             types.String               `tfsdk:"finished_at"`
+	InstanceTypeID         types.String               `tfsdk:"instance_type_id"`
+	EngineID               types.String               `tfsdk:"engine_id"`
 }
 
 type DBaaSClusterResource struct {
@@ -257,12 +259,40 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"apply_parameters_pending": schema.BoolAttribute{
-				Description: "Indicates if parameter changes are pending application.",
+			"addresses": schema.ListNestedAttribute{
+				Description: "Network addresses for connecting to the cluster.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
 				},
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"access": schema.StringAttribute{
+							Description: "Access type (e.g., 'public', 'private').",
+							Computed:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "Address type (e.g., 'read-write', 'read-only').",
+							Computed:    true,
+						},
+						"address": schema.StringAttribute{
+							Description: "The IP address or hostname.",
+							Computed:    true,
+						},
+						"port": schema.StringAttribute{
+							Description: "The port number.",
+							Computed:    true,
+						},
+						"purpose": schema.StringAttribute{
+							Description: "The port purpose ([READ_WRITE, READONLY, METRICS, LOGS]).",
+							Computed:    true,
+						},
+					},
+				},
+			},
+			"apply_parameters_pending": schema.BoolAttribute{
+				Description: "Indicates if parameters changes are pending application.",
+				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
 				Description: "Timestamp of when the cluster was created.",
@@ -469,6 +499,17 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	}
 	model.StartedAt = types.StringPointerValue(detail.StartedAt)
 	model.FinishedAt = types.StringPointerValue(detail.FinishedAt)
+	var modelAddresses []DBaaSClusterAddressModel
+	for _, lba := range detail.Addresses {
+		modelAddresses = append(modelAddresses, DBaaSClusterAddressModel{
+			Address: types.StringValue(lba.Address),
+			Port:    types.StringValue(lba.Port),
+			Access:  types.StringValue(string(lba.Access)),
+			Type:    types.StringValue(string(lba.Type)),
+			Purpose: types.StringValue(string(lba.Purpose)),
+		})
+	}
+	model.Addresses = modelAddresses
 	model.Password = types.StringNull()
 	model.User = types.StringNull()
 }

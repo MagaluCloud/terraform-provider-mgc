@@ -36,6 +36,7 @@ type dbaasClusterAddressDataModel struct {
 	Type    types.String `tfsdk:"type"`
 	Address types.String `tfsdk:"address"`
 	Port    types.String `tfsdk:"port"`
+	Purpose types.String `tfsdk:"purpose"`
 }
 
 func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClusterDataModel {
@@ -46,6 +47,7 @@ func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClust
 			Type:    types.StringValue(string(addr.Type)),
 			Address: types.StringValue(addr.Address),
 			Port:    types.StringValue(addr.Port),
+			Purpose: types.StringValue(string(addr.Purpose)),
 		})
 	}
 
@@ -130,6 +132,10 @@ func dbaasClusterAttributes() map[string]schema.Attribute {
 					},
 					"port": schema.StringAttribute{
 						Description: "The port number.",
+						Computed:    true,
+					},
+					"purpose": schema.StringAttribute{
+						Description: "The port purpose ([READ_WRITE, READONLY, METRICS, LOGS]).",
 						Computed:    true,
 					},
 				},
