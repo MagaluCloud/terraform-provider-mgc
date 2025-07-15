@@ -211,8 +211,8 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 		datasources.NewDataSourceDdbaasParameterGroup,
 		datasources.NewDataSourceDdbaasParameterGroups,
 		datasources.NewDataSourceDbParametersList,
-		// datasources.NewDBaaSClusterDataSource,
-		// datasources.NewDBaaSClustersDataSource,
+		datasources.NewDBaaSClusterDataSource,
+		datasources.NewDBaaSClustersDataSource,
 	}
 }
 
