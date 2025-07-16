@@ -61,6 +61,8 @@ resource "mgc_network_security_groups_rules" "allow_ssh_ipv6" {
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 terraform import mgc_network_security_groups_rules.example 123
 ```

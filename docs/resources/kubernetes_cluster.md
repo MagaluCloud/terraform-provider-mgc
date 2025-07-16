@@ -30,10 +30,12 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
 - `cluster_ipv4_cidr` (String) The IP address range of the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.
-- `enabled_server_group` (Boolean) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.
+- `enabled_server_group` (Boolean, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.
 - `services_ipv4_cidr` (String) The IP address range of the Kubernetes cluster service.
 - `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format.
 
@@ -45,6 +47,8 @@ resource "mgc_kubernetes_cluster" "cluster" {
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 terraform import mgc_kubernetes_cluster.cluster 123
