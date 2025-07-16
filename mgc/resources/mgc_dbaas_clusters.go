@@ -162,9 +162,6 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 			"engine_id": schema.StringAttribute{
 				Description: "ID of the database engine.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"instance_type": schema.StringAttribute{
 				Description: "Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.",
@@ -179,9 +176,6 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 			"instance_type_id": schema.StringAttribute{
 				Description: "ID of the instance type.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"volume_size": schema.Int64Attribute{
 				Description: "Size of the storage volume in GB. Cannot be changed after creation.",
