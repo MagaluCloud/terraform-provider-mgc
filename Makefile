@@ -21,8 +21,8 @@ DOCS_EXTRA_DIR  := $(SCRIPT_DIR)/docs-extra
 SUBCATEGORY_JSON := $(SCRIPT_DIR)/subcategory.json
 
 # External tools and paths
-TF_PLUGIN_DOCS  := github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@v0.19.4
-TERRAFORM_DOCS  := github.com/terraform-docs/terraform-docs@v0.15.0
+TF_PLUGIN_DOCS  := github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
+TERRAFORM_DOCS  := github.com/terraform-docs/terraform-docs@latest
 
 # Styling
 GREEN  := \033[0;32m

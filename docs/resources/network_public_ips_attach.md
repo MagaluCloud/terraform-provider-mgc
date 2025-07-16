@@ -31,6 +31,8 @@ resource "mgc_network_public_ips_attach" "example" {
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 terraform import mgc_network_public_ips_attach.example public_ip_id,interface_id
 ```
