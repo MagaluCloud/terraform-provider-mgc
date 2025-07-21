@@ -16,7 +16,7 @@ type DBaaSReplicaListModel struct {
 }
 
 type DataSourceDbReplicaList struct {
-	service dbSDK.ReplicaService
+	dbaasReplicas dbSDK.ReplicaService
 }
 
 func NewDataSourceDbReplicaList() datasource.DataSource {
@@ -36,7 +36,7 @@ func (r *DataSourceDbReplicaList) Configure(_ context.Context, req datasource.Co
 		resp.Diagnostics.AddError("invalid provider data", "expected tfutil.DataConfig")
 		return
 	}
-	r.service = dbSDK.New(&cfg.CoreConfig).Replicas()
+	r.dbaasReplicas = dbSDK.New(&cfg.CoreConfig).Replicas()
 }
 
 func (r *DataSourceDbReplicaList) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -137,7 +137,7 @@ func (r *DataSourceDbReplicaList) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	list, err := r.service.List(ctx, dbSDK.ListReplicaOptions{})
+	list, err := r.dbaasReplicas.List(ctx, dbSDK.ListReplicaOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
