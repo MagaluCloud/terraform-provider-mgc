@@ -35,6 +35,8 @@ output "security_group_attach_id" {
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 # For importing the resource into the state file you must provide the security group id and the network id separated by a comma.
 terraform import mgc_network_security_groups_attach.example 123,098

@@ -29,8 +29,10 @@ resource "mgc_network_vpcs_interfaces" "interface_example" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `availability_zone` (String) The availability zone of the VPC Interface
-- `subnet_ids` (List of String) The IDs of the subnets
+- `subnet_ids` (List of String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The IDs of the subnets
 
 ### Read-Only
 
@@ -39,6 +41,8 @@ resource "mgc_network_vpcs_interfaces" "interface_example" {
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 terraform import mgc_network_vpcs_interfaces.example 123

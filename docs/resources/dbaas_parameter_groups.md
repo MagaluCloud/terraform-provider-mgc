@@ -42,6 +42,8 @@ resource "mgc_dbaas_parameter_groups" "example" {
 
 Import is supported using the following syntax:
 
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
 ```shell
 terraform import mgc_dbaas_parameter_groups.example "parameter-group-id"
 ```
