@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"errors"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 
@@ -101,7 +100,7 @@ func (r *DBaaSParameterGroupsResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	engineID, err := r.validateAndGetEngineID(ctx, data.EngineName.ValueString(), data.EngineVersion.ValueString())
+	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.dbaasEngines.List, data.EngineName.ValueString(), data.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engine name", err.Error())
 		return
@@ -134,7 +133,7 @@ func (r *DBaaSParameterGroupsResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	engineName, engineVersion, err := r.getEngineNameAndVersionByID(ctx, p.EngineID)
+	engineName, engineVersion, err := tfutil.GetEngineNameAndVersionByID(ctx, r.dbaasEngines.Get, p.EngineID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -189,25 +188,4 @@ func (r *DBaaSParameterGroupsResource) Delete(ctx context.Context, req resource.
 
 func (r *DBaaSParameterGroupsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.Set(ctx, &DBaaSParametersModel{ID: types.StringValue(req.ID)})...)
-}
-
-func (r *DBaaSParameterGroupsResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, engine := range engines {
-		if engine.Name == engineName && engine.Version == engineVersion {
-			return engine.ID, nil
-		}
-	}
-	return "", errors.New("engine not found")
-}
-
-func (r *DBaaSParameterGroupsResource) getEngineNameAndVersionByID(ctx context.Context, engineID string) (name string, version string, err error) {
-	engine, err := r.dbaasEngines.Get(ctx, engineID)
-	if err != nil {
-		return "", "", err
-	}
-	return engine.Name, engine.Version, nil
 }
