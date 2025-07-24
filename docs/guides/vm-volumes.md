@@ -19,8 +19,8 @@ First, let's create a block storage volume:
 ```terraform
 resource "mgc_block_storage_volumes" "data_volume" {
   name              = "data-volume"
-  availability_zone = "br-ne1-a"  # Make sure this matches your VM's availability zone
-  size              = 100         # Size in GB
+  availability_zone = "br-ne1-a"  # Make sure this matches your VM availability zone
+  size              = 100         # Size in GiB
   type              = "cloud_nvme1k"
   encrypted         = true        # Optional: Enable encryption
 }
@@ -29,7 +29,7 @@ resource "mgc_block_storage_volumes" "data_volume" {
 Key parameters:
 
 - `name`: A descriptive name for your volume
-- `size`: Storage capacity in GB
+- `size`: Storage capacity in GiB
 - `type`: Performance characteristics (e.g., "cloud_nvme1k" for NVMe SSD)
 - `availability_zone`: Must match the zone where your VM is deployed
 - `encrypted`: Whether to encrypt the volume data (optional)
@@ -63,7 +63,7 @@ That's it! The volume is now attached to your VM. After the infrastructure is pr
 
 ## Creating Volume Snapshots
 
-Snapshots let you create point-in-time backups of your volumes. They're useful for data backup, cloning environments, or disaster recovery.
+Snapshots let you create point-in-time backups of your volumes. They are useful for data backup, cloning environments, or disaster recovery.
 
 ### 1. Creating a Snapshot of an Attached Volume
 

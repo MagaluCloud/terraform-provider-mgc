@@ -39,7 +39,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 - `name` (String) Name of the DBaaS instance. Must be unique within your account. Cannot be changed after creation.
 - `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.
 - `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database. Must start with a letter and contain only alphanumeric characters.
-- `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
+- `volume_size` (Number) Size of the storage volume in GiB. Can be increased but not decreased after creation.
 
 ### Optional
 

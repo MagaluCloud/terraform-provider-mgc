@@ -63,7 +63,7 @@ That's it! The volume is now attached to your VM. After the infrastructure is pr
 
 ## Creating Volume Snapshots
 
-Snapshots let you create point-in-time backups of your volumes. They're useful for data backup, cloning environments, or disaster recovery.
+Snapshots let you create point-in-time backups of your volumes. They are useful for data backup, cloning environments, or disaster recovery.
 
 ### 1. Creating a Snapshot of an Attached Volume
 

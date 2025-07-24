@@ -35,7 +35,7 @@ Key parameters:
 - `password`: Strong password meeting complexity requirements
 - `engine_name/version`: Database type and version
 - `instance_type`: Determines compute resources allocated
-- `volume_size`: Storage capacity in GB
+- `volume_size`: Storage capacity in GiB
 - `backup_*`: Configures automatic backups
 
 ## Creating a Database Cluster

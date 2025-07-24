@@ -39,7 +39,7 @@ Read-Only:
 - `description` (String) The description of the volume snapshot.
 - `id` (String) The unique identifier of the volume snapshot.
 - `name` (String) The name of the volume snapshot.
-- `size` (Number) The size of the snapshot in GB.
+- `size` (Number) The size of the snapshot in GiB.
 - `state` (String) The current state of the virtual machine instance.
 - `status` (String) The status of the virtual machine instance.
 - `type` (String) The type of the snapshot.
