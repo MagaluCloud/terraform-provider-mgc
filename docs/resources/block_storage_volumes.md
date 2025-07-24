@@ -27,7 +27,7 @@ resource "mgc_block_storage_volumes" "example_volume" {
 ### Required
 
 - `name` (String) The name of the volume.
-- `size` (Number) The size of the volume in GB.
+- `size` (Number) The size of the volume in GiB.
 - `type` (String) The name of the volume type.
 
 ### Optional

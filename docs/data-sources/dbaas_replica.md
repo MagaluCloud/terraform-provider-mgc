@@ -39,7 +39,7 @@ data "mgc_dbaas_replica" "replica" {
 - `started_at` (String) Start timestamp in RFC3339 format
 - `status` (String) Current replica status
 - `updated_at` (String) Last update timestamp in RFC3339 format
-- `volume_size` (Number) Volume size in GB
+- `volume_size` (Number) Volume size in GiB
 - `volume_type` (String) Volume type
 
 <a id="nestedatt--addresses"></a>

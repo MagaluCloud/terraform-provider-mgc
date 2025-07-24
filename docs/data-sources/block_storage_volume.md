@@ -41,7 +41,7 @@ output "my-volume" {
 - `disk_type` (String) The disk type of the block storage.
 - `encrypted` (Boolean) The encryption status of the block storage.
 - `name` (String) The name of the block storage.
-- `size` (Number) The size of the block storage in GB.
+- `size` (Number) The size of the block storage in GiB.
 - `state` (String) The current state of the virtual machine instance.
 - `status` (String) The status of the virtual machine instance.
 - `type_id` (String) The unique identifier of the block storage type.

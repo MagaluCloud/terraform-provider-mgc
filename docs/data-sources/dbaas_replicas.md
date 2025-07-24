@@ -42,7 +42,7 @@ Read-Only:
 - `started_at` (String) Start timestamp
 - `status` (String) Current status
 - `updated_at` (String) Last update timestamp
-- `volume_size` (Number) Volume size in GB
+- `volume_size` (Number) Volume size in GiB
 - `volume_type` (String) Volume type
 
 <a id="nestedatt--replicas--addresses"></a>
