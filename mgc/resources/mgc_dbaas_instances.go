@@ -78,8 +78,6 @@ type DBaaSInstanceModel struct {
 	Status              types.String `tfsdk:"status"`
 	InstanceTypeId      types.String `tfsdk:"instance_type_id"`
 	EngineID            types.String `tfsdk:"engine_id"`
-	SnapshotID          types.String `tfsdk:"snapshot_id"`
-	SnapshotSourceID    types.String `tfsdk:"snapshot_source_id"`
 }
 
 type DBaaSInstanceResource struct {
@@ -135,7 +133,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"user": schema.StringAttribute{
-				Description: "Master username for the database. Must start with a letter and contain only alphanumeric characters. Required when creating a new instance.",
+				Description: "Master username for the database. Must start with a letter and contain only alphanumeric characters.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
@@ -148,14 +146,14 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 						"must start with a letter and contain only alphanumeric characters",
 					),
 				},
+				Required:  true,
 				WriteOnly: true,
-				Optional:  true,
 			},
 			"password": schema.StringAttribute{
-				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters. Required when creating a new instance.",
+				Description: "Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.",
+				Required:    true,
 				Sensitive:   true,
 				WriteOnly:   true,
-				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
@@ -166,26 +164,24 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"engine_name": schema.StringAttribute{
-				Description: "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation. Required when creating a new instance.",
+				Description: "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.",
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
-				Optional: true,
-				Computed: true,
 			},
 			"engine_version": schema.StringAttribute{
-				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required when creating a new instance.",
+				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name.",
+				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
-				Optional: true,
-				Computed: true,
 			},
 			"engine_id": schema.StringAttribute{
 				Description: "Unique identifier for the database engine.",
@@ -230,7 +226,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"parameter_group": schema.StringAttribute{
-				Description: "ID of the parameter group to use for the instance. Not used when restoring from a snapshot.",
+				Description: "ID of the parameter group to use for the instance.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -241,7 +237,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"availability_zone": schema.StringAttribute{
-				Description: "Availability zone to use for the instance. Not used when restoring from a snapshot.",
+				Description: "Availability zone to use for the instance.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -255,26 +251,6 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "Status of the instance.",
 				Computed:    true,
 			},
-			"snapshot_id": schema.StringAttribute{
-				Description: "ID of the snapshot to use for the instance. Not used when creating a new instance.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"snapshot_source_id": schema.StringAttribute{
-				Description: "ID of the instance to use for the snapshot. Not used when creating a new instance.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
 		},
 	}
 }
@@ -283,66 +259,6 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 	var data DBaaSInstanceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if data.SnapshotID.ValueString() != "" {
-		if data.SnapshotSourceID.IsUnknown() {
-			resp.Diagnostics.AddError("Invalid ID", "For restoring a snapshot the snapshot source ID must be known")
-			return
-		}
-		getIntance, err := r.dbaasInstances.Get(ctx, data.SnapshotSourceID.ValueString(), dbSDK.GetInstanceOptions{})
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to get instance", err.Error())
-			return
-		}
-
-		var instanceTypeID string
-		if data.InstanceType.ValueString() != "" {
-			instanceTypeID, err = tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List,
-				data.InstanceType.ValueString(), getIntance.EngineID, dbaasInstanceProductFamily)
-			if err != nil {
-				resp.Diagnostics.AddError("Invalid instance type", err.Error())
-				return
-			}
-		}
-
-		engineDetails, err := r.dbaasEngines.Get(ctx, getIntance.EngineID)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to get engine details", err.Error())
-			return
-		}
-
-		req := dbSDK.RestoreSnapshotRequest{
-			Name:                data.Name.ValueString(),
-			InstanceTypeID:      instanceTypeID,
-			BackupRetentionDays: tfutil.ConvertInt64PointerToIntPointer(data.BackupRetentionDays.ValueInt64Pointer()),
-			BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
-			Volume: &dbSDK.InstanceVolumeRequest{
-				Size: *tfutil.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
-			},
-		}
-		createdInstance, err := r.dbaasInstances.RestoreSnapshot(ctx, data.SnapshotSourceID.ValueString(), data.SnapshotID.ValueString(), req)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to restore snapshot", err.Error())
-			return
-		}
-
-		data.ID = types.StringValue(createdInstance.ID)
-		data.InstanceTypeId = types.StringValue(instanceTypeID)
-		data.EngineID = types.StringValue(getIntance.EngineID)
-		data.EngineName = types.StringValue(engineDetails.Name)
-		data.EngineVersion = types.StringValue(engineDetails.Version)
-		data.Password = types.StringNull()
-		data.User = types.StringNull()
-
-		result, err := r.waitUntilInstanceStatusMatches(ctx, data.ID.ValueString(), DBaaSInstanceStatusActive.String())
-		if err != nil {
-			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-			return
-		}
-		data.Status = types.StringValue(string(result.Status))
-		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 

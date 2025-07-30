@@ -31,24 +31,22 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Required
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.
+- `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name.
 - `instance_type` (String) Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS instance. Must be unique within your account. Cannot be changed after creation.
+- `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters.
+- `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database. Must start with a letter and contain only alphanumeric characters.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
 ### Optional
 
-> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
-
-- `availability_zone` (String) Availability zone to use for the instance. Not used when restoring from a snapshot.
+- `availability_zone` (String) Availability zone to use for the instance.
 - `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS'). Default is 04:00:00.
-- `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation. Required when creating a new instance.
-- `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required when creating a new instance.
-- `parameter_group` (String) ID of the parameter group to use for the instance. Not used when restoring from a snapshot.
-- `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database. Must be at least 8 characters long and contain letters, numbers and special characters. Required when creating a new instance.
-- `snapshot_id` (String) ID of the snapshot to use for the instance. Not used when creating a new instance.
-- `snapshot_source_id` (String) ID of the instance to use for the snapshot. Not used when creating a new instance.
-- `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database. Must start with a letter and contain only alphanumeric characters. Required when creating a new instance.
+- `parameter_group` (String) ID of the parameter group to use for the instance.
 
 ### Read-Only
 
