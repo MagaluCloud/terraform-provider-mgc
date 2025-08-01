@@ -37,12 +37,12 @@ output "nodepool" {
 - `auto_scale_min_replicas` (Number) Minimum number of replicas for auto-scaling.
 - `availability_zones` (List of String) List of availability zones.
 - `created_at` (String) Creation timestamp.
-- `instance_template_disk_size` (Number) Disk size in GB for the instance template.
+- `instance_template_disk_size` (Number) Disk size in GiB for the instance template.
 - `instance_template_disk_type` (String) Disk type for the instance template.
 - `instance_template_flavor_id` (String) Flavor ID for the instance template.
 - `instance_template_flavor_name` (String) Flavor name for the instance template.
 - `instance_template_flavor_ram` (Number) RAM in MB for the instance template flavor.
-- `instance_template_flavor_size` (Number) Size in GB for the instance template flavor.
+- `instance_template_flavor_size` (Number) Size in GiB for the instance template flavor.
 - `instance_template_flavor_vcpu` (Number) Number of vCPUs for the instance template flavor.
 - `instance_template_node_image` (String) Node image for the instance template.
 - `labels` (Map of String) Labels attached to the nodepool.

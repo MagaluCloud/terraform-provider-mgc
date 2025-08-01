@@ -39,7 +39,7 @@ Read-Only:
 - `encrypted` (Boolean) The encryption status of the block storage.
 - `id` (String) The unique identifier of the volume snapshot.
 - `name` (String) The name of the block storage.
-- `size` (Number) The size of the block storage in GB.
+- `size` (Number) The size of the block storage in GiB.
 - `state` (String) The current state of the virtual machine instance.
 - `status` (String) The status of the virtual machine instance.
 - `type_id` (String) The unique identifier of the block storage type.
