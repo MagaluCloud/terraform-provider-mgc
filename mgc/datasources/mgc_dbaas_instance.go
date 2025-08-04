@@ -14,7 +14,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbInstance{}
 
 type DataSourceDbInstance struct {
-	instances dbSDK.InstanceService
+	dbaasInstances dbSDK.InstanceService
 }
 
 type dbInstanceDataSourceModel struct {
@@ -50,7 +50,7 @@ func (r *DataSourceDbInstance) Configure(ctx context.Context, req datasource.Con
 		return
 	}
 
-	r.instances = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DataSourceDbInstance) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -132,7 +132,7 @@ func (r *DataSourceDbInstance) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	instance, err := r.instances.Get(ctx, data.ID.ValueString(), dbSDK.GetInstanceOptions{})
+	instance, err := r.dbaasInstances.Get(ctx, data.ID.ValueString(), dbSDK.GetInstanceOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return

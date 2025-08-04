@@ -22,7 +22,7 @@ type DBaaSParameterModel struct {
 }
 
 type DBaaSParameterResource struct {
-	ParameterService dbSDK.ParameterService
+	dbaasParameters dbSDK.ParameterService
 }
 
 func NewDBaaSParameterResource() resource.Resource {
@@ -42,7 +42,7 @@ func (r *DBaaSParameterResource) Configure(ctx context.Context, req resource.Con
 		resp.Diagnostics.AddError("Invalid provider data", "expected tfutil.DataConfig")
 		return
 	}
-	r.ParameterService = dbSDK.New(&cfg.CoreConfig).Parameters()
+	r.dbaasParameters = dbSDK.New(&cfg.CoreConfig).Parameters()
 }
 
 func (r *DBaaSParameterResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -88,7 +88,7 @@ func (r *DBaaSParameterResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	created, err := r.ParameterService.Create(ctx, data.ParameterGroupID.ValueString(), dbSDK.ParameterCreateRequest{
+	created, err := r.dbaasParameters.Create(ctx, data.ParameterGroupID.ValueString(), dbSDK.ParameterCreateRequest{
 		Name:  data.Name.ValueString(),
 		Value: s,
 	})
@@ -106,7 +106,7 @@ func (r *DBaaSParameterResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	all, err := r.ParameterService.List(ctx, dbSDK.ListParametersOptions{
+	all, err := r.dbaasParameters.List(ctx, dbSDK.ListParametersOptions{
 		ParameterGroupID: data.ParameterGroupID.ValueString(),
 	})
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *DBaaSParameterResource) Update(ctx context.Context, req resource.Update
 	}
 
 	currentData.Value = data.Value
-	_, err = r.ParameterService.Update(ctx, currentData.ParameterGroupID.ValueString(), currentData.ID.ValueString(), dbSDK.ParameterUpdateRequest{
+	_, err = r.dbaasParameters.Update(ctx, currentData.ParameterGroupID.ValueString(), currentData.ID.ValueString(), dbSDK.ParameterUpdateRequest{
 		Value: s,
 	})
 	if err != nil {
@@ -172,7 +172,7 @@ func (r *DBaaSParameterResource) Delete(ctx context.Context, req resource.Delete
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := r.ParameterService.Delete(ctx, data.ParameterGroupID.ValueString(), data.ID.ValueString())
+	err := r.dbaasParameters.Delete(ctx, data.ParameterGroupID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 	}
