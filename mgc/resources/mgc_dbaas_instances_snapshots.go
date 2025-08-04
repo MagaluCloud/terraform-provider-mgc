@@ -42,7 +42,7 @@ type DBaaSInstanceSnapshotModel struct {
 }
 
 type DBaaSInstanceSnapshotResource struct {
-	instanceService dbSDK.InstanceService
+	dbaasInstances dbSDK.InstanceService
 }
 
 func NewDBaaSInstanceSnapshotResource() resource.Resource {
@@ -63,7 +63,7 @@ func (r *DBaaSInstanceSnapshotResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.instanceService = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
 }
 
 func (r *DBaaSInstanceSnapshotResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -106,7 +106,7 @@ func (r *DBaaSInstanceSnapshotResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	created, err := r.instanceService.CreateSnapshot(ctx, data.InstanceID.ValueString(), dbSDK.SnapshotCreateRequest{
+	created, err := r.dbaasInstances.CreateSnapshot(ctx, data.InstanceID.ValueString(), dbSDK.SnapshotCreateRequest{
 		Name:        data.Name.ValueString(),
 		Description: data.Description.ValueStringPointer(),
 	})
@@ -131,7 +131,7 @@ func (r *DBaaSInstanceSnapshotResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	snapshot, err := r.instanceService.GetSnapshot(ctx, data.InstanceID.ValueString(), data.ID.ValueString())
+	snapshot, err := r.dbaasInstances.GetSnapshot(ctx, data.InstanceID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -158,7 +158,7 @@ func (r *DBaaSInstanceSnapshotResource) Update(ctx context.Context, req resource
 	currentData.Name = planData.Name
 	currentData.Description = planData.Description
 
-	_, err := r.instanceService.UpdateSnapshot(ctx,
+	_, err := r.dbaasInstances.UpdateSnapshot(ctx,
 		currentData.InstanceID.ValueString(),
 		currentData.ID.ValueString(),
 		dbSDK.SnapshotUpdateRequest{
@@ -181,7 +181,7 @@ func (r *DBaaSInstanceSnapshotResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.instanceService.DeleteSnapshot(ctx, data.InstanceID.ValueString(), data.ID.ValueString())
+	err := r.dbaasInstances.DeleteSnapshot(ctx, data.InstanceID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -212,7 +212,7 @@ func (r *DBaaSInstanceSnapshotResource) waitUntilSnapshotStatusMatches(ctx conte
 		case <-timeoutCtx.Done():
 			return fmt.Errorf("timeout waiting for snapshot %s to reach status %s", snapshotID, status)
 		case <-time.After(10 * time.Second):
-			snapshot, err := r.instanceService.GetSnapshot(ctx, instanceID, snapshotID)
+			snapshot, err := r.dbaasInstances.GetSnapshot(ctx, instanceID, snapshotID)
 			if err != nil {
 				return err
 			}

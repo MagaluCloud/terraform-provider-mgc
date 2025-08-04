@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"errors"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 
@@ -25,8 +24,8 @@ type DBaaSParametersModel struct {
 }
 
 type DBaaSParameterGroupsResource struct {
-	ParametersService dbSDK.ParameterGroupService
-	dbaasEngines      dbSDK.EngineService
+	dbaasParameterGroups dbSDK.ParameterGroupService
+	dbaasEngines         dbSDK.EngineService
 }
 
 func NewDBaaSParameterGroupsResource() resource.Resource {
@@ -47,7 +46,7 @@ func (r *DBaaSParameterGroupsResource) Configure(ctx context.Context, req resour
 		return
 	}
 
-	r.ParametersService = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
+	r.dbaasParameterGroups = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
 	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
 }
 
@@ -101,13 +100,13 @@ func (r *DBaaSParameterGroupsResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	engineID, err := r.validateAndGetEngineID(ctx, data.EngineName.ValueString(), data.EngineVersion.ValueString())
+	engineID, err := tfutil.ValidateAndGetEngineID(ctx, r.dbaasEngines.List, data.EngineName.ValueString(), data.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engine name", err.Error())
 		return
 	}
 
-	created, err := r.ParametersService.Create(ctx, dbSDK.ParameterGroupCreateRequest{
+	created, err := r.dbaasParameterGroups.Create(ctx, dbSDK.ParameterGroupCreateRequest{
 		EngineID:    engineID,
 		Name:        data.Name.ValueString(),
 		Description: data.Description.ValueStringPointer(),
@@ -128,13 +127,13 @@ func (r *DBaaSParameterGroupsResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	p, err := r.ParametersService.Get(ctx, data.ID.ValueString())
+	p, err := r.dbaasParameterGroups.Get(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
 
-	engineName, engineVersion, err := r.getEngineNameAndVersionByID(ctx, p.EngineID)
+	engineName, engineVersion, err := tfutil.GetEngineNameAndVersionByID(ctx, r.dbaasEngines.Get, p.EngineID)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -162,7 +161,7 @@ func (r *DBaaSParameterGroupsResource) Update(ctx context.Context, req resource.
 
 	currentData.Description = data.Description
 	currentData.Name = data.Name
-	_, err := r.ParametersService.Update(ctx, currentData.ID.ValueString(), dbSDK.ParameterGroupUpdateRequest{
+	_, err := r.dbaasParameterGroups.Update(ctx, currentData.ID.ValueString(), dbSDK.ParameterGroupUpdateRequest{
 		Name:        data.Name.ValueStringPointer(),
 		Description: data.Description.ValueStringPointer(),
 	})
@@ -180,7 +179,7 @@ func (r *DBaaSParameterGroupsResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.ParametersService.Delete(ctx, data.ID.ValueString())
+	err := r.dbaasParameterGroups.Delete(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -189,25 +188,4 @@ func (r *DBaaSParameterGroupsResource) Delete(ctx context.Context, req resource.
 
 func (r *DBaaSParameterGroupsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.Set(ctx, &DBaaSParametersModel{ID: types.StringValue(req.ID)})...)
-}
-
-func (r *DBaaSParameterGroupsResource) validateAndGetEngineID(ctx context.Context, engineName string, engineVersion string) (string, error) {
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, engine := range engines {
-		if engine.Name == engineName && engine.Version == engineVersion {
-			return engine.ID, nil
-		}
-	}
-	return "", errors.New("engine not found")
-}
-
-func (r *DBaaSParameterGroupsResource) getEngineNameAndVersionByID(ctx context.Context, engineID string) (name string, version string, err error) {
-	engine, err := r.dbaasEngines.Get(ctx, engineID)
-	if err != nil {
-		return "", "", err
-	}
-	return engine.Name, engine.Version, nil
 }

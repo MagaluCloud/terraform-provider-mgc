@@ -3,6 +3,7 @@ package tfutil
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 )
@@ -13,10 +14,7 @@ type GetEngineFunc func(ctx context.Context, id string) (*dbSDK.EngineDetail, er
 type GetInstanceTypeFunc func(ctx context.Context, id string) (*dbSDK.InstanceType, error)
 
 func ValidateAndGetEngineID(ctx context.Context, listEngineFunc ListEngineFunc, engineName string, engineVersion string) (string, error) {
-	active := "ACTIVE"
-	engines, err := listEngineFunc(ctx, dbSDK.ListEngineOptions{
-		Status: &active,
-	})
+	engines, err := listEngineFunc(ctx, dbSDK.ListEngineOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -44,7 +42,7 @@ func ValidateAndGetInstanceTypeID(ctx context.Context, listInstanceTypeFunc List
 			return instance.ID, nil
 		}
 	}
-	return "", errors.New("instance type not found, not active or not compatible with single instance family")
+	return "", fmt.Errorf("instance type not found, not active or not compatible with %s family", compatibleProduct)
 }
 
 func GetEngineNameAndVersionByID(ctx context.Context, getEngineFunc GetEngineFunc, engineID string) (name string, version string, err error) {

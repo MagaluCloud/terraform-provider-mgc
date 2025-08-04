@@ -36,6 +36,7 @@ type dbaasClusterAddressDataModel struct {
 	Type    types.String `tfsdk:"type"`
 	Address types.String `tfsdk:"address"`
 	Port    types.String `tfsdk:"port"`
+	Purpose types.String `tfsdk:"purpose"`
 }
 
 func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClusterDataModel {
@@ -46,6 +47,7 @@ func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClust
 			Type:    types.StringValue(string(addr.Type)),
 			Address: types.StringValue(addr.Address),
 			Port:    types.StringValue(addr.Port),
+			Purpose: types.StringValue(string(addr.Purpose)),
 		})
 	}
 
@@ -72,8 +74,8 @@ func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClust
 func dbaasClusterAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Description: "Unique identifier for the DBaaS cluster.",
-			Computed:    true,
+			Description: "ID of the cluster to fetch",
+			Required:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "Name of the DBaaS cluster.",
@@ -132,6 +134,10 @@ func dbaasClusterAttributes() map[string]schema.Attribute {
 						Description: "The port number.",
 						Computed:    true,
 					},
+					"purpose": schema.StringAttribute{
+						Description: "The port purpose ([READ_WRITE, READONLY, METRICS, LOGS]).",
+						Computed:    true,
+					},
 				},
 			},
 		},
@@ -159,7 +165,7 @@ func dbaasClusterAttributes() map[string]schema.Attribute {
 }
 
 type DBaaSClusterDataSource struct {
-	clusterService dbSDK.ClusterService
+	dbaasClusters dbSDK.ClusterService
 }
 
 type dbaasClusterDataSourceModel struct {
@@ -198,7 +204,7 @@ func (ds *DBaaSClusterDataSource) Configure(ctx context.Context, req datasource.
 		resp.Diagnostics.AddError("Failed to get provider data", "Provider data has unexpected type")
 		return
 	}
-	ds.clusterService = dbSDK.New(&dataConfig.CoreConfig).Clusters()
+	ds.dbaasClusters = dbSDK.New(&dataConfig.CoreConfig).Clusters()
 }
 
 func (ds *DBaaSClusterDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -220,7 +226,7 @@ func (ds *DBaaSClusterDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	sdkCluster, err := ds.clusterService.Get(ctx, config.ID.ValueString())
+	sdkCluster, err := ds.dbaasClusters.Get(ctx, config.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
