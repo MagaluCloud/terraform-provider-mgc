@@ -14,10 +14,7 @@ type GetEngineFunc func(ctx context.Context, id string) (*dbSDK.EngineDetail, er
 type GetInstanceTypeFunc func(ctx context.Context, id string) (*dbSDK.InstanceType, error)
 
 func ValidateAndGetEngineID(ctx context.Context, listEngineFunc ListEngineFunc, engineName string, engineVersion string) (string, error) {
-	active := "ACTIVE"
-	engines, err := listEngineFunc(ctx, dbSDK.ListEngineOptions{
-		Status: &active,
-	})
+	engines, err := listEngineFunc(ctx, dbSDK.ListEngineOptions{})
 	if err != nil {
 		return "", err
 	}
