@@ -16,7 +16,7 @@ import (
 var _ datasource.DataSource = &DataSourceDbEngines{}
 
 type DataSourceDbEngines struct {
-	dbEngines dbSDK.EngineService
+	dbaasEngines dbSDK.EngineService
 }
 
 type dbEngineModel struct {
@@ -49,7 +49,7 @@ func (r *DataSourceDbEngines) Configure(ctx context.Context, req datasource.Conf
 		return
 	}
 
-	r.dbEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
+	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
 }
 
 func (r *DataSourceDbEngines) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -98,7 +98,7 @@ func (r *DataSourceDbEngines) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	limit := 50
-	engines, err := r.dbEngines.List(ctx, dbSDK.ListEngineOptions{
+	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{
 		Status: data.Status.ValueStringPointer(),
 		Limit:  &limit,
 	})
