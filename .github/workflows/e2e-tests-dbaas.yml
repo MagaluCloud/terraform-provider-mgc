@@ -1,0 +1,199 @@
+name: E2E DBaaS Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    types: [opened, synchronize, reopened]
+    
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dbaas_single_instance_mysql:
+    name: DBaaS E2E Tests - Single Instance MySQL ${{ matrix.engine_version }}
+
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: true
+
+      matrix:
+        engine_version: [ "8.0", "8.4" ]
+
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+      with:
+        go-version: ${{ vars.GO_VERSION || '1.24' }} # settings > secrets and variables > variables > GO_VERSION
+        cache: true
+        cache-dependency-path: |
+          **/go.mod
+          **/go.sum
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Build Binary from Source
+      run: go build -v
+
+    - name: Override Provider with Build
+      run: |
+        PWD=$(pwd)
+        sed -i "s|BINARY_PATH|$PWD|g" .terraformrc_template
+        cp .terraformrc_template ~/.terraformrc
+
+    - name: Install Image Packages Requirements
+      run: |
+        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+        gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt update && sudo apt install terraform
+
+    - name: E2E Test 
+      run: |
+        DB_TYPE="single_instance"
+        ENGINE_NAME="mysql"
+        ENGINE_VERSION=${{ matrix.engine_version }}
+        API_KEY=${{ secrets.SECRET_API_KEY_PROD }}
+        ENV="prod"
+        REGION="br-se1"
+        DB_PREFIX="ci-github-${{ github.run_id }}"
+        DB_PASSWORD="admin1234"
+        make e2e-tests-dbaas-run S="1" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="3" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="4" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="5" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-clean R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+
+  dbaas_single_instance_postgresql:
+    name: DBaaS E2E Tests - Single Instance Postgresql ${{ matrix.engine_version }}
+
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: true
+
+      matrix:
+        engine_version: [ "16" ]
+
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+      with:
+        go-version: ${{ vars.GO_VERSION || '1.24' }} # settings > secrets and variables > variables > GO_VERSION
+        cache: true
+        cache-dependency-path: |
+          **/go.mod
+          **/go.sum
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Build Binary from Source
+      run: go build -v
+
+    - name: Override Provider with Build
+      run: |
+        PWD=$(pwd)
+        sed -i "s|BINARY_PATH|$PWD|g" .terraformrc_template
+        cp .terraformrc_template ~/.terraformrc
+
+    - name: Install Image Packages Requirements
+      run: |
+        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+        gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt update && sudo apt install terraform
+
+    - name: E2E Test 
+      run: |
+        DB_TYPE="single_instance"
+        ENGINE_NAME="postgresql"
+        ENGINE_VERSION=${{ matrix.engine_version }}
+        API_KEY=${{ secrets.SECRET_API_KEY_PROD }}
+        ENV="prod"
+        REGION="br-se1"
+        DB_PREFIX="ci-github-${{ github.run_id }}"
+        DB_PASSWORD="admin1234"
+        make e2e-tests-dbaas-run S="1" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="3" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="4" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-clean R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+
+  dbaas_cluster_mysql:
+    name: DBaaS E2E Tests - Cluster MySQL ${{ matrix.engine_version }}
+
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: true
+
+      matrix:
+        engine_version: [ "8.0", "8.4" ]
+
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+      with:
+        go-version: ${{ vars.GO_VERSION || '1.24' }} # settings > secrets and variables > variables > GO_VERSION
+        cache: true
+        cache-dependency-path: |
+          **/go.mod
+          **/go.sum
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Build Binary from Source
+      run: go build -v
+
+    - name: Override Provider with Build
+      run: |
+        PWD=$(pwd)
+        sed -i "s|BINARY_PATH|$PWD|g" .terraformrc_template
+        cp .terraformrc_template ~/.terraformrc
+
+    - name: Install Image Packages Requirements
+      run: |
+        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+        gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt update && sudo apt install terraform
+
+    - name: E2E Test 
+      run: |
+        DB_TYPE="cluster"
+        ENGINE_NAME="mysql"
+        ENGINE_VERSION=${{ matrix.engine_version }}
+        API_KEY=${{ secrets.SECRET_API_KEY_PROD }}
+        ENV="prod"
+        REGION="br-se1"
+        DB_PREFIX="ci-github-${{ github.run_id }}"
+        DB_PASSWORD="admin1234"
+        make e2e-tests-dbaas-run S="1" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-run S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-clean R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}

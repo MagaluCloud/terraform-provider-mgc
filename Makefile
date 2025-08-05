@@ -137,3 +137,9 @@ clean: ## Clean build artifacts
 
 all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 	@echo -e "$(GREEN)All tasks completed successfully!$(NC)"
+
+e2e-tests-dbaas-run: ## make dbaas-run S=<step> U=<user> P=<password> R=<region> E=<env> A=<api-key> N=<engine_name> V=<engine_version> T=<db_type>
+	@bash e2e-tests/dbaas/run.sh "${R}" "${E}" "${A}" "${N}" "${V}" "${S}" "${U}" "${P}" "${T}"
+
+e2e-tests-dbaas-clean: ## make dbaas-clean R=<region> E=<env> A=<api-key> N=<engine_name> V=<engine_version> T=<db_type>
+	@bash e2e-tests/dbaas/clean.sh "${R}" "${E}" "${A}" "${N}" "${V}" "${T}"
