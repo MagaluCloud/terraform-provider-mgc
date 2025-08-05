@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"slices"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
@@ -367,6 +370,19 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
+	}
+
+	_, err = r.waitUntilInstanceStatusMatches(ctx, data.ID.ValueString(), StatusDeleted)
+	if err != nil {
+		switch e := err.(type) {
+		case *clientSDK.HTTPError:
+			if e.StatusCode == http.StatusNotFound {
+				return
+			}
+		default:
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 }
 
