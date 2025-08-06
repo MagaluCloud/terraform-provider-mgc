@@ -51,4 +51,5 @@ Read-Only:
 - `access` (String) Access type (e.g., 'public', 'private').
 - `address` (String) The IP address or hostname.
 - `port` (String) The port number.
+- `purpose` (String) The port purpose ([READ_WRITE, READONLY, METRICS, LOGS]).
 - `type` (String) Address type (e.g., 'read-write', 'read-only').

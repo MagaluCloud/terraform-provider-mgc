@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
 	tfutil "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
@@ -186,7 +189,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID)
+	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, "running", "provisioned")
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		data.ID = types.StringValue(cluster.ID)
@@ -198,18 +201,18 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
-func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string) (k8sSDK.Cluster, error) {
+func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string, states ...string) (k8sSDK.Cluster, error) {
 	var result *k8sSDK.Cluster
 	var err error
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
 		time.Sleep(1 * time.Minute)
 		result, err = r.k8sCluster.Get(ctx, clusterId)
 		if err != nil {
-			return *result, err
+			return k8sSDK.Cluster{}, err
 		}
 		state := strings.ToLower(result.Status.State)
 
-		if state == "running" || state == "provisioned" {
+		if slices.Contains(states, state) {
 			return *result, nil
 		}
 		if state == "failed" {
@@ -263,6 +266,19 @@ func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequ
 	err := r.k8sCluster.Delete(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	if _, err := r.GetClusterPooling(ctx, data.ID.ValueString(), "deleted"); err != nil {
+		switch e := err.(type) {
+		case *clientSDK.HTTPError:
+			if e.StatusCode == http.StatusNotFound {
+				return
+			}
+		default:
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 }
 
