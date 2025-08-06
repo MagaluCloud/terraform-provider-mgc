@@ -2,10 +2,14 @@ package resources
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -27,11 +31,11 @@ type LoadBalancerModel struct {
 	ID              types.String `tfsdk:"id"`
 	Description     types.String `tfsdk:"description"`
 	PanicThreshold  types.Int64  `tfsdk:"panic_threshold"`
-	PublicIPID      types.String `tfsdk:"public_ip_id"`
 	SubnetpoolID    types.String `tfsdk:"subnetpool_id"`
 	Type            types.String `tfsdk:"type"`
 	Visibility      types.String `tfsdk:"visibility"`
 	VPCID           types.String `tfsdk:"vpc_id"`
+	PublicIPID      types.String `tfsdk:"public_ip_id"`
 	ACLs            types.List   `tfsdk:"acls"`
 	Backends        types.List   `tfsdk:"backends"`
 	HealthChecks    types.List   `tfsdk:"health_checks"`
@@ -100,6 +104,7 @@ type TLSCertificateModel struct {
 
 // LoadBalancerResource representa o recurso do load balancer
 type LoadBalancerResource struct {
+	lbNetwork               lbSDK.NetworkLoadBalancerService
 	lbNetworkBackend        lbSDK.NetworkBackendService
 	lbNetworkACL            lbSDK.NetworkACLService
 	lbNetworkHealthCheck    lbSDK.NetworkHealthCheckService
@@ -113,7 +118,7 @@ func NewLoadBalancerResource() resource.Resource {
 }
 
 func (r *LoadBalancerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_loadbalancers_network_loadbalancers"
+	resp.TypeName = req.ProviderTypeName + "_loadbalancers_network"
 }
 
 func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -128,6 +133,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 	}
 
 	lbaasClient := lbSDK.New(&dataConfig.CoreConfig)
+	r.lbNetwork = lbaasClient.NetworkLoadBalancers()
 	r.lbNetworkBackend = lbaasClient.NetworkBackends()
 	r.lbNetworkACL = lbaasClient.NetworkACLs()
 	r.lbNetworkHealthCheck = lbaasClient.NetworkHealthChecks()
@@ -153,18 +159,15 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"panic_threshold": schema.Int64Attribute{
 				Description: "The panic threshold percentage for the load balancer.",
+				WriteOnly:   true, // todo: constando apenas no payload de create.
 				Optional:    true,
-				Computed:    true,
 				Validators: []validator.Int64{
 					int64validator.Between(1, 100),
 				},
 			},
 			"public_ip_id": schema.StringAttribute{
-				Description: "The ID of the public IP associated with the load balancer.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Description: "The public IPs associated with the load balancer.",
+				Computed:    true,
 			},
 			"subnetpool_id": schema.StringAttribute{
 				Description: "The ID of the subnet pool for the load balancer.",
@@ -454,29 +457,55 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		"vpc_id":      data.VPCID.ValueString(),
 	})
 
-	// TODO: Implementar a criação do load balancer usando o SDK
-	// createdLB, err := r.loadBalancerService.Create(ctx, loadBalancerSDK.CreateLoadBalancerRequest{
-	//     Description:     data.Description.ValueStringPointer(),
-	//     PanicThreshold: data.PanicThreshold.ValueInt64Pointer(),
-	//     PublicIPID:     data.PublicIPID.ValueString(),
-	//     SubnetpoolID:   data.SubnetpoolID.ValueString(),
-	//     Type:           data.Type.ValueString(),
-	//     Visibility:     data.Visibility.ValueString(),
-	//     VPCID:          data.VPCID.ValueString(),
-	//     ACLs:           r.convertACLsToSDK(data.ACLs),
-	//     Backends:       r.convertBackendsToSDK(data.Backends),
-	//     HealthChecks:   r.convertHealthChecksToSDK(data.HealthChecks),
-	//     Listeners:      r.convertListenersToSDK(data.Listeners),
-	//     TLSCertificates: r.convertTLSCertificatesToSDK(data.TLSCertificates),
-	// })
+	wRequest := lbSDK.CreateNetworkLoadBalancerRequest{}
+	wRequest.Description = data.Description.ValueStringPointer()
+	wRequest.PanicThreshold = new(int)
+	wRequest.SubnetPoolID = data.SubnetpoolID.ValueStringPointer()
+	wRequest.Type = data.Type.ValueStringPointer()
+	wRequest.Visibility = lbSDK.LoadBalancerVisibility(data.Visibility.ValueString())
+	wRequest.VPCID = data.VPCID.ValueString()
+	wRequest.PublicIPID = data.PublicIPID.ValueStringPointer()
 
-	// if err != nil {
-	//     resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-	//     return
-	// }
+	// TODO
+	if !data.ACLs.IsNull() {
+		wRequest.ACLs = []lbSDK.NetworkAclRequest{}
+	}
 
-	// data.ID = types.StringValue(createdLB.ID)
-	// resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	if !data.Backends.IsNull() {
+		wRequest.Backends = []lbSDK.NetworkBackendRequest{}
+	}
+
+	if !data.HealthChecks.IsNull() {
+		wRequest.HealthChecks = []lbSDK.NetworkHealthCheckRequest{}
+	}
+
+	if !data.Listeners.IsNull() {
+		wRequest.Listeners = []lbSDK.NetworkListenerRequest{}
+	}
+
+	if !data.TLSCertificates.IsNull() {
+		wRequest.TLSCertificates = []lbSDK.NetworkTLSCertificateRequest{}
+	}
+
+	lbID, err := r.lbNetwork.Create(ctx, wRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	lbSdk, err := r.waitUntilLbaasStatusMatches(ctx, lbID, "active")
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	err = r.toTerraformModel(ctx, lbSdk, &data, resp.Diagnostics)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
 func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -486,83 +515,127 @@ func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// TODO: Implementar a leitura do load balancer usando o SDK
-	// lb, err := r.loadBalancerService.Get(ctx, data.ID.ValueString())
-	// if err != nil {
-	//     resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-	//     return
-	// }
+	lb, err := r.readAPI(ctx, data.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
 
-	// data = r.toTerraformModel(ctx, lb)
-	// resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	err = r.toTerraformModel(ctx, lb, &data, resp.Diagnostics)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
 func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data LoadBalancerModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// TODO: Implementar a atualização do load balancer usando o SDK
-	// _, err := r.loadBalancerService.Update(ctx, data.ID.ValueString(), loadBalancerSDK.UpdateLoadBalancerRequest{
-	//     Description:     data.Description.ValueStringPointer(),
-	//     PanicThreshold: data.PanicThreshold.ValueInt64Pointer(),
-	//     ACLs:           r.convertACLsToSDK(data.ACLs),
-	//     Backends:       r.convertBackendsToSDK(data.Backends),
-	//     HealthChecks:   r.convertHealthChecksToSDK(data.HealthChecks),
-	//     Listeners:      r.convertListenersToSDK(data.Listeners),
-	//     TLSCertificates: r.convertTLSCertificatesToSDK(data.TLSCertificates),
-	// })
-
-	// if err != nil {
-	//     resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-	//     return
-	// }
-
-	// resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	// TODO
 }
 
 func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data LoadBalancerModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// TODO: Implementar a exclusão do load balancer usando o SDK
-	// err := r.loadBalancerService.Delete(ctx, data.ID.ValueString())
-	// if err != nil {
-	//     resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
-	//     return
-	// }
+	// TODO
 }
 
 func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// TODO: Implementar métodos auxiliares para conversão de dados
-// func (r *LoadBalancerResource) convertACLsToSDK(acls types.List) []loadBalancerSDK.ACL {
-//     // Implementar conversão
-// }
+func (r *LoadBalancerResource) readAPI(ctx context.Context, lbID string) (*lbSDK.NetworkLoadBalancerResponse, error) {
+	lb, err := r.lbNetwork.Get(ctx, lbSDK.GetNetworkLoadBalancerRequest{LoadBalancerID: lbID})
+	if err != nil {
+		return nil, err
+	}
+	return lb, nil
+}
 
-// func (r *LoadBalancerResource) convertBackendsToSDK(backends types.List) []loadBalancerSDK.Backend {
-//     // Implementar conversão
-// }
+func (r *LoadBalancerResource) waitUntilLbaasStatusMatches(ctx context.Context, lbaasID string, status ...string) (*lbSDK.NetworkLoadBalancerResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, LoadBalancerTimeout)
+	defer cancel()
 
-// func (r *LoadBalancerResource) convertHealthChecksToSDK(healthChecks types.List) []loadBalancerSDK.HealthCheck {
-//     // Implementar conversão
-// }
+	for {
+		select {
+		case <-timeoutCtx.Done():
 
-// func (r *LoadBalancerResource) convertListenersToSDK(listeners types.List) []loadBalancerSDK.Listener {
-//     // Implementar conversão
-// }
+			return nil, fmt.Errorf("timeout waiting for resource %s to reach status %s", lbaasID, status)
+		case <-time.After(10 * time.Second):
+			instance, err := r.readAPI(ctx, lbaasID)
+			if err != nil {
+				return nil, err
+			}
 
-// func (r *LoadBalancerResource) convertTLSCertificatesToSDK(certificates types.List) []loadBalancerSDK.TLSCertificate {
-//     // Implementar conversão
-// }
+			if slices.Contains(status, instance.Status) {
+				return instance, nil
+			}
+			if strings.Contains(strings.ToLower(instance.Status), "error") {
+				return nil, fmt.Errorf("instance %s is in error state: %s", lbaasID, instance.Status)
+			}
+		}
+	}
+}
 
-// func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb *loadBalancerSDK.LoadBalancer) LoadBalancerModel {
-//     // Implementar conversão
-// }
+func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb *lbSDK.NetworkLoadBalancerResponse, model *LoadBalancerModel, diags diag.Diagnostics) error {
+	if lb == nil {
+		return fmt.Errorf("programmer error: lb is nil")
+	}
+
+	if model == nil {
+		model = &LoadBalancerModel{}
+	}
+
+	// CAMPOS
+	// data.ID
+	// data.Description
+	// data.PanicThreshold  = SETADO COMO WRITE ONLY, VERIFICAR COM API SE SERÁ RETORNADO
+	// data.SubnetpoolID
+	// data.Type
+	// data.Visibility
+	// data.VPCID
+	// data.PublicIPID = AGUARDANDO ALTERAÇÃO DA API
+
+	model.ID = types.StringValue(lb.ID)
+
+	if lb.Description != nil {
+		model.Description = types.StringPointerValue(lb.Description)
+	}
+
+	model.PublicIPID = types.StringValue("TODO - AGUARDANDO TIME DE LBAAS AJUSTAR RETORNO")
+	if lb.SubnetPoolID != nil {
+		model.SubnetpoolID = types.StringPointerValue(lb.SubnetPoolID)
+	}
+
+	// model.PanicThreshold  // READ ONLY? NÃO ESTÁ RETORNANDO
+	model.Type = types.StringValue(lb.Type)
+	model.Visibility = types.StringValue(string(lb.Visibility))
+	model.VPCID = types.StringValue(lb.VPCID)
+
+	// LISTAS
+	var diag diag.Diagnostics
+	if lb.ACLs != nil {
+		model.ACLs, diag = types.ListValueFrom(ctx, types.ObjectType{}, lb.ACLs)
+		diags.Append(diag...)
+	}
+
+	if lb.Backends != nil {
+		model.Backends, diag = types.ListValueFrom(ctx, types.ObjectType{}, lb.Backends)
+		diags.Append(diag...)
+	}
+
+	if lb.HealthChecks != nil {
+		model.HealthChecks, diag = types.ListValueFrom(ctx, types.ObjectType{}, lb.HealthChecks)
+		diags.Append(diag...)
+	}
+
+	if lb.Listeners != nil {
+		model.Listeners, diag = types.ListValueFrom(ctx, types.ObjectType{}, lb.Listeners)
+		diags.Append(diag...)
+	}
+
+	if lb.TLSCertificates != nil {
+		model.TLSCertificates, diag = types.ListValueFrom(ctx, types.ObjectType{}, lb.TLSCertificates)
+		diags.Append(diag...)
+	}
+
+	return nil
+}
