@@ -140,6 +140,8 @@ jobs:
   dbaas_cluster_mysql:
     name: DBaaS E2E Tests - Cluster MySQL ${{ matrix.engine_version }}
 
+    needs: dbaas_single_instance_mysql
+
     runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
 
     timeout-minutes: 120
