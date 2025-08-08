@@ -1,5 +1,7 @@
 #!bin/bash
 
+set -euo pipefail
+
 REGION=$1
 ENV=$2
 API_KEY=$3
