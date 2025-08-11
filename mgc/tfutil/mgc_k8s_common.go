@@ -25,7 +25,7 @@ type Taint struct {
 	Value  types.String `tfsdk:"value"`
 }
 
-func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
+func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 	if np == nil {
 		return NodePool{}
 	}
@@ -41,7 +41,7 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
 	if np.AvailabilityZones != nil {
 		availabilityZones := make([]types.String, len(*np.AvailabilityZones))
 		for i, zone := range *np.AvailabilityZones {
-			availabilityZones[i] = types.StringValue(zone)
+			availabilityZones[i] = types.StringValue(ConvertXZoneToAvailabilityZone(region, zone))
 		}
 		nodePool.AvailabilityZones = &availabilityZones
 	}
@@ -50,12 +50,14 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
 		nodePool.MaxPodsPerNode = types.Int64Value(int64(*np.MaxPodsPerNode))
 	}
 
-	if np.AutoScale.MaxReplicas != nil {
-		nodePool.MaxReplicas = types.Int64Value(int64(*np.AutoScale.MaxReplicas))
-	}
+	if np.AutoScale != nil {
+		if np.AutoScale.MaxReplicas != nil {
+			nodePool.MaxReplicas = types.Int64Value(int64(*np.AutoScale.MaxReplicas))
+		}
 
-	if np.AutoScale.MinReplicas != nil {
-		nodePool.MinReplicas = types.Int64Value(int64(*np.AutoScale.MinReplicas))
+		if np.AutoScale.MinReplicas != nil {
+			nodePool.MinReplicas = types.Int64Value(int64(*np.AutoScale.MinReplicas))
+		}
 	}
 
 	if np.InstanceTemplate.Flavor.Name != "" {
@@ -63,13 +65,13 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool) NodePool {
 	}
 
 	if np.Taints != nil {
-		var taints []Taint
-		for _, taint := range *np.Taints {
-			taints = append(taints, Taint{
+		taints := make([]Taint, len(*np.Taints))
+		for i, taint := range *np.Taints {
+			taints[i] = Taint{
 				Effect: types.StringValue(taint.Effect),
 				Key:    types.StringValue(taint.Key),
 				Value:  types.StringValue(taint.Value),
-			})
+			}
 		}
 		nodePool.Taints = &taints
 	}

@@ -35,9 +35,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 ### Optional
 
-> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
-
-- `availability_zones` (List of String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) List of availability zones where the node pool is deployed.
+- `availability_zones` (Set of String) List of availability zones where the node pool is deployed.
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
