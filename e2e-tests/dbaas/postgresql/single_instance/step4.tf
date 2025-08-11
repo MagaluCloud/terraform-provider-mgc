@@ -35,37 +35,6 @@ output "single_instance" {
 ###############################################################################
 
 ###############################################################################
-# Create Database Replica for Instance
-###############################################################################
-resource "mgc_dbaas_replicas" "single_instance_replica" {
-  name                  = "${var.db_prefix}-replica-terraform-${var.engine_name}${var.engine_version}"
-  source_id             = resource.mgc_dbaas_instances.single_instance.id
-}
-
-output "single_instance_replica_id" {
-  description = "Created Single Instance Replica ID"
-  value       = resource.mgc_dbaas_replicas.single_instance_replica.id
-}
-
-data "mgc_dbaas_replica" "single_instance_replica" {
-  id = resource.mgc_dbaas_replicas.single_instance_replica.id
-}
-
-output "single_instance_replica" {
-  description = "Created Single Instance Replica"
-  value       = data.mgc_dbaas_replica.single_instance_replica
-}
-
-###############################################################################
-# Create a Snapshot for Instance
-###############################################################################
-resource "mgc_dbaas_instances_snapshots" "create_manual_snapshot" {
-  instance_id = resource.mgc_dbaas_instances.single_instance.id
-  name        = "${var.db_prefix}-snapshot-terraform-${var.engine_name}${var.engine_version}"
-  description = "Snapshot created via Terraform"
-}
-
-###############################################################################
 # Create a Parameter Group for Tenant
 ###############################################################################
 resource "mgc_dbaas_parameter_groups" "terraform_parameter_group" {
