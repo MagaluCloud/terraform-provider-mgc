@@ -11,7 +11,7 @@ permissions:
 
 env:
   ENV: "prod"
-  REGION: "br-ne1"
+  REGION: "br-se1"
   API_KEY: ${{ secrets.SECRET_API_KEY_PROD }}
   DB_PREFIX: "ci-github-${{ github.run_id }}"
   DB_PASSWORD: "admin1234"
