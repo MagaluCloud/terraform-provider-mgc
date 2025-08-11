@@ -40,6 +40,7 @@ type FlattenedGetResult struct {
 
 type DataSourceKubernetesNodepool struct {
 	sdkClient sdkK8s.NodePoolService
+	region    string
 }
 
 func NewDataSourceKubernetesNodepool() datasource.DataSource {
@@ -62,6 +63,7 @@ func (r *DataSourceKubernetesNodepool) Configure(ctx context.Context, req dataso
 		return
 	}
 
+	r.region = dataConfig.Region
 	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
 }
 
@@ -202,7 +204,7 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	flattened, err := ConvertGetResultToFlattened(ctx, sdkOutput, data.ClusterID.ValueString())
+	flattened, err := ConvertGetResultToFlattened(ctx, sdkOutput, data.ClusterID.ValueString(), r.region)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to convert nodepool", err.Error())
 		return
@@ -211,7 +213,7 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &flattened)...)
 }
 
-func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID string) (FlattenedGetResult, error) {
+func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID, region string) (FlattenedGetResult, error) {
 	if original == nil {
 		return FlattenedGetResult{}, nil
 	}
@@ -281,7 +283,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	if original.AvailabilityZones != nil && len(*original.AvailabilityZones) > 0 {
 		flattened.AvailabilityZones = make([]types.String, len(*original.AvailabilityZones))
 		for i, zone := range *original.AvailabilityZones {
-			flattened.AvailabilityZones[i] = types.StringValue(zone)
+			flattened.AvailabilityZones[i] = types.StringValue(tfutil.ConvertXZoneToAvailabilityZone(region, zone))
 		}
 	}
 

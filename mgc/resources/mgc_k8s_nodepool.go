@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,11 +13,14 @@ import (
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,6 +32,11 @@ const (
 	NodepoolDeletedState = "Deleted"
 )
 
+var (
+	NodepoolTimeout  = time.Minute * 90
+	NodepoolInterval = time.Second * 30
+)
+
 type NodePoolResourceModel struct {
 	ClusterID types.String `tfsdk:"cluster_id"`
 	tfutil.NodePool
@@ -35,6 +44,7 @@ type NodePoolResourceModel struct {
 
 type NewNodePoolResource struct {
 	sdkNodepool k8sSDK.NodePoolService
+	region      string
 }
 
 func NewNewNodePoolResource() resource.Resource {
@@ -55,10 +65,12 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 		return
 	}
 
+	r.region = dataConfig.Region
 	r.sdkNodepool = k8sSDK.New(&dataConfig.CoreConfig).Nodepools()
 }
 
 func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	azRegex := regexp.MustCompile(`^[a-z]{2}-[a-z]+[0-9]+-[a-z]$`)
 	resp.Schema = schema.Schema{
 		Description: "An array representing a set of nodes within a Kubernetes cluster.",
 		Attributes: map[string]schema.Attribute{
@@ -128,15 +140,22 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
+					int64planmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
-			"availability_zones": schema.ListAttribute{
+			"availability_zones": schema.SetAttribute{
 				Description: "List of availability zones where the node pool is deployed.",
 				Optional:    true,
-				WriteOnly:   true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.Set{
+					setvalidator.ValueStringsAre(stringvalidator.RegexMatches(azRegex, "The availability zone must be in the format 'country-region-availability', example 'br-se1-a'")),
+				},
 				ElementType: types.StringType,
 			},
 			"taints": schema.ListNestedAttribute{
@@ -179,7 +198,7 @@ func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -211,7 +230,17 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	if data.AvailabilityZones != nil {
-		createParams.AvailabilityZones = convertStringArrayTFToSliceString(data.AvailabilityZones)
+		azList := convertStringArrayTFToSliceString(data.AvailabilityZones)
+		var azListConverted []string
+		for _, az := range *azList {
+			converted, err := tfutil.ConvertAvailabilityZoneToXZone(az)
+			if err != nil {
+				resp.Diagnostics.AddError("Error converting availability zone", err.Error())
+				return
+			}
+			azListConverted = append(azListConverted, converted)
+		}
+		createParams.AvailabilityZones = &azListConverted
 	}
 
 	nodepool, err := r.sdkNodepool.Create(ctx, data.ClusterID.ValueString(), createParams)
@@ -220,13 +249,13 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState)
+	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -267,9 +296,9 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
+	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool, r.region)
 
-	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState)
+	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -291,7 +320,7 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState); err != nil {
+	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, NodepoolTimeout, NodepoolInterval); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -345,9 +374,9 @@ func convertStringArrayTFToSliceString(tags *[]types.String) *[]string {
 	return &tagsSlice
 }
 
-func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string) error {
-	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
-		time.Sleep(30 * time.Second)
+func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string, timeout, interval time.Duration) error {
+	for startTime := time.Now(); time.Since(startTime) < timeout; {
+		time.Sleep(interval)
 
 		nodepool, err := r.sdkNodepool.Get(ctx, clusterId, nodepoolid)
 		if err != nil {
