@@ -51,7 +51,7 @@ jobs:
 
     - name: Install Image Packages Requirements
       run: |
-        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        sudo apt update && sudo apt install -y gnupg software-properties-common make
         wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
         gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
@@ -115,7 +115,7 @@ jobs:
 
     - name: Install Image Packages Requirements
       run: |
-        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        sudo apt update && sudo apt install -y gnupg software-properties-common make
         wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
         gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
@@ -180,7 +180,7 @@ jobs:
 
     - name: Install Image Packages Requirements
       run: |
-        sudo apt update  && sudo apt install -y gnupg software-properties-common make
+        sudo apt update && sudo apt install -y gnupg software-properties-common make
         wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
         gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
@@ -199,3 +199,31 @@ jobs:
         make e2e-tests-dbaas-apply S="1" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
         make e2e-tests-dbaas-apply S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
         make e2e-tests-dbaas-destroy R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+
+  dbaas_cleanup:
+    name: DBaaS E2E Tests - Cleanup for failed jobs
+
+    needs: [dbaas_single_instance_mysql, dbaas_single_instance_postgresql, dbaas_cluster_mysql]
+
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
+
+    if: always()
+
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+
+    - name: Install MGC CLI
+      run: |
+        sudo apt update && sudo apt install -y gnupg software-properties-common make
+        sudo gpg --yes --keyserver keyserver.ubuntu.com --recv-keys 0C59E21A5CB00594 && sudo gpg --export --armor 0C59E21A5CB00594 | sudo gpg --dearmor -o /etc/apt/keyrings/magalu-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/magalu-archive-keyring.gpg] https://packages.magalu.cloud/apt stable main" | sudo tee /etc/apt/sources.list.d/magalu.list
+        sudo apt update && sudo apt install mgccli
+    - name: Cleanup
+      run: |
+        API_KEY=${{ secrets.SECRET_API_KEY_PROD }}
+        ENV="prod"
+        REGION="br-se1"
+        echo "Removing instances, replicas and clusters for Github run ${{ github.run_id }}"
+        make e2e-tests-dbaas-cleanup R=${REGION} E=${ENV} A=${API_KEY} J="${{ github.run_id }}"

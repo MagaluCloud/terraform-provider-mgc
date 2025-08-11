@@ -143,3 +143,6 @@ e2e-tests-dbaas-apply: ## make dbaas-apply S=<step> U=<user> P=<password> R=<reg
 
 e2e-tests-dbaas-destroy: ## make dbaas-destroy R=<region> E=<env> A=<api-key> N=<engine_name> V=<engine_version> T=<db_type>
 	@bash e2e-tests/dbaas/destroy.sh "${R}" "${E}" "${A}" "${N}" "${V}" "${T}"
+
+e2e-tests-dbaas-cleanup: ## make dbaas-cleanup R=<region> E=<env> A=<api-key> J=<job-id>
+	@bash e2e-tests/dbaas/cleanup.sh "${R}" "${E}" "${A}" "${J}"
