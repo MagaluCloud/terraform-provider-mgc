@@ -32,18 +32,6 @@ output "cluster_instance" {
 ### >>>              KEEP CREATED INFRASTRUCTURE                        <<< ###
 ###############################################################################
 
-###############################################################################
-# List All Clusters
-###############################################################################
-
-data "mgc_dbaas_clusters" "all_clusters" {
-}
-
-output "all_dbaas_clusters" {
-  description = "Details of all MGC DBaaS clusters"
-  value       = data.mgc_dbaas_clusters.all_clusters.clusters
-}
-
 # ###############################################################################
 # # Create a Snapshot for Cluster
 # ###############################################################################

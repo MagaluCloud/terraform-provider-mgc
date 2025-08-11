@@ -28,17 +28,6 @@ output "cluster_instance" {
   value       = data.mgc_dbaas_cluster.cluster_instance
 }
 
-###############################################################################
-# List All Clusters
-###############################################################################
-
-data "mgc_dbaas_clusters" "all_clusters" {
-}
-
-output "all_dbaas_clusters" {
-  description = "Details of all MGC DBaaS clusters"
-  value       = data.mgc_dbaas_clusters.all_clusters.clusters
-}
 # ###############################################################################
 # # Create a Snapshot for Cluster
 # ###############################################################################
@@ -73,4 +62,49 @@ data "mgc_dbaas_parameter_group" "terraform_parameter_group" {
 output "terraform_parameter_group" {
   description = "Details of created parameter group"
   value       = data.mgc_dbaas_parameter_group.terraform_parameter_group
+}
+
+###############################################################################
+# List All Engines
+###############################################################################
+data "mgc_dbaas_engines" "all_engines" {
+}
+
+output "all_dbaas_engines" {
+  description = "Details of all MGC DBaaS engines"
+  value       = data.mgc_dbaas_engines.all_engines
+}
+
+###############################################################################
+# List All Instance-Types
+###############################################################################
+data "mgc_dbaas_instance_types" "all_instance_types" {
+}
+
+output "all_instance_types" {
+  description = "Details of all MGC DBaaS instance-types"
+  value       = data.mgc_dbaas_instance_types.all_instance_types
+}
+
+###############################################################################
+# List All Parameter-Groups
+###############################################################################
+data "mgc_dbaas_parameter_groups" "all_parameter_groups" {
+}
+
+output "mgc_dbaas_parameter_groups" {
+  description = "Details of all MGC DBaaS parameter groups"
+  value       = data.mgc_dbaas_parameter_groups.all_parameter_groups
+}
+
+###############################################################################
+# List All Clusters
+###############################################################################
+
+data "mgc_dbaas_clusters" "all_clusters" {
+}
+
+output "all_dbaas_clusters" {
+  description = "Details of all MGC DBaaS clusters"
+  value       = data.mgc_dbaas_clusters.all_clusters.clusters
 }
