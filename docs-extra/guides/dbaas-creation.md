@@ -2,7 +2,7 @@
 page_title: "DBaaS Creation"
 subcategory: "Guides"
 description: |-
-  How to create a database intance or cluster with terraform.
+  How to create a database instance or cluster with terraform.
 ---
 
 # Getting Started with DBaaS on Magalu Cloud
