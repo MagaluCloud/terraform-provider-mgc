@@ -3,9 +3,11 @@ package resources
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
@@ -19,6 +21,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+const (
+	NodepoolRunningState = "Running"
+	NodepoolDeletedState = "Deleted"
 )
 
 type NodePoolResourceModel struct {
@@ -219,7 +226,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	err = r.waitNodePoolCreation(ctx, nodepool.ID, data.ClusterID.ValueString())
+	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -262,7 +269,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 	data.NodePool = tfutil.ConvertToNodePoolToTFModel(nodepool)
 
-	err = r.waitNodePoolCreation(ctx, data.ID.ValueString(), data.ClusterID.ValueString())
+	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState)
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
@@ -282,6 +289,18 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
+	}
+
+	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState); err != nil {
+		switch e := err.(type) {
+		case *clientSDK.HTTPError:
+			if e.StatusCode == http.StatusNotFound {
+				return
+			}
+		default:
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
 	}
 }
 
@@ -326,7 +345,7 @@ func convertStringArrayTFToSliceString(tags *[]types.String) *[]string {
 	return &tagsSlice
 }
 
-func (r *NewNodePoolResource) waitNodePoolCreation(ctx context.Context, nodepoolid, clusterId string) error {
+func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string) error {
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
 		time.Sleep(30 * time.Second)
 
@@ -334,7 +353,7 @@ func (r *NewNodePoolResource) waitNodePoolCreation(ctx context.Context, nodepool
 		if err != nil {
 			return err
 		}
-		if nodepool.Status.State == "Running" {
+		if nodepool.Status.State == state {
 			return nil
 		}
 

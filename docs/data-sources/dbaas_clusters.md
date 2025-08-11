@@ -32,6 +32,10 @@ data "mgc_dbaas_clusters" "all_clusters" {}
 <a id="nestedatt--clusters"></a>
 ### Nested Schema for `clusters`
 
+Required:
+
+- `id` (String) ID of the cluster to fetch
+
 Read-Only:
 
 - `addresses` (Attributes List) Network addresses for connecting to the cluster. (see [below for nested schema](#nestedatt--clusters--addresses))
@@ -41,7 +45,6 @@ Read-Only:
 - `created_at` (String) Timestamp of when the cluster was created.
 - `engine_id` (String) ID of the database engine used by the cluster.
 - `finished_at` (String) Timestamp of when the cluster last finished an operation.
-- `id` (String) Unique identifier for the DBaaS cluster.
 - `instance_type_id` (String) ID of the instance type for the cluster nodes.
 - `name` (String) Name of the DBaaS cluster.
 - `parameter_group_id` (String) ID of the parameter group associated with the cluster.
@@ -59,4 +62,5 @@ Read-Only:
 - `access` (String) Access type (e.g., 'public', 'private').
 - `address` (String) The IP address or hostname.
 - `port` (String) The port number.
+- `purpose` (String) The port purpose ([READ_WRITE, READONLY, METRICS, LOGS]).
 - `type` (String) Address type (e.g., 'read-write', 'read-only').
