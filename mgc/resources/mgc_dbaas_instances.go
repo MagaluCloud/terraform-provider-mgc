@@ -291,7 +291,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 			resp.Diagnostics.AddError("Invalid ID", "For restoring a snapshot the snapshot source ID must be known")
 			return
 		}
-		getIntance, err := r.dbaasInstances.Get(ctx, data.SnapshotSourceID.ValueString(), dbSDK.GetInstanceOptions{})
+		getInstance, err := r.dbaasInstances.Get(ctx, data.SnapshotSourceID.ValueString(), dbSDK.GetInstanceOptions{})
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get instance", err.Error())
 			return
@@ -300,14 +300,14 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		var instanceTypeID string
 		if data.InstanceType.ValueString() != "" {
 			instanceTypeID, err = tfutil.ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List,
-				data.InstanceType.ValueString(), getIntance.EngineID, dbaasInstanceProductFamily)
+				data.InstanceType.ValueString(), getInstance.EngineID, dbaasInstanceProductFamily)
 			if err != nil {
 				resp.Diagnostics.AddError("Invalid instance type", err.Error())
 				return
 			}
 		}
 
-		engineDetails, err := r.dbaasEngines.Get(ctx, getIntance.EngineID)
+		engineDetails, err := r.dbaasEngines.Get(ctx, getInstance.EngineID)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get engine details", err.Error())
 			return
@@ -330,7 +330,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 		data.ID = types.StringValue(createdInstance.ID)
 		data.InstanceTypeId = types.StringValue(instanceTypeID)
-		data.EngineID = types.StringValue(getIntance.EngineID)
+		data.EngineID = types.StringValue(getInstance.EngineID)
 		data.EngineName = types.StringValue(engineDetails.Name)
 		data.EngineVersion = types.StringValue(engineDetails.Version)
 		data.Password = types.StringNull()
