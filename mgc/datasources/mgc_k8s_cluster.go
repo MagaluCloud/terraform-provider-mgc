@@ -65,6 +65,7 @@ func NewDataSourceKubernetesCluster() datasource.DataSource {
 
 type DataSourceKubernetesCluster struct {
 	sdkClient sdkK8s.ClusterService
+	region    string
 }
 
 func (r *DataSourceKubernetesCluster) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -80,7 +81,7 @@ func (r *DataSourceKubernetesCluster) Configure(ctx context.Context, req datasou
 	}
 
 	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Clusters()
-
+	r.region = dataConfig.Region
 }
 
 func (d *DataSourceKubernetesCluster) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -364,11 +365,11 @@ func (d *DataSourceKubernetesCluster) Read(ctx context.Context, req datasource.R
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
-	converted := convertToKubernetesCluster(cluster)
+	converted := convertToKubernetesCluster(cluster, d.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &converted)...)
 }
 
-func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
+func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *KubernetesCluster {
 	if getResult == nil {
 		return nil
 	}
@@ -421,7 +422,7 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster) *KubernetesCluster {
 	if getResult.NodePools != nil {
 		kubernetesCluster.NodePools = make([]tfutil.NodePool, len(*getResult.NodePools))
 		for i, np := range *getResult.NodePools {
-			kubernetesCluster.NodePools[i] = tfutil.ConvertToNodePoolToTFModel(&np)
+			kubernetesCluster.NodePools[i] = tfutil.ConvertToNodePoolToTFModel(&np, region)
 		}
 	}
 
