@@ -129,9 +129,11 @@ jobs:
         ENGINE_NAME="postgresql"
         ENGINE_VERSION=${{ matrix.engine_version }}
         make e2e-tests-dbaas-apply S="1" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
-        # make e2e-tests-dbaas-apply S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
-        # make e2e-tests-dbaas-apply S="3" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
-        # make e2e-tests-dbaas-apply S="4" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-apply S="2" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-apply S="3" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-apply S="4" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-apply S="5" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
+        make e2e-tests-dbaas-apply S="6" U=${DB_PREFIX} P=${DB_PASSWORD} R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
         make e2e-tests-dbaas-destroy R=${REGION} E=${ENV} A=${API_KEY} N=${ENGINE_NAME} V=${ENGINE_VERSION} T=${DB_TYPE}
 
   dbaas_cluster_mysql:

@@ -1,5 +1,20 @@
 ###############################################################################
-# Database Instance: Retype Instance-Type
+# Create Instance Restore
+###############################################################################
+resource "mgc_dbaas_instances" "instance_restore" {
+  name                  = "${var.db_prefix}-restore-terraform-${var.engine_name}${var.engine_version}"
+  instance_type         = "BV1-4-10"
+  volume_size           = 40
+  snapshot_id           = resource.mgc_dbaas_instances_snapshots.create_manual_snapshot.id
+  snapshot_source_id    = resource.mgc_dbaas_instances.single_instance.id
+}
+
+###############################################################################
+### >>>              KEEP CREATED INFRASTRUCTURE                        <<< ###
+###############################################################################
+
+###############################################################################
+# Create Database Instance
 ###############################################################################
 resource "mgc_dbaas_instances" "single_instance" {
   name                  = "${var.db_prefix}-db-terraform-${var.engine_name}${var.engine_version}"
@@ -7,10 +22,10 @@ resource "mgc_dbaas_instances" "single_instance" {
   password              = var.db_password
   engine_name           = var.engine_name
   engine_version        = var.engine_version
-  instance_type         = "BV2-4-10"
-  volume_size           = 30
-  backup_retention_days = 1
-  backup_start_at       = "01:00:00"
+  instance_type         = "BV1-4-10"
+  volume_size           = 40
+  backup_retention_days = 2
+  backup_start_at       = "02:00:00"
   availability_zone     = "${var.mgc_region}-${var.mgc_zone}"
   parameter_group       = resource.mgc_dbaas_parameter_groups.terraform_parameter_group.id
 }
