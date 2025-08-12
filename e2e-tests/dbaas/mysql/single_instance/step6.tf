@@ -1,5 +1,24 @@
 ###############################################################################
-# Database Instance: Adjust Backup/Snapshot Period
+# Create Instance Restore
+###############################################################################
+resource "mgc_dbaas_instances" "instance_restore" {
+  name                  = "${var.db_prefix}-restore-terraform-${var.engine_name}${var.engine_version}"
+  instance_type         = "BV1-4-10"
+  volume_size           = 40
+  snapshot_id           = resource.mgc_dbaas_instances_snapshots.create_manual_snapshot.id
+  snapshot_source_id    = resource.mgc_dbaas_instances.single_instance.id
+}
+
+###############################################################################
+# Remove Database Replica for Instance
+###############################################################################
+
+###############################################################################
+### >>>              KEEP CREATED INFRASTRUCTURE                        <<< ###
+###############################################################################
+
+###############################################################################
+# Database Instance
 ###############################################################################
 
 resource "mgc_dbaas_instances" "single_instance" {
@@ -8,38 +27,12 @@ resource "mgc_dbaas_instances" "single_instance" {
   password              = var.db_password
   engine_name           = var.engine_name
   engine_version        = var.engine_version
-  instance_type         = "BV2-4-10"
-  volume_size           = 30
+  instance_type         = "BV1-4-10"
+  volume_size           = 40
   backup_retention_days = 2
   backup_start_at       = "02:00:00"
   availability_zone     = "${var.mgc_region}-${var.mgc_zone}"
   parameter_group       = resource.mgc_dbaas_parameter_groups.terraform_parameter_group.id
-}
-
-###############################################################################
-### >>>              KEEP CREATED INFRASTRUCTURE                        <<< ###
-###############################################################################
-
-###############################################################################
-# Create Database Replica for Instance
-###############################################################################
-resource "mgc_dbaas_replicas" "single_instance_replica" {
-  name                  = "${var.db_prefix}-replica-terraform-${var.engine_name}${var.engine_version}"
-  source_id             = resource.mgc_dbaas_instances.single_instance.id
-}
-
-output "single_instance_replica_id" {
-  description = "Created Single Instance Replica ID"
-  value       = resource.mgc_dbaas_replicas.single_instance_replica.id
-}
-
-data "mgc_dbaas_replica" "single_instance_replica" {
-  id = resource.mgc_dbaas_replicas.single_instance_replica.id
-}
-
-output "single_instance_replica" {
-  description = "Created Single Instance Replica"
-  value       = data.mgc_dbaas_replica.single_instance_replica
 }
 
 ###############################################################################

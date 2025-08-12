@@ -15,21 +15,6 @@ resource "mgc_dbaas_instances" "single_instance" {
   parameter_group       = resource.mgc_dbaas_parameter_groups.terraform_parameter_group.id
 }
 
-output "single_instance_id" {
-  description = "Created Single Instance ID"
-  value       = resource.mgc_dbaas_instances.single_instance.id
-}
-
-data "mgc_dbaas_instance" "single_instance" {
-  id = resource.mgc_dbaas_instances.single_instance.id
-}
-
-output "single_instance" {
-  description = "Created Single Instance"
-  value       = data.mgc_dbaas_instance.single_instance
-}
-
-
 ###############################################################################
 # Database Replica: Retype Instance-Type
 ###############################################################################
