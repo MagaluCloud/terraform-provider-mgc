@@ -11,6 +11,8 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
+replace github.com/MagaluCloud/mgc-sdk-go => ../mgc-sdk-go
+
 require (
 	github.com/MagaluCloud/magalu/mgc/core v0.33.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
