@@ -54,7 +54,7 @@ type BackendModel struct {
 	Name                                types.String  `tfsdk:"name"`
 	Targets                             []TargetModel `tfsdk:"targets"`
 	TargetsType                         types.String  `tfsdk:"targets_type"`
-	PanicThreshold                      types.Int64   `tfsdk:"panic_threshold"`
+	PanicThreshold                      types.Float64 `tfsdk:"panic_threshold"`
 	CloseConnectionsOnHostHealthFailure types.Bool    `tfsdk:"close_connections_on_host_health_failure"`
 }
 
@@ -134,7 +134,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 	r.lbNetworkHealthCheck = lbaasClient.NetworkHealthChecks()
 	r.lbNetworkListener = lbaasClient.NetworkListeners()
 	r.lbNetworkTLSCertificate = lbaasClient.NetworkCertificates()
-	r.lbNetworkTarget = lbaasClient.NetworkBackends().Targets()
+	r.lbNetworkTarget = lbaasClient.NetworkBackendTargets()
 	r.lbNetworkLB = lbaasClient.NetworkLoadBalancers()
 }
 
@@ -574,14 +574,14 @@ func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.Imp
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *LoadBalancerResource) convertACLsToSDK(acls *[]ACLModel) []lbSDK.NetworkAclRequest {
+func (r *LoadBalancerResource) convertACLsToSDK(acls *[]ACLModel) []lbSDK.CreateNetworkACLRequest {
 	if acls == nil {
 		return nil
 	}
 
-	var aclRequests []lbSDK.NetworkAclRequest
+	var aclRequests []lbSDK.CreateNetworkACLRequest
 	for _, acl := range *acls {
-		aclRequests = append(aclRequests, lbSDK.NetworkAclRequest{
+		aclRequests = append(aclRequests, lbSDK.CreateNetworkACLRequest{
 			Action:         lbSDK.AclActionType(acl.Action.ValueString()),
 			Name:           acl.Name.ValueStringPointer(),
 			Ethertype:      lbSDK.AclEtherType(acl.Ethertype.ValueString()),
@@ -592,35 +592,24 @@ func (r *LoadBalancerResource) convertACLsToSDK(acls *[]ACLModel) []lbSDK.Networ
 	return aclRequests
 }
 
-func (r *LoadBalancerResource) convertBackendsToSDK(backends []BackendModel) []lbSDK.NetworkBackendRequest {
-	var backendRequests []lbSDK.NetworkBackendRequest
+func (r *LoadBalancerResource) convertBackendsToSDK(backends []BackendModel) []lbSDK.CreateNetworkBackendRequest {
+	var backendRequests []lbSDK.CreateNetworkBackendRequest
 	for _, backend := range backends {
 
-		var targets lbSDK.TargetsRawOrInstancesRequest
+		var targets []lbSDK.NetworkBackendInstanceTargetRequest
 		for _, target := range backend.Targets {
-			switch backend.TargetsType.ValueString() {
-			case "instance":
-				{
-					targets.TargetsInstances = append(targets.TargetsInstances, lbSDK.NetworkBackendInstanceRequest{
-						NicID: target.NICID.ValueString(),
-						Port:  int(target.Port.ValueInt64()),
-					})
-				}
-			case "raw":
-				{
-					targets.TargetsRaw = append(targets.TargetsRaw, lbSDK.NetworkBackendRawTargetRequest{
-						IPAddress: target.IPAddress.ValueString(),
-						Port:      int(target.Port.ValueInt64()),
-					})
-				}
-			}
+			targets = append(targets, lbSDK.NetworkBackendInstanceTargetRequest{
+				NicID:     target.NICID.ValueStringPointer(),
+				Port:      target.Port.ValueInt64(),
+				IPAddress: target.IPAddress.ValueStringPointer(),
+			})
 		}
 
-		backendRequests = append(backendRequests, lbSDK.NetworkBackendRequest{
+		backendRequests = append(backendRequests, lbSDK.CreateNetworkBackendRequest{
 			HealthCheckName:                     backend.HealthCheckName.ValueStringPointer(),
 			Name:                                backend.Name.ValueString(),
 			Description:                         backend.Description.ValueStringPointer(),
-			PanicThreshold:                      backend.PanicThreshold.ValueInt64Pointer(),
+			PanicThreshold:                      backend.PanicThreshold.ValueFloat64Pointer(),
 			CloseConnectionsOnHostHealthFailure: backend.CloseConnectionsOnHostHealthFailure.ValueBoolPointer(),
 			BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm(backend.BalanceAlgorithm.ValueString()),
 			TargetsType:                         lbSDK.BackendType(backend.TargetsType.ValueString()),
@@ -630,14 +619,14 @@ func (r *LoadBalancerResource) convertBackendsToSDK(backends []BackendModel) []l
 	return backendRequests
 }
 
-func (r *LoadBalancerResource) convertHealthChecksToSDK(healthChecks *[]HealthCheckModel) []lbSDK.NetworkHealthCheckRequest {
+func (r *LoadBalancerResource) convertHealthChecksToSDK(healthChecks *[]HealthCheckModel) []lbSDK.CreateNetworkHealthCheckRequest {
 	if healthChecks == nil {
 		return nil
 	}
 
-	var healthCheckRequests []lbSDK.NetworkHealthCheckRequest
+	var healthCheckRequests []lbSDK.CreateNetworkHealthCheckRequest
 	for _, healthCheck := range *healthChecks {
-		healthCheckRequests = append(healthCheckRequests, lbSDK.NetworkHealthCheckRequest{
+		healthCheckRequests = append(healthCheckRequests, lbSDK.CreateNetworkHealthCheckRequest{
 			Name:                    healthCheck.Name.ValueString(),
 			Description:             healthCheck.Description.ValueStringPointer(),
 			Protocol:                lbSDK.HealthCheckProtocol(healthCheck.Protocol.ValueString()),
@@ -669,14 +658,14 @@ func (r *LoadBalancerResource) convertListenersToSDK(listeners []ListenerModel) 
 	return listenerRequests
 }
 
-func (r *LoadBalancerResource) convertTLSCertificatesToSDK(certificates *[]TLSCertificateModel) []lbSDK.NetworkTLSCertificateRequest {
+func (r *LoadBalancerResource) convertTLSCertificatesToSDK(certificates *[]TLSCertificateModel) []lbSDK.CreateNetworkCertificateRequest {
 	if certificates == nil {
 		return nil
 	}
 
-	var certificateRequests []lbSDK.NetworkTLSCertificateRequest
+	var certificateRequests []lbSDK.CreateNetworkCertificateRequest
 	for _, certificate := range *certificates {
-		certificateRequests = append(certificateRequests, lbSDK.NetworkTLSCertificateRequest{
+		certificateRequests = append(certificateRequests, lbSDK.CreateNetworkCertificateRequest{
 			Name:        certificate.Name.ValueString(),
 			Description: certificate.Description.ValueStringPointer(),
 			Certificate: certificate.Certificate.ValueString(),
@@ -727,9 +716,9 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 		for _, target := range backend.Targets {
 			targets = append(targets, TargetModel{
 				ID:        types.StringValue(target.ID),
-				Port:      types.Int64Value(int64(target.Port)),
+				Port:      types.Int64PointerValue(target.Port),
 				NICID:     types.StringPointerValue(target.NicID),
-				IPAddress: types.StringValue(target.IPAddress),
+				IPAddress: types.StringPointerValue(target.IPAddress),
 			})
 		}
 
@@ -744,7 +733,7 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 			Description:                         types.StringPointerValue(backend.Description),
 			BalanceAlgorithm:                    types.StringValue(string(backend.BalanceAlgorithm)),
 			HealthCheckName:                     types.StringValue(healthCheckName),
-			PanicThreshold:                      types.Int64PointerValue(backend.PanicThreshold),
+			PanicThreshold:                      types.Float64PointerValue(backend.PanicThreshold),
 			CloseConnectionsOnHostHealthFailure: types.BoolValue(backend.CloseConnectionsOnHostHealthFailure),
 			TargetsType:                         types.StringValue(string(backend.TargetsType)),
 			Targets:                             targets,
@@ -761,7 +750,7 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 			Certificate:    types.StringNull(),
 			PrivateKey:     types.StringNull(),
 			ID:             types.StringValue(certificate.ID),
-			ExpirationDate: types.StringPointerValue(certificate.ExpirationDate),
+			ExpirationDate: types.StringValue(certificate.ExpirationDate.String()),
 		})
 	}
 
