@@ -676,7 +676,7 @@ func (r *LoadBalancerResource) convertTLSCertificatesToSDK(certificates *[]TLSCe
 }
 
 func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.NetworkLoadBalancerResponse) LoadBalancerModel {
-	var healthCheckIDsNames map[string]string
+	healthCheckIDsNames := make(map[string]string)
 	var healthCheckModels []HealthCheckModel
 	for _, healthCheck := range lb.HealthChecks {
 		healthCheckIDsNames[healthCheck.ID] = healthCheck.Name
@@ -708,7 +708,7 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 		})
 	}
 
-	var backendIDsNames map[string]string
+	backendIDsNames := make(map[string]string)
 	var backendModels []BackendModel
 	for _, backend := range lb.Backends {
 		backendIDsNames[backend.ID] = backend.Name
@@ -740,18 +740,23 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 		})
 	}
 
-	var tlsCertificatesIDsNames map[string]string
+	tlsCertificatesIDsNames := make(map[string]string)
 	var tlsCertificates []TLSCertificateModel
 	for _, certificate := range lb.TLSCertificates {
 		tlsCertificatesIDsNames[certificate.ID] = certificate.Name
-		tlsCertificates = append(tlsCertificates, TLSCertificateModel{
-			Description:    types.StringPointerValue(certificate.Description),
-			Name:           types.StringValue(certificate.Name),
-			Certificate:    types.StringNull(),
-			PrivateKey:     types.StringNull(),
-			ID:             types.StringValue(certificate.ID),
-			ExpirationDate: types.StringValue(certificate.ExpirationDate.String()),
-		})
+		t := TLSCertificateModel{
+			Description: types.StringPointerValue(certificate.Description),
+			Name:        types.StringValue(certificate.Name),
+			Certificate: types.StringNull(),
+			PrivateKey:  types.StringNull(),
+			ID:          types.StringValue(certificate.ID),
+		}
+
+		if certificate.ExpirationDate != nil {
+			t.ExpirationDate = types.StringValue(certificate.ExpirationDate.String())
+		}
+
+		tlsCertificates = append(tlsCertificates, t)
 	}
 
 	var listenerModels []ListenerModel
