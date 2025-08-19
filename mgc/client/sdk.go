@@ -3,7 +3,7 @@ package client
 import (
 	"fmt"
 
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 
@@ -15,19 +15,19 @@ type SDKFrom interface {
 	resource.ConfigureRequest | datasource.ConfigureRequest
 }
 
-func NewSDKClient[T SDKFrom, G tfutil.ResponseFrom](req T, resp *G) (*mgcSdk.Client, error, error) {
-	var config tfutil.DataConfig
+func NewSDKClient[T SDKFrom, G utils.ResponseFrom](req T, resp *G) (*mgcSdk.Client, error, error) {
+	var config utils.DataConfig
 
 	devErrMsg := "fail to parse provider config"
 	switch tp := any(req).(type) {
 	case resource.ConfigureRequest:
-		if cfg, ok := tp.ProviderData.(tfutil.DataConfig); ok {
+		if cfg, ok := tp.ProviderData.(utils.DataConfig); ok {
 			config = cfg
 			break
 		}
 		return nil, fmt.Errorf("%s", devErrMsg), fmt.Errorf("unexpected Resource Configure Type")
 	case datasource.ConfigureRequest:
-		if cfg, ok := tp.ProviderData.(tfutil.DataConfig); ok {
+		if cfg, ok := tp.ProviderData.(utils.DataConfig); ok {
 			config = cfg
 			break
 		}

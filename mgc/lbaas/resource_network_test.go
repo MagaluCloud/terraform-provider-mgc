@@ -1,0 +1,1423 @@
+package lbaas
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+)
+
+func TestLoadBalancerResource_convertACLsToSDK(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    *[]ACLModel
+		expected []lbSDK.CreateNetworkACLRequest
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty slice",
+			input:    &[]ACLModel{},
+			expected: nil,
+		},
+		{
+			name: "single ACL with all fields",
+			input: &[]ACLModel{
+				{
+					Action:         types.StringValue("ALLOW"),
+					Name:           types.StringValue("test-acl"),
+					Ethertype:      types.StringValue("IPv4"),
+					Protocol:       types.StringValue("TCP"),
+					RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkACLRequest{
+				{
+					Action:         lbSDK.AclActionType("ALLOW"),
+					Name:           stringPtr("test-acl"),
+					Ethertype:      lbSDK.AclEtherType("IPv4"),
+					Protocol:       lbSDK.AclProtocol("TCP"),
+					RemoteIPPrefix: "192.168.1.0/24",
+				},
+			},
+		},
+		{
+			name: "multiple ACLs",
+			input: &[]ACLModel{
+				{
+					Action:         types.StringValue("ALLOW"),
+					Name:           types.StringValue("acl-1"),
+					Ethertype:      types.StringValue("IPv4"),
+					Protocol:       types.StringValue("TCP"),
+					RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+				},
+				{
+					Action:         types.StringValue("DENY"),
+					Name:           types.StringValue("acl-2"),
+					Ethertype:      types.StringValue("IPv6"),
+					Protocol:       types.StringValue("UDP"),
+					RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkACLRequest{
+				{
+					Action:         lbSDK.AclActionType("ALLOW"),
+					Name:           stringPtr("acl-1"),
+					Ethertype:      lbSDK.AclEtherType("IPv4"),
+					Protocol:       lbSDK.AclProtocol("TCP"),
+					RemoteIPPrefix: "192.168.1.0/24",
+				},
+				{
+					Action:         lbSDK.AclActionType("DENY"),
+					Name:           stringPtr("acl-2"),
+					Ethertype:      lbSDK.AclEtherType("IPv6"),
+					Protocol:       lbSDK.AclProtocol("UDP"),
+					RemoteIPPrefix: "10.0.0.0/8",
+				},
+			},
+		},
+		{
+			name: "ACL with null name",
+			input: &[]ACLModel{
+				{
+					Action:         types.StringValue("ALLOW"),
+					Name:           types.StringNull(),
+					Ethertype:      types.StringValue("IPv4"),
+					Protocol:       types.StringValue("TCP"),
+					RemoteIPPrefix: types.StringValue("0.0.0.0/0"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkACLRequest{
+				{
+					Action:         lbSDK.AclActionType("ALLOW"),
+					Name:           nil,
+					Ethertype:      lbSDK.AclEtherType("IPv4"),
+					Protocol:       lbSDK.AclProtocol("TCP"),
+					RemoteIPPrefix: "0.0.0.0/0",
+				},
+			},
+		},
+		{
+			name: "ACL with empty string values",
+			input: &[]ACLModel{
+				{
+					Action:         types.StringValue(""),
+					Name:           types.StringValue(""),
+					Ethertype:      types.StringValue(""),
+					Protocol:       types.StringValue(""),
+					RemoteIPPrefix: types.StringValue(""),
+				},
+			},
+			expected: []lbSDK.CreateNetworkACLRequest{
+				{
+					Action:         lbSDK.AclActionType(""),
+					Name:           stringPtr(""),
+					Ethertype:      lbSDK.AclEtherType(""),
+					Protocol:       lbSDK.AclProtocol(""),
+					RemoteIPPrefix: "",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertACLsToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertBackendsToSDK(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    []BackendModel
+		expected []lbSDK.CreateNetworkBackendRequest
+	}{
+		{
+			name:     "empty slice",
+			input:    []BackendModel{},
+			expected: nil,
+		},
+		{
+			name: "single backend with all fields",
+			input: []BackendModel{
+				{
+					Name:                                types.StringValue("test-backend"),
+					Description:                         types.StringValue("Test backend description"),
+					HealthCheckName:                     types.StringValue("health-check-1"),
+					PanicThreshold:                      types.Float64Value(0.8),
+					CloseConnectionsOnHostHealthFailure: types.BoolValue(true),
+					BalanceAlgorithm:                    types.StringValue("ROUND_ROBIN"),
+					TargetsType:                         types.StringValue("INSTANCE"),
+					Targets: []TargetModel{
+						{
+							NICID:     types.StringValue("nic-123"),
+							IPAddress: types.StringValue("192.168.1.10"),
+							Port:      types.Int64Value(8080),
+						},
+					},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:                                "test-backend",
+					Description:                         stringPtr("Test backend description"),
+					HealthCheckName:                     stringPtr("health-check-1"),
+					PanicThreshold:                      float64Ptr(0.8),
+					CloseConnectionsOnHostHealthFailure: boolPtr(true),
+					BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+					TargetsType:                         lbSDK.BackendType("INSTANCE"),
+					Targets: &[]lbSDK.NetworkBackendInstanceTargetRequest{
+						{
+							NicID:     stringPtr("nic-123"),
+							IPAddress: stringPtr("192.168.1.10"),
+							Port:      8080,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "backend with multiple targets",
+			input: []BackendModel{
+				{
+					Name:             types.StringValue("multi-target-backend"),
+					BalanceAlgorithm: types.StringValue("LEAST_CONNECTIONS"),
+					TargetsType:      types.StringValue("INSTANCE"),
+					Targets: []TargetModel{
+						{
+							NICID:     types.StringValue("nic-1"),
+							IPAddress: types.StringValue("192.168.1.10"),
+							Port:      types.Int64Value(8080),
+						},
+						{
+							NICID:     types.StringValue("nic-2"),
+							IPAddress: types.StringValue("192.168.1.20"),
+							Port:      types.Int64Value(8081),
+						},
+					},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:             "multi-target-backend",
+					BalanceAlgorithm: lbSDK.BackendBalanceAlgorithm("LEAST_CONNECTIONS"),
+					TargetsType:      lbSDK.BackendType("INSTANCE"),
+					Targets: &[]lbSDK.NetworkBackendInstanceTargetRequest{
+						{
+							NicID:     stringPtr("nic-1"),
+							IPAddress: stringPtr("192.168.1.10"),
+							Port:      8080,
+						},
+						{
+							NicID:     stringPtr("nic-2"),
+							IPAddress: stringPtr("192.168.1.20"),
+							Port:      8081,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "backend with null optional fields",
+			input: []BackendModel{
+				{
+					Name:                                types.StringValue("minimal-backend"),
+					Description:                         types.StringNull(),
+					HealthCheckName:                     types.StringNull(),
+					PanicThreshold:                      types.Float64Null(),
+					CloseConnectionsOnHostHealthFailure: types.BoolNull(),
+					BalanceAlgorithm:                    types.StringValue("ROUND_ROBIN"),
+					TargetsType:                         types.StringValue("INSTANCE"),
+					Targets:                             []TargetModel{},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:                                "minimal-backend",
+					Description:                         nil,
+					HealthCheckName:                     nil,
+					PanicThreshold:                      nil,
+					CloseConnectionsOnHostHealthFailure: nil,
+					BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+					TargetsType:                         lbSDK.BackendType("INSTANCE"),
+					Targets:                             &[]lbSDK.NetworkBackendInstanceTargetRequest{},
+				},
+			},
+		},
+		{
+			name: "target with null optional fields",
+			input: []BackendModel{
+				{
+					Name:             types.StringValue("backend-null-targets"),
+					BalanceAlgorithm: types.StringValue("ROUND_ROBIN"),
+					TargetsType:      types.StringValue("INSTANCE"),
+					Targets: []TargetModel{
+						{
+							NICID:     types.StringNull(),
+							IPAddress: types.StringNull(),
+							Port:      types.Int64Value(80),
+						},
+					},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:             "backend-null-targets",
+					BalanceAlgorithm: lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+					TargetsType:      lbSDK.BackendType("INSTANCE"),
+					Targets: &[]lbSDK.NetworkBackendInstanceTargetRequest{
+						{
+							NicID:     nil,
+							IPAddress: nil,
+							Port:      80,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertBackendsToSDK(tt.input)
+
+			// Compare length first
+			assert.Equal(t, len(tt.expected), len(result))
+
+			// Compare each backend individually
+			for i, expectedBackend := range tt.expected {
+				if i < len(result) {
+					actualBackend := result[i]
+
+					// Compare all fields except Targets
+					assert.Equal(t, expectedBackend.Name, actualBackend.Name)
+					assert.Equal(t, expectedBackend.Description, actualBackend.Description)
+					assert.Equal(t, expectedBackend.HealthCheckName, actualBackend.HealthCheckName)
+					assert.Equal(t, expectedBackend.PanicThreshold, actualBackend.PanicThreshold)
+					assert.Equal(t, expectedBackend.CloseConnectionsOnHostHealthFailure, actualBackend.CloseConnectionsOnHostHealthFailure)
+					assert.Equal(t, expectedBackend.BalanceAlgorithm, actualBackend.BalanceAlgorithm)
+					assert.Equal(t, expectedBackend.TargetsType, actualBackend.TargetsType)
+
+					// Compare Targets content
+					if expectedBackend.Targets != nil && actualBackend.Targets != nil {
+						assert.Equal(t, len(*expectedBackend.Targets), len(*actualBackend.Targets))
+						for j, expectedTarget := range *expectedBackend.Targets {
+							if j < len(*actualBackend.Targets) {
+								actualTarget := (*actualBackend.Targets)[j]
+								assert.Equal(t, expectedTarget, actualTarget)
+							}
+						}
+					} else {
+						assert.Equal(t, expectedBackend.Targets == nil, actualBackend.Targets == nil)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertHealthChecksToSDK(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    *[]HealthCheckModel
+		expected []lbSDK.CreateNetworkHealthCheckRequest
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty slice",
+			input:    &[]HealthCheckModel{},
+			expected: nil,
+		},
+		{
+			name: "single health check with all fields",
+			input: &[]HealthCheckModel{
+				{
+					Name:                    types.StringValue("test-health-check"),
+					Description:             types.StringValue("Test health check"),
+					Protocol:                types.StringValue("HTTP"),
+					Port:                    types.Int64Value(80),
+					Path:                    types.StringValue("/health"),
+					HealthyStatusCode:       types.Int64Value(200),
+					IntervalSeconds:         types.Int64Value(30),
+					TimeoutSeconds:          types.Int64Value(5),
+					InitialDelaySeconds:     types.Int64Value(10),
+					HealthyThresholdCount:   types.Int64Value(3),
+					UnhealthyThresholdCount: types.Int64Value(2),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:                    "test-health-check",
+					Description:             stringPtr("Test health check"),
+					Protocol:                lbSDK.HealthCheckProtocol("HTTP"),
+					Port:                    80,
+					Path:                    stringPtr("/health"),
+					HealthyStatusCode:       intPtr(200),
+					IntervalSeconds:         intPtr(30),
+					TimeoutSeconds:          intPtr(5),
+					InitialDelaySeconds:     intPtr(10),
+					HealthyThresholdCount:   intPtr(3),
+					UnhealthyThresholdCount: intPtr(2),
+				},
+			},
+		},
+		{
+			name: "health check with null optional fields",
+			input: &[]HealthCheckModel{
+				{
+					Name:                    types.StringValue("minimal-health-check"),
+					Description:             types.StringNull(),
+					Protocol:                types.StringValue("TCP"),
+					Port:                    types.Int64Value(443),
+					Path:                    types.StringNull(),
+					HealthyStatusCode:       types.Int64Null(),
+					IntervalSeconds:         types.Int64Null(),
+					TimeoutSeconds:          types.Int64Null(),
+					InitialDelaySeconds:     types.Int64Null(),
+					HealthyThresholdCount:   types.Int64Null(),
+					UnhealthyThresholdCount: types.Int64Null(),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:                    "minimal-health-check",
+					Description:             nil,
+					Protocol:                lbSDK.HealthCheckProtocol("TCP"),
+					Port:                    443,
+					Path:                    nil,
+					HealthyStatusCode:       nil,
+					IntervalSeconds:         nil,
+					TimeoutSeconds:          nil,
+					InitialDelaySeconds:     nil,
+					HealthyThresholdCount:   nil,
+					UnhealthyThresholdCount: nil,
+				},
+			},
+		},
+		{
+			name: "multiple health checks",
+			input: &[]HealthCheckModel{
+				{
+					Name:     types.StringValue("http-check"),
+					Protocol: types.StringValue("HTTP"),
+					Port:     types.Int64Value(80),
+					Path:     types.StringValue("/"),
+				},
+				{
+					Name:     types.StringValue("tcp-check"),
+					Protocol: types.StringValue("TCP"),
+					Port:     types.Int64Value(443),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:     "http-check",
+					Protocol: lbSDK.HealthCheckProtocol("HTTP"),
+					Port:     80,
+					Path:     stringPtr("/"),
+				},
+				{
+					Name:     "tcp-check",
+					Protocol: lbSDK.HealthCheckProtocol("TCP"),
+					Port:     443,
+				},
+			},
+		},
+		{
+			name: "health check with zero values",
+			input: &[]HealthCheckModel{
+				{
+					Name:                    types.StringValue("zero-values"),
+					Protocol:                types.StringValue("HTTP"),
+					Port:                    types.Int64Value(0),
+					HealthyStatusCode:       types.Int64Value(0),
+					IntervalSeconds:         types.Int64Value(0),
+					TimeoutSeconds:          types.Int64Value(0),
+					InitialDelaySeconds:     types.Int64Value(0),
+					HealthyThresholdCount:   types.Int64Value(0),
+					UnhealthyThresholdCount: types.Int64Value(0),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:                    "zero-values",
+					Protocol:                lbSDK.HealthCheckProtocol("HTTP"),
+					Port:                    0,
+					HealthyStatusCode:       intPtr(0),
+					IntervalSeconds:         intPtr(0),
+					TimeoutSeconds:          intPtr(0),
+					InitialDelaySeconds:     intPtr(0),
+					HealthyThresholdCount:   intPtr(0),
+					UnhealthyThresholdCount: intPtr(0),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertHealthChecksToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertListenersToSDK(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    []ListenerModel
+		expected []lbSDK.NetworkListenerRequest
+	}{
+		{
+			name:     "empty slice",
+			input:    []ListenerModel{},
+			expected: nil,
+		},
+		{
+			name: "single listener with all fields",
+			input: []ListenerModel{
+				{
+					Name:               types.StringValue("test-listener"),
+					Description:        types.StringValue("Test listener description"),
+					Port:               types.Int64Value(443),
+					Protocol:           types.StringValue("HTTPS"),
+					TLSCertificateName: types.StringValue("test-cert"),
+					BackendName:        types.StringValue("test-backend"),
+				},
+			},
+			expected: []lbSDK.NetworkListenerRequest{
+				{
+					Name:               "test-listener",
+					Description:        stringPtr("Test listener description"),
+					Port:               443,
+					Protocol:           lbSDK.ListenerProtocol("HTTPS"),
+					TLSCertificateName: stringPtr("test-cert"),
+					BackendName:        "test-backend",
+				},
+			},
+		},
+		{
+			name: "listener with null optional fields",
+			input: []ListenerModel{
+				{
+					Name:               types.StringValue("minimal-listener"),
+					Description:        types.StringNull(),
+					Port:               types.Int64Value(80),
+					Protocol:           types.StringValue("HTTP"),
+					TLSCertificateName: types.StringNull(),
+					BackendName:        types.StringValue("backend-1"),
+				},
+			},
+			expected: []lbSDK.NetworkListenerRequest{
+				{
+					Name:               "minimal-listener",
+					Description:        nil,
+					Port:               80,
+					Protocol:           lbSDK.ListenerProtocol("HTTP"),
+					TLSCertificateName: nil,
+					BackendName:        "backend-1",
+				},
+			},
+		},
+		{
+			name: "multiple listeners",
+			input: []ListenerModel{
+				{
+					Name:        types.StringValue("http-listener"),
+					Port:        types.Int64Value(80),
+					Protocol:    types.StringValue("HTTP"),
+					BackendName: types.StringValue("web-backend"),
+				},
+				{
+					Name:               types.StringValue("https-listener"),
+					Port:               types.Int64Value(443),
+					Protocol:           types.StringValue("HTTPS"),
+					TLSCertificateName: types.StringValue("ssl-cert"),
+					BackendName:        types.StringValue("secure-backend"),
+				},
+			},
+			expected: []lbSDK.NetworkListenerRequest{
+				{
+					Name:        "http-listener",
+					Port:        80,
+					Protocol:    lbSDK.ListenerProtocol("HTTP"),
+					BackendName: "web-backend",
+				},
+				{
+					Name:               "https-listener",
+					Port:               443,
+					Protocol:           lbSDK.ListenerProtocol("HTTPS"),
+					TLSCertificateName: stringPtr("ssl-cert"),
+					BackendName:        "secure-backend",
+				},
+			},
+		},
+		{
+			name: "listener with zero port",
+			input: []ListenerModel{
+				{
+					Name:        types.StringValue("zero-port"),
+					Port:        types.Int64Value(0),
+					Protocol:    types.StringValue("TCP"),
+					BackendName: types.StringValue("backend"),
+				},
+			},
+			expected: []lbSDK.NetworkListenerRequest{
+				{
+					Name:        "zero-port",
+					Port:        0,
+					Protocol:    lbSDK.ListenerProtocol("TCP"),
+					BackendName: "backend",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertListenersToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertTLSCertificatesToSDK(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    *[]TLSCertificateModel
+		expected []lbSDK.CreateNetworkCertificateRequest
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty slice",
+			input:    &[]TLSCertificateModel{},
+			expected: nil,
+		},
+		{
+			name: "single certificate with all fields",
+			input: &[]TLSCertificateModel{
+				{
+					Name:        types.StringValue("test-cert"),
+					Description: types.StringValue("Test certificate"),
+					Certificate: types.StringValue("-----BEGIN CERTIFICATE-----\nMIIC..."),
+					PrivateKey:  types.StringValue("-----BEGIN PRIVATE KEY-----\nMIIE..."),
+				},
+			},
+			expected: []lbSDK.CreateNetworkCertificateRequest{
+				{
+					Name:        "test-cert",
+					Description: stringPtr("Test certificate"),
+					Certificate: "-----BEGIN CERTIFICATE-----\nMIIC...",
+					PrivateKey:  "-----BEGIN PRIVATE KEY-----\nMIIE...",
+				},
+			},
+		},
+		{
+			name: "certificate with null description",
+			input: &[]TLSCertificateModel{
+				{
+					Name:        types.StringValue("minimal-cert"),
+					Description: types.StringNull(),
+					Certificate: types.StringValue("cert-data"),
+					PrivateKey:  types.StringValue("key-data"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkCertificateRequest{
+				{
+					Name:        "minimal-cert",
+					Description: nil,
+					Certificate: "cert-data",
+					PrivateKey:  "key-data",
+				},
+			},
+		},
+		{
+			name: "multiple certificates",
+			input: &[]TLSCertificateModel{
+				{
+					Name:        types.StringValue("cert-1"),
+					Certificate: types.StringValue("cert-data-1"),
+					PrivateKey:  types.StringValue("key-data-1"),
+				},
+				{
+					Name:        types.StringValue("cert-2"),
+					Description: types.StringValue("Second certificate"),
+					Certificate: types.StringValue("cert-data-2"),
+					PrivateKey:  types.StringValue("key-data-2"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkCertificateRequest{
+				{
+					Name:        "cert-1",
+					Certificate: "cert-data-1",
+					PrivateKey:  "key-data-1",
+				},
+				{
+					Name:        "cert-2",
+					Description: stringPtr("Second certificate"),
+					Certificate: "cert-data-2",
+					PrivateKey:  "key-data-2",
+				},
+			},
+		},
+		{
+			name: "certificate with empty strings",
+			input: &[]TLSCertificateModel{
+				{
+					Name:        types.StringValue(""),
+					Description: types.StringValue(""),
+					Certificate: types.StringValue(""),
+					PrivateKey:  types.StringValue(""),
+				},
+			},
+			expected: []lbSDK.CreateNetworkCertificateRequest{
+				{
+					Name:        "",
+					Description: stringPtr(""),
+					Certificate: "",
+					PrivateKey:  "",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertTLSCertificatesToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_toTerraformModel(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		input    lbSDK.NetworkLoadBalancerResponse
+		expected LoadBalancerModel
+	}{
+		{
+			name: "complete load balancer",
+			input: lbSDK.NetworkLoadBalancerResponse{
+				ID:           "lb-123",
+				Name:         "test-lb",
+				Description:  stringPtr("Test load balancer"),
+				Type:         "APPLICATION",
+				Visibility:   lbSDK.LoadBalancerVisibility("PUBLIC"),
+				VPCID:        "vpc-123",
+				SubnetPoolID: stringPtr("subnet-pool-123"),
+				PublicIPs: []lbSDK.NetworkPublicIPResponse{
+					{ID: "public-ip-123"},
+				},
+				HealthChecks: []lbSDK.NetworkHealthCheckResponse{
+					{
+						ID:                      "hc-123",
+						Name:                    "test-hc",
+						Description:             stringPtr("Test health check"),
+						Protocol:                lbSDK.HealthCheckProtocol("HTTP"),
+						Port:                    80,
+						Path:                    stringPtr("/health"),
+						IntervalSeconds:         30,
+						TimeoutSeconds:          5,
+						HealthyStatusCode:       200,
+						HealthyThresholdCount:   3,
+						InitialDelaySeconds:     10,
+						UnhealthyThresholdCount: 2,
+					},
+				},
+				ACLs: []lbSDK.NetworkAclResponse{
+					{
+						ID:             "acl-123",
+						Action:         "ALLOW",
+						Ethertype:      lbSDK.AclEtherType("IPv4"),
+						Protocol:       lbSDK.AclProtocol("TCP"),
+						Name:           stringPtr("test-acl"),
+						RemoteIPPrefix: "0.0.0.0/0",
+					},
+				},
+				Backends: []lbSDK.NetworkBackendResponse{
+					{
+						ID:                                  "backend-123",
+						Name:                                "test-backend",
+						Description:                         stringPtr("Test backend"),
+						BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+						HealthCheckID:                       stringPtr("hc-123"),
+						PanicThreshold:                      float64Ptr(0.8),
+						CloseConnectionsOnHostHealthFailure: boolPtr(true),
+						TargetsType:                         lbSDK.BackendType("INSTANCE"),
+						Targets: []lbSDK.NetworkBackedTarget{
+							{
+								ID:        "target-123",
+								Port:      int64Ptr(8080),
+								NicID:     stringPtr("nic-123"),
+								IPAddress: stringPtr("192.168.1.10"),
+							},
+						},
+					},
+				},
+				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{
+					{
+						ID:          "cert-123",
+						Name:        "test-cert",
+						Description: stringPtr("Test certificate"),
+					},
+				},
+				Listeners: []lbSDK.NetworkListenerResponse{
+					{
+						ID:               "listener-123",
+						Name:             "test-listener",
+						Description:      stringPtr("Test listener"),
+						Port:             443,
+						Protocol:         lbSDK.ListenerProtocol("HTTPS"),
+						BackendID:        "backend-123",
+						TLSCertificateID: stringPtr("cert-123"),
+					},
+				},
+			},
+			expected: LoadBalancerModel{
+				ID:           types.StringValue("lb-123"),
+				Name:         types.StringValue("test-lb"),
+				Description:  types.StringValue("Test load balancer"),
+				PublicIPID:   types.StringValue("public-ip-123"),
+				SubnetpoolID: types.StringValue("subnet-pool-123"),
+				Type:         types.StringValue("APPLICATION"),
+				Visibility:   types.StringValue("PUBLIC"),
+				VPCID:        types.StringValue("vpc-123"),
+				ACLs: &[]ACLModel{
+					{
+						ID:             types.StringValue("acl-123"),
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Protocol:       types.StringValue("TCP"),
+						Name:           types.StringValue("test-acl"),
+						RemoteIPPrefix: types.StringValue("0.0.0.0/0"),
+					},
+				},
+				Backends: []BackendModel{
+					{
+						ID:                                  types.StringValue("backend-123"),
+						Name:                                types.StringValue("test-backend"),
+						Description:                         types.StringValue("Test backend"),
+						BalanceAlgorithm:                    types.StringValue("ROUND_ROBIN"),
+						HealthCheckName:                     types.StringValue("test-hc"),
+						PanicThreshold:                      types.Float64Value(0.8),
+						CloseConnectionsOnHostHealthFailure: types.BoolValue(true),
+						TargetsType:                         types.StringValue("INSTANCE"),
+						Targets: []TargetModel{
+							{
+								ID:        types.StringValue("target-123"),
+								Port:      types.Int64Value(8080),
+								NICID:     types.StringValue("nic-123"),
+								IPAddress: types.StringValue("192.168.1.10"),
+							},
+						},
+					},
+				},
+				HealthChecks: &[]HealthCheckModel{
+					{
+						ID:                      types.StringValue("hc-123"),
+						Name:                    types.StringValue("test-hc"),
+						Description:             types.StringValue("Test health check"),
+						Protocol:                types.StringValue("HTTP"),
+						Port:                    types.Int64Value(80),
+						Path:                    types.StringValue("/health"),
+						IntervalSeconds:         types.Int64Value(30),
+						TimeoutSeconds:          types.Int64Value(5),
+						HealthyStatusCode:       types.Int64Value(200),
+						HealthyThresholdCount:   types.Int64Value(3),
+						InitialDelaySeconds:     types.Int64Value(10),
+						UnhealthyThresholdCount: types.Int64Value(2),
+					},
+				},
+				Listeners: []ListenerModel{
+					{
+						ID:                 types.StringValue("listener-123"),
+						Name:               types.StringValue("test-listener"),
+						Description:        types.StringValue("Test listener"),
+						Port:               types.Int64Value(443),
+						Protocol:           types.StringValue("HTTPS"),
+						BackendName:        types.StringValue("test-backend"),
+						TLSCertificateName: types.StringValue("test-cert"),
+					},
+				},
+				TLSCertificates: &[]TLSCertificateModel{
+					{
+						ID:             types.StringValue("cert-123"),
+						Name:           types.StringValue("test-cert"),
+						Description:    types.StringValue("Test certificate"),
+						Certificate:    types.StringNull(),
+						PrivateKey:     types.StringNull(),
+						ExpirationDate: types.StringValue(""),
+					},
+				},
+			},
+		},
+		{
+			name: "minimal load balancer",
+			input: lbSDK.NetworkLoadBalancerResponse{
+				ID:              "lb-456",
+				Name:            "minimal-lb",
+				Type:            "NETWORK",
+				Visibility:      lbSDK.LoadBalancerVisibility("PRIVATE"),
+				VPCID:           "vpc-456",
+				HealthChecks:    []lbSDK.NetworkHealthCheckResponse{},
+				ACLs:            []lbSDK.NetworkAclResponse{},
+				Backends:        []lbSDK.NetworkBackendResponse{},
+				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
+				Listeners:       []lbSDK.NetworkListenerResponse{},
+				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+			},
+			expected: LoadBalancerModel{
+				ID:              types.StringValue("lb-456"),
+				Name:            types.StringValue("minimal-lb"),
+				Description:     types.StringNull(),
+				PublicIPID:      types.StringNull(),
+				SubnetpoolID:    types.StringNull(),
+				Type:            types.StringValue("NETWORK"),
+				Visibility:      types.StringValue("PRIVATE"),
+				VPCID:           types.StringValue("vpc-456"),
+				ACLs:            &[]ACLModel{},
+				Backends:        []BackendModel{},
+				HealthChecks:    &[]HealthCheckModel{},
+				Listeners:       []ListenerModel{},
+				TLSCertificates: &[]TLSCertificateModel{},
+			},
+		},
+		{
+			name: "load balancer with multiple public IPs",
+			input: lbSDK.NetworkLoadBalancerResponse{
+				ID:         "lb-multi-ip",
+				Name:       "multi-ip-lb",
+				Type:       "APPLICATION",
+				Visibility: lbSDK.LoadBalancerVisibility("PUBLIC"),
+				VPCID:      "vpc-multi",
+				PublicIPs: []lbSDK.NetworkPublicIPResponse{
+					{ID: "ip-1"},
+					{ID: "ip-2"},
+				},
+				HealthChecks:    []lbSDK.NetworkHealthCheckResponse{},
+				ACLs:            []lbSDK.NetworkAclResponse{},
+				Backends:        []lbSDK.NetworkBackendResponse{},
+				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
+				Listeners:       []lbSDK.NetworkListenerResponse{},
+			},
+			expected: LoadBalancerModel{
+				ID:              types.StringValue("lb-multi-ip"),
+				Name:            types.StringValue("multi-ip-lb"),
+				Description:     types.StringNull(),
+				PublicIPID:      types.StringNull(), // Should be null when multiple IPs
+				SubnetpoolID:    types.StringNull(),
+				Type:            types.StringValue("APPLICATION"),
+				Visibility:      types.StringValue("PUBLIC"),
+				VPCID:           types.StringValue("vpc-multi"),
+				ACLs:            &[]ACLModel{},
+				Backends:        []BackendModel{},
+				HealthChecks:    &[]HealthCheckModel{},
+				Listeners:       []ListenerModel{},
+				TLSCertificates: &[]TLSCertificateModel{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Note: The original implementation has a bug with uninitialized maps
+			// This test will help identify that issue
+			result := resource.toTerraformModel(ctx, tt.input)
+
+			// Compare each field individually for better error messages
+			assert.Equal(t, tt.expected.ID, result.ID)
+			assert.Equal(t, tt.expected.Name, result.Name)
+			assert.Equal(t, tt.expected.Description, result.Description)
+			assert.Equal(t, tt.expected.PublicIPID, result.PublicIPID)
+			assert.Equal(t, tt.expected.SubnetpoolID, result.SubnetpoolID)
+			assert.Equal(t, tt.expected.Type, result.Type)
+			assert.Equal(t, tt.expected.Visibility, result.Visibility)
+			assert.Equal(t, tt.expected.VPCID, result.VPCID)
+
+			// Compare slices
+			require.NotNil(t, result.ACLs)
+			assert.Equal(t, len(*tt.expected.ACLs), len(*result.ACLs))
+			for i, expectedACL := range *tt.expected.ACLs {
+				if i < len(*result.ACLs) {
+					actualACL := (*result.ACLs)[i]
+					assert.Equal(t, expectedACL, actualACL)
+				}
+			}
+
+			assert.Equal(t, len(tt.expected.Backends), len(result.Backends))
+			for i, expectedBackend := range tt.expected.Backends {
+				if i < len(result.Backends) {
+					actualBackend := result.Backends[i]
+					assert.Equal(t, expectedBackend, actualBackend)
+				}
+			}
+
+			require.NotNil(t, result.HealthChecks)
+			assert.Equal(t, len(*tt.expected.HealthChecks), len(*result.HealthChecks))
+
+			assert.Equal(t, len(tt.expected.Listeners), len(result.Listeners))
+
+			require.NotNil(t, result.TLSCertificates)
+			if tt.expected.TLSCertificates != nil {
+				assert.Equal(t, len(*tt.expected.TLSCertificates), len(*result.TLSCertificates))
+			}
+		})
+	}
+}
+
+// Helper functions for creating pointers
+func stringPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func float64Ptr(f float64) *float64 {
+	return &f
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+// Additional edge case tests for better coverage
+func TestLoadBalancerResource_convertACLsToSDK_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    *[]ACLModel
+		expected []lbSDK.CreateNetworkACLRequest
+	}{
+		{
+			name: "large slice of ACLs",
+			input: func() *[]ACLModel {
+				acls := make([]ACLModel, 100)
+				for i := 0; i < 100; i++ {
+					acls[i] = ACLModel{
+						Action:         types.StringValue("ALLOW"),
+						Name:           types.StringValue(fmt.Sprintf("acl-%d", i)),
+						Ethertype:      types.StringValue("IPv4"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("0.0.0.0/0"),
+					}
+				}
+				return &acls
+			}(),
+			expected: func() []lbSDK.CreateNetworkACLRequest {
+				acls := make([]lbSDK.CreateNetworkACLRequest, 100)
+				for i := 0; i < 100; i++ {
+					acls[i] = lbSDK.CreateNetworkACLRequest{
+						Action:         lbSDK.AclActionType("ALLOW"),
+						Name:           stringPtr(fmt.Sprintf("acl-%d", i)),
+						Ethertype:      lbSDK.AclEtherType("IPv4"),
+						Protocol:       lbSDK.AclProtocol("TCP"),
+						RemoteIPPrefix: "0.0.0.0/0",
+					}
+				}
+				return acls
+			}(),
+		},
+		{
+			name: "ACL with special characters in name",
+			input: &[]ACLModel{
+				{
+					Action:         types.StringValue("DENY"),
+					Name:           types.StringValue("acl-with-special-chars-!@#$%^&*()"),
+					Ethertype:      types.StringValue("IPv6"),
+					Protocol:       types.StringValue("UDP"),
+					RemoteIPPrefix: types.StringValue("::/0"),
+				},
+			},
+			expected: []lbSDK.CreateNetworkACLRequest{
+				{
+					Action:         lbSDK.AclActionType("DENY"),
+					Name:           stringPtr("acl-with-special-chars-!@#$%^&*()"),
+					Ethertype:      lbSDK.AclEtherType("IPv6"),
+					Protocol:       lbSDK.AclProtocol("UDP"),
+					RemoteIPPrefix: "::/0",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertACLsToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertBackendsToSDK_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    []BackendModel
+		expected []lbSDK.CreateNetworkBackendRequest
+	}{
+		{
+			name: "backend with extreme values",
+			input: []BackendModel{
+				{
+					Name:                                types.StringValue("extreme-backend"),
+					PanicThreshold:                      types.Float64Value(1.0),
+					CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+					BalanceAlgorithm:                    types.StringValue("WEIGHTED_ROUND_ROBIN"),
+					TargetsType:                         types.StringValue("IP"),
+					Targets: []TargetModel{
+						{
+							Port:      types.Int64Value(65535), // Max port
+							IPAddress: types.StringValue("255.255.255.255"),
+						},
+						{
+							Port:      types.Int64Value(1), // Min port
+							IPAddress: types.StringValue("0.0.0.0"),
+						},
+					},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:                                "extreme-backend",
+					PanicThreshold:                      float64Ptr(1.0),
+					CloseConnectionsOnHostHealthFailure: boolPtr(false),
+					BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("WEIGHTED_ROUND_ROBIN"),
+					TargetsType:                         lbSDK.BackendType("IP"),
+					Targets: &[]lbSDK.NetworkBackendInstanceTargetRequest{
+						{
+							Port:      65535,
+							IPAddress: stringPtr("255.255.255.255"),
+						},
+						{
+							Port:      1,
+							IPAddress: stringPtr("0.0.0.0"),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "backend with zero panic threshold",
+			input: []BackendModel{
+				{
+					Name:             types.StringValue("zero-panic"),
+					PanicThreshold:   types.Float64Value(0.0),
+					BalanceAlgorithm: types.StringValue("ROUND_ROBIN"),
+					TargetsType:      types.StringValue("INSTANCE"),
+					Targets:          []TargetModel{},
+				},
+			},
+			expected: []lbSDK.CreateNetworkBackendRequest{
+				{
+					Name:             "zero-panic",
+					PanicThreshold:   float64Ptr(0.0),
+					BalanceAlgorithm: lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+					TargetsType:      lbSDK.BackendType("INSTANCE"),
+					Targets:          &[]lbSDK.NetworkBackendInstanceTargetRequest{},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertBackendsToSDK(tt.input)
+
+			// Use the same comparison logic as the main test
+			assert.Equal(t, len(tt.expected), len(result))
+			for i, expectedBackend := range tt.expected {
+				if i < len(result) {
+					actualBackend := result[i]
+					assert.Equal(t, expectedBackend.Name, actualBackend.Name)
+					assert.Equal(t, expectedBackend.Description, actualBackend.Description)
+					assert.Equal(t, expectedBackend.HealthCheckName, actualBackend.HealthCheckName)
+					assert.Equal(t, expectedBackend.PanicThreshold, actualBackend.PanicThreshold)
+					assert.Equal(t, expectedBackend.CloseConnectionsOnHostHealthFailure, actualBackend.CloseConnectionsOnHostHealthFailure)
+					assert.Equal(t, expectedBackend.BalanceAlgorithm, actualBackend.BalanceAlgorithm)
+					assert.Equal(t, expectedBackend.TargetsType, actualBackend.TargetsType)
+
+					if expectedBackend.Targets != nil && actualBackend.Targets != nil {
+						assert.Equal(t, len(*expectedBackend.Targets), len(*actualBackend.Targets))
+						for j, expectedTarget := range *expectedBackend.Targets {
+							if j < len(*actualBackend.Targets) {
+								actualTarget := (*actualBackend.Targets)[j]
+								assert.Equal(t, expectedTarget, actualTarget)
+							}
+						}
+					} else {
+						assert.Equal(t, expectedBackend.Targets == nil, actualBackend.Targets == nil)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestLoadBalancerResource_convertHealthChecksToSDK_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+
+	tests := []struct {
+		name     string
+		input    *[]HealthCheckModel
+		expected []lbSDK.CreateNetworkHealthCheckRequest
+	}{
+		{
+			name: "health check with maximum values",
+			input: &[]HealthCheckModel{
+				{
+					Name:                    types.StringValue("max-values-hc"),
+					Protocol:                types.StringValue("HTTPS"),
+					Port:                    types.Int64Value(65535),
+					Path:                    types.StringValue("/very/long/path/to/health/check/endpoint/that/might/be/used/in/some/applications"),
+					HealthyStatusCode:       types.Int64Value(999),
+					IntervalSeconds:         types.Int64Value(3600), // 1 hour
+					TimeoutSeconds:          types.Int64Value(300),  // 5 minutes
+					InitialDelaySeconds:     types.Int64Value(3600), // 1 hour
+					HealthyThresholdCount:   types.Int64Value(100),
+					UnhealthyThresholdCount: types.Int64Value(100),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:                    "max-values-hc",
+					Protocol:                lbSDK.HealthCheckProtocol("HTTPS"),
+					Port:                    65535,
+					Path:                    stringPtr("/very/long/path/to/health/check/endpoint/that/might/be/used/in/some/applications"),
+					HealthyStatusCode:       intPtr(999),
+					IntervalSeconds:         intPtr(3600),
+					TimeoutSeconds:          intPtr(300),
+					InitialDelaySeconds:     intPtr(3600),
+					HealthyThresholdCount:   intPtr(100),
+					UnhealthyThresholdCount: intPtr(100),
+				},
+			},
+		},
+		{
+			name: "health check with negative values (edge case)",
+			input: &[]HealthCheckModel{
+				{
+					Name:                    types.StringValue("negative-values"),
+					Protocol:                types.StringValue("TCP"),
+					Port:                    types.Int64Value(-1), // Invalid but testing conversion
+					HealthyStatusCode:       types.Int64Value(-1),
+					IntervalSeconds:         types.Int64Value(-1),
+					TimeoutSeconds:          types.Int64Value(-1),
+					InitialDelaySeconds:     types.Int64Value(-1),
+					HealthyThresholdCount:   types.Int64Value(-1),
+					UnhealthyThresholdCount: types.Int64Value(-1),
+				},
+			},
+			expected: []lbSDK.CreateNetworkHealthCheckRequest{
+				{
+					Name:                    "negative-values",
+					Protocol:                lbSDK.HealthCheckProtocol("TCP"),
+					Port:                    -1,
+					HealthyStatusCode:       intPtr(-1),
+					IntervalSeconds:         intPtr(-1),
+					TimeoutSeconds:          intPtr(-1),
+					InitialDelaySeconds:     intPtr(-1),
+					HealthyThresholdCount:   intPtr(-1),
+					UnhealthyThresholdCount: intPtr(-1),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.convertHealthChecksToSDK(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoadBalancerResource_toTerraformModel_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	resource := &LoadBalancerResource{}
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		input    lbSDK.NetworkLoadBalancerResponse
+		expected LoadBalancerModel
+	}{
+		{
+			name: "load balancer with empty string fields",
+			input: lbSDK.NetworkLoadBalancerResponse{
+				ID:              "",
+				Name:            "",
+				Type:            "",
+				Visibility:      lbSDK.LoadBalancerVisibility(""),
+				VPCID:           "",
+				HealthChecks:    []lbSDK.NetworkHealthCheckResponse{},
+				ACLs:            []lbSDK.NetworkAclResponse{},
+				Backends:        []lbSDK.NetworkBackendResponse{},
+				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
+				Listeners:       []lbSDK.NetworkListenerResponse{},
+				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+			},
+			expected: LoadBalancerModel{
+				ID:              types.StringValue(""),
+				Name:            types.StringValue(""),
+				Description:     types.StringNull(),
+				PublicIPID:      types.StringNull(),
+				SubnetpoolID:    types.StringNull(),
+				Type:            types.StringValue(""),
+				Visibility:      types.StringValue(""),
+				VPCID:           types.StringValue(""),
+				ACLs:            &[]ACLModel{},
+				Backends:        []BackendModel{},
+				HealthChecks:    &[]HealthCheckModel{},
+				Listeners:       []ListenerModel{},
+				TLSCertificates: &[]TLSCertificateModel{},
+			},
+		},
+		{
+			name: "load balancer with backend without health check",
+			input: lbSDK.NetworkLoadBalancerResponse{
+				ID:         "lb-no-hc",
+				Name:       "no-health-check-lb",
+				Type:       "APPLICATION",
+				Visibility: lbSDK.LoadBalancerVisibility("PUBLIC"),
+				VPCID:      "vpc-123",
+				Backends: []lbSDK.NetworkBackendResponse{
+					{
+						ID:                                  "backend-no-hc",
+						Name:                                "backend-without-health-check",
+						HealthCheckID:                       nil, // No health check
+						BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+						CloseConnectionsOnHostHealthFailure: nil,
+						TargetsType:                         lbSDK.BackendType("INSTANCE"),
+						Targets:                             []lbSDK.NetworkBackedTarget{},
+					},
+				},
+				HealthChecks:    []lbSDK.NetworkHealthCheckResponse{},
+				ACLs:            []lbSDK.NetworkAclResponse{},
+				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
+				Listeners:       []lbSDK.NetworkListenerResponse{},
+				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+			},
+			expected: LoadBalancerModel{
+				ID:           types.StringValue("lb-no-hc"),
+				Name:         types.StringValue("no-health-check-lb"),
+				Description:  types.StringNull(),
+				PublicIPID:   types.StringNull(),
+				SubnetpoolID: types.StringNull(),
+				Type:         types.StringValue("APPLICATION"),
+				Visibility:   types.StringValue("PUBLIC"),
+				VPCID:        types.StringValue("vpc-123"),
+				Backends: []BackendModel{
+					{
+						ID:                                  types.StringValue("backend-no-hc"),
+						Name:                                types.StringValue("backend-without-health-check"),
+						Description:                         types.StringNull(),
+						BalanceAlgorithm:                    types.StringValue("ROUND_ROBIN"),
+						HealthCheckName:                     types.StringNull(), // Null when no health check
+						PanicThreshold:                      types.Float64Null(),
+						CloseConnectionsOnHostHealthFailure: types.BoolNull(),
+						TargetsType:                         types.StringValue("INSTANCE"),
+						Targets:                             nil,
+					},
+				},
+				ACLs:            &[]ACLModel{},
+				HealthChecks:    &[]HealthCheckModel{},
+				Listeners:       []ListenerModel{},
+				TLSCertificates: &[]TLSCertificateModel{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resource.toTerraformModel(ctx, tt.input)
+
+			// Compare main fields
+			assert.Equal(t, tt.expected.ID, result.ID)
+			assert.Equal(t, tt.expected.Name, result.Name)
+			assert.Equal(t, tt.expected.Description, result.Description)
+			assert.Equal(t, tt.expected.PublicIPID, result.PublicIPID)
+			assert.Equal(t, tt.expected.SubnetpoolID, result.SubnetpoolID)
+			assert.Equal(t, tt.expected.Type, result.Type)
+			assert.Equal(t, tt.expected.Visibility, result.Visibility)
+			assert.Equal(t, tt.expected.VPCID, result.VPCID)
+
+			// Compare slice lengths and content
+			require.NotNil(t, result.ACLs)
+			assert.Equal(t, len(*tt.expected.ACLs), len(*result.ACLs))
+
+			assert.Equal(t, len(tt.expected.Backends), len(result.Backends))
+			for i, expectedBackend := range tt.expected.Backends {
+				if i < len(result.Backends) {
+					actualBackend := result.Backends[i]
+					assert.Equal(t, expectedBackend, actualBackend)
+				}
+			}
+
+			require.NotNil(t, result.HealthChecks)
+			assert.Equal(t, len(*tt.expected.HealthChecks), len(*result.HealthChecks))
+
+			assert.Equal(t, len(tt.expected.Listeners), len(result.Listeners))
+
+			require.NotNil(t, result.TLSCertificates)
+			assert.Equal(t, len(*tt.expected.TLSCertificates), len(*result.TLSCertificates))
+		})
+	}
+}
