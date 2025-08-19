@@ -785,7 +785,7 @@ func TestLoadBalancerResource_toTerraformModel(t *testing.T) {
 						BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
 						HealthCheckID:                       stringPtr("hc-123"),
 						PanicThreshold:                      float64Ptr(0.8),
-						CloseConnectionsOnHostHealthFailure: true,
+						CloseConnectionsOnHostHealthFailure: boolPtr(true),
 						TargetsType:                         lbSDK.BackendType("INSTANCE"),
 						Targets: []lbSDK.NetworkBackedTarget{
 							{
@@ -1344,7 +1344,7 @@ func TestLoadBalancerResource_toTerraformModel_EdgeCases(t *testing.T) {
 						Name:                                "backend-without-health-check",
 						HealthCheckID:                       nil, // No health check
 						BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
-						CloseConnectionsOnHostHealthFailure: false,
+						CloseConnectionsOnHostHealthFailure: nil,
 						TargetsType:                         lbSDK.BackendType("INSTANCE"),
 						Targets:                             []lbSDK.NetworkBackedTarget{},
 					},
@@ -1370,9 +1370,9 @@ func TestLoadBalancerResource_toTerraformModel_EdgeCases(t *testing.T) {
 						Name:                                types.StringValue("backend-without-health-check"),
 						Description:                         types.StringNull(),
 						BalanceAlgorithm:                    types.StringValue("ROUND_ROBIN"),
-						HealthCheckName:                     types.StringValue(""), // Empty string when no health check
+						HealthCheckName:                     types.StringNull(), // Null when no health check
 						PanicThreshold:                      types.Float64Null(),
-						CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+						CloseConnectionsOnHostHealthFailure: types.BoolNull(),
 						TargetsType:                         types.StringValue("INSTANCE"),
 						Targets:                             nil,
 					},

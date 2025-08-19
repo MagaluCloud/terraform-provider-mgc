@@ -2,8 +2,11 @@ package resources
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,9 +17,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	lbaasvalidators "github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil/lbaas"
 )
 
 const LoadBalancerTimeout = 90 * time.Minute
@@ -114,7 +119,7 @@ func NewLoadBalancerResource() resource.Resource {
 }
 
 func (r *LoadBalancerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_lbaas_networklbs"
+	resp.TypeName = req.ProviderTypeName + "_lbaas_network"
 }
 
 func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -140,7 +145,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 
 func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages network load balancers in Magalu Cloud.",
+		Description: "Manages network load balancers in Magalu Cloud. Note: Enum values are case-sensitive and must match API requirements exactly.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the load balancer.",
@@ -158,34 +163,37 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 			},
 			"public_ip_id": schema.StringAttribute{
-				Description: "The ID of the public IP associated with the load balancer.",
-				Required:    true,
+				Description: "The ID of the public IP associated with the load balancer. Required for external load balancers, must be omitted for internal load balancers.",
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"subnetpool_id": schema.StringAttribute{
 				Description: "The ID of the subnet pool for the load balancer.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The type of the load balancer.",
+				Description: "The type of the load balancer. Only 'proxy' type is currently supported by the API.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("application", "network"),
+					stringvalidator.OneOf("proxy"),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"visibility": schema.StringAttribute{
-				Description: "The visibility of the load balancer.",
+				Description: "The visibility of the load balancer. Valid values: 'internal' (accessible only within VPC), 'external' (accessible from internet).",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("internal", "external"),
+					lbaasvalidators.VisibilityValidator{},
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -208,10 +216,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							Computed:    true,
 						},
 						"action": schema.StringAttribute{
-							Description: "The action for the ACL rule.",
+							Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("allow", "deny"),
+								stringvalidator.OneOf("ALLOW", "DENY", "DENY_UNSPECIFIED"),
 							},
 						},
 						"ethertype": schema.StringAttribute{
@@ -263,21 +271,25 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"close_connections_on_host_health_failure": schema.BoolAttribute{
 							Description: "Whether to close connections when a host health check fails.",
 							Optional:    true,
+							Computed:    true,
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the backend.",
 							Required:    true,
 						},
-						"panic_threshold": schema.Int64Attribute{
+						"panic_threshold": schema.Float64Attribute{
 							Description: "The panic threshold percentage for the backend.",
 							Optional:    true,
-							Validators: []validator.Int64{
-								int64validator.Between(0, 100),
+							Validators: []validator.Float64{
+								float64validator.Between(0, 100),
 							},
 						},
 						"targets": schema.ListNestedAttribute{
 							Description: "The targets for this backend.",
 							Required:    true,
+							Validators: []validator.List{
+								lbaasvalidators.TargetValidator{},
+							},
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"id": schema.StringAttribute{
@@ -285,11 +297,11 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 										Computed:    true,
 									},
 									"nic_id": schema.StringAttribute{
-										Description: "The NIC ID of the target.",
+										Description: "The NIC ID of the target. Required when targets_type is 'instance', must be empty when targets_type is 'raw'.",
 										Optional:    true,
 									},
 									"ip_address": schema.StringAttribute{
-										Description: "The IP address of the target.",
+										Description: "The IP address of the target. Required when targets_type is 'raw', must be empty when targets_type is 'instance'.",
 										Optional:    true,
 									},
 									"port": schema.Int64Attribute{
@@ -303,10 +315,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 						},
 						"targets_type": schema.StringAttribute{
-							Description: "The type of targets.",
+							Description: "The type of targets. Valid values: 'instance' (requires nic_id and port), 'raw' (requires ip_address and port).",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("instance"),
+								stringvalidator.OneOf("instance", "raw"),
 							},
 						},
 					},
@@ -373,10 +385,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 						},
 						"protocol": schema.StringAttribute{
-							Description: "The protocol for health checks.",
+							Description: "The protocol for health checks. Valid values: 'tcp', 'http'. Note: values are case-sensitive and must be lowercase.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("HTTP", "HTTPS", "TCP", "UDP"),
+								stringvalidator.OneOf("tcp", "http"),
 							},
 						},
 						"timeout_seconds": schema.Int64Attribute{
@@ -427,10 +439,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 						},
 						"protocol": schema.StringAttribute{
-							Description: "The protocol for the listener.",
+							Description: "The protocol for the listener. Valid values: 'tcp' (for network load balancers), 'tls' (for SSL/TLS termination). Note: values are case-sensitive and must be lowercase.",
 							Required:    true,
 							Validators: []validator.String{
-								stringvalidator.OneOf("HTTP", "HTTPS", "TCP", "UDP"),
+								stringvalidator.OneOf("tcp", "tls"),
 							},
 						},
 						"tls_certificate_name": schema.StringAttribute{
@@ -507,6 +519,17 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	data.ID = types.StringValue(createdLB)
+	getLB, err := r.waitLoadBalancerState(ctx, createdLB, lbSDK.LoadBalancerStatusRunning)
+	if err != nil {
+		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+		return
+	}
+	if getLB == nil {
+		resp.Diagnostics.AddError("Load Balancer not found", fmt.Sprintf("Load Balancer with ID %s not found after creation.", createdLB))
+		return
+	}
+
+	data = r.toTerraformModel(ctx, *getLB)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -541,6 +564,8 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if !planData.Description.Equal(stateData.Description) || !planData.Name.Equal(stateData.Name) {
+		stateData.Description = planData.Description
+		stateData.Name = planData.Name
 		_, err := r.lbNetworkLB.Update(ctx, planData.ID.ValueString(), lbSDK.UpdateNetworkLoadBalancerRequest{
 			Description: planData.Description.ValueStringPointer(),
 			Name:        planData.Name.ValueStringPointer(),
@@ -550,8 +575,7 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, planData)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, stateData)...)
 }
 
 func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -561,13 +585,27 @@ func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
+	deletePublicIP := true
 	err := r.lbNetworkLB.Delete(ctx, data.ID.ValueString(), lbSDK.DeleteNetworkLoadBalancerRequest{
-		// DeletePublicIP: *bool,
+		DeletePublicIP: &deletePublicIP,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
 		return
 	}
+	_, err = r.waitLoadBalancerState(ctx, data.ID.ValueString(), lbSDK.LoadBalancerStatusDeleted)
+	if err != nil {
+		switch e := err.(type) {
+		case *clientSDK.HTTPError:
+			if e.StatusCode == http.StatusNotFound {
+				return
+			}
+		default:
+			resp.Diagnostics.AddError(tfutil.ParseSDKError(err))
+			return
+		}
+	}
+
 }
 
 func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -722,9 +760,10 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 			})
 		}
 
-		var healthCheckName string
+		var healthCheckName *string
 		if backend.HealthCheckID != nil {
-			healthCheckName = healthCheckIDsNames[*backend.HealthCheckID]
+			name := healthCheckIDsNames[*backend.HealthCheckID]
+			healthCheckName = &name
 		}
 
 		backendModels = append(backendModels, BackendModel{
@@ -732,9 +771,9 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 			Name:                                types.StringValue(backend.Name),
 			Description:                         types.StringPointerValue(backend.Description),
 			BalanceAlgorithm:                    types.StringValue(string(backend.BalanceAlgorithm)),
-			HealthCheckName:                     types.StringValue(healthCheckName),
+			HealthCheckName:                     types.StringPointerValue(healthCheckName),
 			PanicThreshold:                      types.Float64PointerValue(backend.PanicThreshold),
-			CloseConnectionsOnHostHealthFailure: types.BoolValue(backend.CloseConnectionsOnHostHealthFailure),
+			CloseConnectionsOnHostHealthFailure: types.BoolPointerValue(backend.CloseConnectionsOnHostHealthFailure),
 			TargetsType:                         types.StringValue(string(backend.TargetsType)),
 			Targets:                             targets,
 		})
@@ -761,30 +800,31 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 
 	var listenerModels []ListenerModel
 	for _, listener := range lb.Listeners {
-		var tlsCertificateName string
-		if listener.TLSCertificateID != nil {
-			tlsCertificateName = tlsCertificatesIDsNames[*listener.TLSCertificateID]
+		lm := ListenerModel{
+			ID:          types.StringValue(listener.ID),
+			Name:        types.StringValue(listener.Name),
+			Description: types.StringPointerValue(listener.Description),
+			Port:        types.Int64Value(int64(listener.Port)),
+			Protocol:    types.StringValue(string(listener.Protocol)),
 		}
-		listenerModels = append(listenerModels, ListenerModel{
-			ID:                 types.StringValue(listener.ID),
-			Name:               types.StringValue(listener.Name),
-			Description:        types.StringPointerValue(listener.Description),
-			Port:               types.Int64Value(int64(listener.Port)),
-			Protocol:           types.StringValue(string(listener.Protocol)),
-			BackendName:        types.StringValue(backendIDsNames[listener.BackendID]),
-			TLSCertificateName: types.StringValue(tlsCertificateName),
-		})
+
+		if listener.TLSCertificateID != nil {
+			if tlsName, exists := tlsCertificatesIDsNames[*listener.TLSCertificateID]; exists {
+				lm.TLSCertificateName = types.StringValue(tlsName)
+			}
+		}
+
+		if backendName, exists := backendIDsNames[listener.BackendID]; exists {
+			lm.BackendName = types.StringValue(backendName)
+		}
+
+		listenerModels = append(listenerModels, lm)
 	}
 
-	var publicIPID string
-	if len(lb.PublicIPs) == 1 {
-		publicIPID = lb.PublicIPs[0].ID
-	}
 	loadBalancer := LoadBalancerModel{
 		ID:              types.StringValue(lb.ID),
 		Name:            types.StringValue(lb.Name),
 		Description:     types.StringPointerValue(lb.Description),
-		PublicIPID:      types.StringValue(publicIPID),
 		SubnetpoolID:    types.StringPointerValue(lb.SubnetPoolID),
 		Type:            types.StringValue(lb.Type),
 		Visibility:      types.StringValue(string(lb.Visibility)),
@@ -796,5 +836,33 @@ func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.Ne
 		TLSCertificates: &tlsCertificates,
 	}
 
+	if len(lb.PublicIPs) == 1 {
+		loadBalancer.PublicIPID = types.StringValue(lb.PublicIPs[0].ID)
+	} else {
+		loadBalancer.PublicIPID = types.StringNull()
+	}
+
 	return loadBalancer
+}
+
+func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID string, desiredState lbSDK.LoadBalancerStatus) (*lbSDK.NetworkLoadBalancerResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, LoadBalancerTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("timeout waiting for load balancer %s to reach status %s", lbID, desiredState)
+		case <-time.After(10 * time.Second):
+			lb, err := r.lbNetworkLB.Get(ctx, lbID)
+			if err != nil {
+				return nil, err
+			}
+			if lb.Status == lbSDK.LoadBalancerStatusFailed {
+				return nil, fmt.Errorf("load balancer %s is in error state", lbID)
+			}
+			if lb.Status == desiredState {
+				return &lb, nil
+			}
+		}
+	}
 }
