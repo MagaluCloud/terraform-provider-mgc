@@ -428,11 +428,11 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		Type:            data.Type.ValueStringPointer(),
 		Visibility:      lbSDK.LoadBalancerVisibility(data.Visibility.ValueString()),
 		VPCID:           data.VPCID.ValueString(),
-		ACLs:            r.convertACLsToSDK(data.ACLs),
-		Backends:        r.convertBackendsToSDK(data.Backends),
-		HealthChecks:    r.convertHealthChecksToSDK(data.HealthChecks),
-		Listeners:       r.convertListenersToSDK(data.Listeners),
-		TLSCertificates: r.convertTLSCertificatesToSDK(data.TLSCertificates),
+		ACLs:            data.ConvertACLsToSDK(),
+		Backends:        data.ConvertBackendsToSDK(),
+		HealthChecks:    data.ConvertHealthChecksToSDK(),
+		Listeners:       data.ConvertListenersToSDK(),
+		TLSCertificates: data.ConvertTLSCertificatesToSDK(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -450,7 +450,7 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	data = r.toTerraformModel(ctx, *getLB)
+	data = data.ToTerraformNetworkResource(ctx, *getLB)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -467,7 +467,7 @@ func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	data = r.toTerraformModel(ctx, lb)
+	data = data.ToTerraformNetworkResource(ctx, lb)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -531,239 +531,6 @@ func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 
 func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-func (r *LoadBalancerResource) convertACLsToSDK(acls *[]ACLModel) []lbSDK.CreateNetworkACLRequest {
-	if acls == nil {
-		return nil
-	}
-
-	var aclRequests []lbSDK.CreateNetworkACLRequest
-	for _, acl := range *acls {
-		aclRequests = append(aclRequests, lbSDK.CreateNetworkACLRequest{
-			Action:         lbSDK.AclActionType(acl.Action.ValueString()),
-			Name:           acl.Name.ValueStringPointer(),
-			Ethertype:      lbSDK.AclEtherType(acl.Ethertype.ValueString()),
-			Protocol:       lbSDK.AclProtocol(acl.Protocol.ValueString()),
-			RemoteIPPrefix: acl.RemoteIPPrefix.ValueString(),
-		})
-	}
-	return aclRequests
-}
-
-func (r *LoadBalancerResource) convertBackendsToSDK(backends []BackendModel) []lbSDK.CreateNetworkBackendRequest {
-	var backendRequests []lbSDK.CreateNetworkBackendRequest
-	for _, backend := range backends {
-
-		var targets []lbSDK.NetworkBackendInstanceTargetRequest
-		for _, target := range backend.Targets {
-			targets = append(targets, lbSDK.NetworkBackendInstanceTargetRequest{
-				NicID:     target.NICID.ValueStringPointer(),
-				Port:      target.Port.ValueInt64(),
-				IPAddress: target.IPAddress.ValueStringPointer(),
-			})
-		}
-
-		backendRequests = append(backendRequests, lbSDK.CreateNetworkBackendRequest{
-			HealthCheckName:                     backend.HealthCheckName.ValueStringPointer(),
-			Name:                                backend.Name.ValueString(),
-			Description:                         backend.Description.ValueStringPointer(),
-			PanicThreshold:                      backend.PanicThreshold.ValueFloat64Pointer(),
-			CloseConnectionsOnHostHealthFailure: backend.CloseConnectionsOnHostHealthFailure.ValueBoolPointer(),
-			BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm(backend.BalanceAlgorithm.ValueString()),
-			TargetsType:                         lbSDK.BackendType(backend.TargetsType.ValueString()),
-			Targets:                             &targets,
-		})
-	}
-	return backendRequests
-}
-
-func (r *LoadBalancerResource) convertHealthChecksToSDK(healthChecks *[]HealthCheckModel) []lbSDK.CreateNetworkHealthCheckRequest {
-	if healthChecks == nil {
-		return nil
-	}
-
-	var healthCheckRequests []lbSDK.CreateNetworkHealthCheckRequest
-	for _, healthCheck := range *healthChecks {
-		healthCheckRequests = append(healthCheckRequests, lbSDK.CreateNetworkHealthCheckRequest{
-			Name:                    healthCheck.Name.ValueString(),
-			Description:             healthCheck.Description.ValueStringPointer(),
-			Protocol:                lbSDK.HealthCheckProtocol(healthCheck.Protocol.ValueString()),
-			Port:                    int(healthCheck.Port.ValueInt64()),
-			Path:                    healthCheck.Path.ValueStringPointer(),
-			HealthyStatusCode:       utils.ConvertInt64PointerToIntPointer(healthCheck.HealthyStatusCode.ValueInt64Pointer()),
-			IntervalSeconds:         utils.ConvertInt64PointerToIntPointer(healthCheck.IntervalSeconds.ValueInt64Pointer()),
-			TimeoutSeconds:          utils.ConvertInt64PointerToIntPointer(healthCheck.TimeoutSeconds.ValueInt64Pointer()),
-			InitialDelaySeconds:     utils.ConvertInt64PointerToIntPointer(healthCheck.InitialDelaySeconds.ValueInt64Pointer()),
-			HealthyThresholdCount:   utils.ConvertInt64PointerToIntPointer(healthCheck.HealthyThresholdCount.ValueInt64Pointer()),
-			UnhealthyThresholdCount: utils.ConvertInt64PointerToIntPointer(healthCheck.UnhealthyThresholdCount.ValueInt64Pointer()),
-		})
-	}
-	return healthCheckRequests
-}
-
-func (r *LoadBalancerResource) convertListenersToSDK(listeners []ListenerModel) []lbSDK.NetworkListenerRequest {
-	var listenerRequests []lbSDK.NetworkListenerRequest
-	for _, listener := range listeners {
-		listenerRequests = append(listenerRequests, lbSDK.NetworkListenerRequest{
-			Name:               listener.Name.ValueString(),
-			Description:        listener.Description.ValueStringPointer(),
-			Port:               int(listener.Port.ValueInt64()),
-			Protocol:           lbSDK.ListenerProtocol(listener.Protocol.ValueString()),
-			TLSCertificateName: listener.TLSCertificateName.ValueStringPointer(),
-			BackendName:        listener.BackendName.ValueString(),
-		})
-	}
-	return listenerRequests
-}
-
-func (r *LoadBalancerResource) convertTLSCertificatesToSDK(certificates *[]TLSCertificateModel) []lbSDK.CreateNetworkCertificateRequest {
-	if certificates == nil {
-		return nil
-	}
-
-	var certificateRequests []lbSDK.CreateNetworkCertificateRequest
-	for _, certificate := range *certificates {
-		certificateRequests = append(certificateRequests, lbSDK.CreateNetworkCertificateRequest{
-			Name:        certificate.Name.ValueString(),
-			Description: certificate.Description.ValueStringPointer(),
-			Certificate: certificate.Certificate.ValueString(),
-			PrivateKey:  certificate.PrivateKey.ValueString(),
-		})
-	}
-	return certificateRequests
-}
-
-func (r *LoadBalancerResource) toTerraformModel(ctx context.Context, lb lbSDK.NetworkLoadBalancerResponse) LoadBalancerModel {
-	healthCheckIDsNames := make(map[string]string)
-	var healthCheckModels []HealthCheckModel
-	for _, healthCheck := range lb.HealthChecks {
-		healthCheckIDsNames[healthCheck.ID] = healthCheck.Name
-		healthCheckModels = append(healthCheckModels, HealthCheckModel{
-			ID:                      types.StringValue(healthCheck.ID),
-			Name:                    types.StringValue(healthCheck.Name),
-			Description:             types.StringPointerValue(healthCheck.Description),
-			Protocol:                types.StringValue(string(healthCheck.Protocol)),
-			Port:                    types.Int64Value(int64(healthCheck.Port)),
-			Path:                    types.StringPointerValue(healthCheck.Path),
-			IntervalSeconds:         types.Int64Value(int64(healthCheck.IntervalSeconds)),
-			TimeoutSeconds:          types.Int64Value(int64(healthCheck.TimeoutSeconds)),
-			HealthyStatusCode:       types.Int64Value(int64(healthCheck.HealthyStatusCode)),
-			HealthyThresholdCount:   types.Int64Value(int64(healthCheck.HealthyThresholdCount)),
-			InitialDelaySeconds:     types.Int64Value(int64(healthCheck.InitialDelaySeconds)),
-			UnhealthyThresholdCount: types.Int64Value(int64(healthCheck.UnhealthyThresholdCount)),
-		})
-	}
-
-	var aclModels []ACLModel
-	for _, acl := range lb.ACLs {
-		aclModels = append(aclModels, ACLModel{
-			ID:             types.StringValue(acl.ID),
-			Action:         types.StringValue(acl.Action),
-			Ethertype:      types.StringValue(string(acl.Ethertype)),
-			Protocol:       types.StringValue(string(acl.Protocol)),
-			Name:           types.StringPointerValue(acl.Name),
-			RemoteIPPrefix: types.StringValue(acl.RemoteIPPrefix),
-		})
-	}
-
-	backendIDsNames := make(map[string]string)
-	var backendModels []BackendModel
-	for _, backend := range lb.Backends {
-		backendIDsNames[backend.ID] = backend.Name
-		var targets []TargetModel
-		for _, target := range backend.Targets {
-			targets = append(targets, TargetModel{
-				ID:        types.StringValue(target.ID),
-				Port:      types.Int64PointerValue(target.Port),
-				NICID:     types.StringPointerValue(target.NicID),
-				IPAddress: types.StringPointerValue(target.IPAddress),
-			})
-		}
-
-		var healthCheckName *string
-		if backend.HealthCheckID != nil {
-			name := healthCheckIDsNames[*backend.HealthCheckID]
-			healthCheckName = &name
-		}
-
-		backendModels = append(backendModels, BackendModel{
-			ID:                                  types.StringValue(backend.ID),
-			Name:                                types.StringValue(backend.Name),
-			Description:                         types.StringPointerValue(backend.Description),
-			BalanceAlgorithm:                    types.StringValue(string(backend.BalanceAlgorithm)),
-			HealthCheckName:                     types.StringPointerValue(healthCheckName),
-			PanicThreshold:                      types.Float64PointerValue(backend.PanicThreshold),
-			CloseConnectionsOnHostHealthFailure: types.BoolPointerValue(backend.CloseConnectionsOnHostHealthFailure),
-			TargetsType:                         types.StringValue(string(backend.TargetsType)),
-			Targets:                             targets,
-		})
-	}
-
-	tlsCertificatesIDsNames := make(map[string]string)
-	var tlsCertificates []TLSCertificateModel
-	for _, certificate := range lb.TLSCertificates {
-		tlsCertificatesIDsNames[certificate.ID] = certificate.Name
-		t := TLSCertificateModel{
-			Description: types.StringPointerValue(certificate.Description),
-			Name:        types.StringValue(certificate.Name),
-			Certificate: types.StringNull(),
-			PrivateKey:  types.StringNull(),
-			ID:          types.StringValue(certificate.ID),
-		}
-
-		if certificate.ExpirationDate != nil {
-			t.ExpirationDate = types.StringValue(certificate.ExpirationDate.String())
-		}
-
-		tlsCertificates = append(tlsCertificates, t)
-	}
-
-	var listenerModels []ListenerModel
-	for _, listener := range lb.Listeners {
-		lm := ListenerModel{
-			ID:          types.StringValue(listener.ID),
-			Name:        types.StringValue(listener.Name),
-			Description: types.StringPointerValue(listener.Description),
-			Port:        types.Int64Value(int64(listener.Port)),
-			Protocol:    types.StringValue(string(listener.Protocol)),
-		}
-
-		if listener.TLSCertificateID != nil {
-			if tlsName, exists := tlsCertificatesIDsNames[*listener.TLSCertificateID]; exists {
-				lm.TLSCertificateName = types.StringValue(tlsName)
-			}
-		}
-
-		if backendName, exists := backendIDsNames[listener.BackendID]; exists {
-			lm.BackendName = types.StringValue(backendName)
-		}
-
-		listenerModels = append(listenerModels, lm)
-	}
-
-	loadBalancer := LoadBalancerModel{
-		ID:              types.StringValue(lb.ID),
-		Name:            types.StringValue(lb.Name),
-		Description:     types.StringPointerValue(lb.Description),
-		SubnetpoolID:    types.StringPointerValue(lb.SubnetPoolID),
-		Type:            types.StringValue(lb.Type),
-		Visibility:      types.StringValue(string(lb.Visibility)),
-		VPCID:           types.StringValue(lb.VPCID),
-		ACLs:            &aclModels,
-		Backends:        backendModels,
-		HealthChecks:    &healthCheckModels,
-		Listeners:       listenerModels,
-		TLSCertificates: &tlsCertificates,
-	}
-
-	if len(lb.PublicIPs) == 1 {
-		loadBalancer.PublicIPID = types.StringValue(lb.PublicIPs[0].ID)
-	} else {
-		loadBalancer.PublicIPID = types.StringNull()
-	}
-
-	return loadBalancer
 }
 
 func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID string, desiredState lbSDK.LoadBalancerStatus) (*lbSDK.NetworkLoadBalancerResponse, error) {

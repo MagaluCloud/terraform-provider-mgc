@@ -12,10 +12,8 @@ import (
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
 )
 
-func TestLoadBalancerResource_convertACLsToSDK(t *testing.T) {
+func TestLoadBalancerModel_ConvertACLsToSDK(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -134,16 +132,15 @@ func TestLoadBalancerResource_convertACLsToSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertACLsToSDK(tt.input)
+			model := &LoadBalancerModel{ACLs: tt.input}
+			result := model.ConvertACLsToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_convertBackendsToSDK(t *testing.T) {
+func TestLoadBalancerModel_ConvertBackendsToSDK(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -297,7 +294,8 @@ func TestLoadBalancerResource_convertBackendsToSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertBackendsToSDK(tt.input)
+			model := &LoadBalancerModel{Backends: tt.input}
+			result := model.ConvertBackendsToSDK()
 
 			// Compare length first
 			assert.Equal(t, len(tt.expected), len(result))
@@ -334,10 +332,8 @@ func TestLoadBalancerResource_convertBackendsToSDK(t *testing.T) {
 	}
 }
 
-func TestLoadBalancerResource_convertHealthChecksToSDK(t *testing.T) {
+func TestLoadBalancerModel_ConvertHealthChecksToSDK(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -482,16 +478,15 @@ func TestLoadBalancerResource_convertHealthChecksToSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertHealthChecksToSDK(tt.input)
+			model := &LoadBalancerModel{HealthChecks: tt.input}
+			result := model.ConvertHealthChecksToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_convertListenersToSDK(t *testing.T) {
+func TestLoadBalancerModel_ConvertListenersToSDK(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -605,16 +600,15 @@ func TestLoadBalancerResource_convertListenersToSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertListenersToSDK(tt.input)
+			model := &LoadBalancerModel{Listeners: tt.input}
+			result := model.ConvertListenersToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_convertTLSCertificatesToSDK(t *testing.T) {
+func TestLoadBalancerModel_ConvertTLSCertificatesToSDK(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -721,16 +715,16 @@ func TestLoadBalancerResource_convertTLSCertificatesToSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertTLSCertificatesToSDK(tt.input)
+			model := &LoadBalancerModel{TLSCertificates: tt.input}
+			result := model.ConvertTLSCertificatesToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_toTerraformModel(t *testing.T) {
+func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 	t.Parallel()
 
-	resource := &LoadBalancerResource{}
 	ctx := context.Background()
 
 	tests := []struct {
@@ -965,7 +959,8 @@ func TestLoadBalancerResource_toTerraformModel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Note: The original implementation has a bug with uninitialized maps
 			// This test will help identify that issue
-			result := resource.toTerraformModel(ctx, tt.input)
+			model := &LoadBalancerModel{}
+			result := model.ToTerraformNetworkResource(ctx, tt.input)
 
 			// Compare each field individually for better error messages
 			assert.Equal(t, tt.expected.ID, result.ID)
@@ -1030,10 +1025,8 @@ func boolPtr(b bool) *bool {
 }
 
 // Additional edge case tests for better coverage
-func TestLoadBalancerResource_convertACLsToSDK_EdgeCases(t *testing.T) {
+func TestLoadBalancerModel_ConvertACLsToSDK_EdgeCases(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -1094,16 +1087,15 @@ func TestLoadBalancerResource_convertACLsToSDK_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertACLsToSDK(tt.input)
+			model := &LoadBalancerModel{ACLs: tt.input}
+			result := model.ConvertACLsToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_convertBackendsToSDK_EdgeCases(t *testing.T) {
+func TestLoadBalancerModel_ConvertBackendsToSDK_EdgeCases(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -1176,7 +1168,8 @@ func TestLoadBalancerResource_convertBackendsToSDK_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertBackendsToSDK(tt.input)
+			model := &LoadBalancerModel{Backends: tt.input}
+			result := model.ConvertBackendsToSDK()
 
 			// Use the same comparison logic as the main test
 			assert.Equal(t, len(tt.expected), len(result))
@@ -1208,10 +1201,8 @@ func TestLoadBalancerResource_convertBackendsToSDK_EdgeCases(t *testing.T) {
 	}
 }
 
-func TestLoadBalancerResource_convertHealthChecksToSDK_EdgeCases(t *testing.T) {
+func TestLoadBalancerModel_ConvertHealthChecksToSDK_EdgeCases(t *testing.T) {
 	t.Parallel()
-
-	resource := &LoadBalancerResource{}
 
 	tests := []struct {
 		name     string
@@ -1282,16 +1273,16 @@ func TestLoadBalancerResource_convertHealthChecksToSDK_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.convertHealthChecksToSDK(tt.input)
+			model := &LoadBalancerModel{HealthChecks: tt.input}
+			result := model.ConvertHealthChecksToSDK()
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestLoadBalancerResource_toTerraformModel_EdgeCases(t *testing.T) {
+func TestLoadBalancerModel_ToTerraformNetworkResource_EdgeCases(t *testing.T) {
 	t.Parallel()
 
-	resource := &LoadBalancerResource{}
 	ctx := context.Background()
 
 	tests := []struct {
@@ -1387,7 +1378,8 @@ func TestLoadBalancerResource_toTerraformModel_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resource.toTerraformModel(ctx, tt.input)
+			model := &LoadBalancerModel{}
+			result := model.ToTerraformNetworkResource(ctx, tt.input)
 
 			// Compare main fields
 			assert.Equal(t, tt.expected.ID, result.ID)
