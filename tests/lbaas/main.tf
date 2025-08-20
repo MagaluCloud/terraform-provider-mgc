@@ -50,7 +50,7 @@ resource "mgc_lbaas_network" "basic_http_lb" {
   acls = [
     {
       name             = "allow-http"
-      action           = "ALLOW"
+      action           = "DENY"
       ethertype        = "IPv4"
       protocol         = "tcp"
       remote_ip_prefix = "0.0.0.0/0"
@@ -68,13 +68,13 @@ resource "mgc_lbaas_network" "basic_http_lb" {
 #   vpc_id        = local.vpc_id
 
 #   # TLS Certificate configuration
-#   tls_certificates = [
-#     {
-#       name        = "web-ssl-cert"
-#       description = "SSL certificate for web application"
-#       certificate = file("${path.module}/certs/certificate.pem")
-#       private_key = file("${path.module}/certs/private_key.pem")
-#     }
+# tls_certificates = [
+#   {
+#     name        = "web-ssl-cert"
+#     description = "SSL certificate for web application"
+#     certificate = file("${path.module}/certs/certificate.pem")
+#     private_key = file("${path.module}/certs/private_key.pem")
+#   }
 #   ]
 
 #   # Backend for HTTPS
@@ -100,22 +100,22 @@ resource "mgc_lbaas_network" "basic_http_lb" {
 #     }
 #   ]
 
-#   # HTTPS health check
-#   health_checks = [
-#     {
-#       name                      = "https-health-check"
-#       description               = "Health check for HTTPS endpoints"
-#       protocol                  = "http"
-#       port                      = 443
-#       path                      = "/health"
-#       healthy_status_code       = 200
-#       healthy_threshold_count   = 3
-#       unhealthy_threshold_count = 3
-#       interval_seconds          = 30
-#       timeout_seconds           = 10
-#       initial_delay_seconds     = 60
-#     }
-#   ]
+# # HTTPS health check
+# health_checks = [
+#   {
+#     name                      = "https-health-check"
+#     description               = "Health check for HTTPS endpoints"
+#     protocol                  = "http"
+#     port                      = 443
+#     path                      = "/health"
+#     healthy_status_code       = 200
+#     healthy_threshold_count   = 3
+#     unhealthy_threshold_count = 3
+#     interval_seconds          = 30
+#     timeout_seconds           = 10
+#     initial_delay_seconds     = 60
+#   }
+# ]
 
 #   # HTTPS listener with SSL certificate
 #   listeners = [

@@ -321,17 +321,17 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 	return loadBalancer
 }
 
-func (plan ACLModel) hasChanges(state ACLModel) bool {
-	if plan.Action.IsUnknown() || plan.Ethertype.IsUnknown() || plan.Name.IsUnknown() || plan.Protocol.IsUnknown() || plan.RemoteIPPrefix.IsUnknown() {
+func (plan ACLModel) hasACLChanges(state ACLModel) bool {
+	if plan.Action.IsUnknown() || plan.Ethertype.IsUnknown() ||
+		plan.Name.IsUnknown() || plan.Protocol.IsUnknown() ||
+		plan.RemoteIPPrefix.IsUnknown() {
 		return false
 	}
+
 	if !plan.Action.Equal(state.Action) {
 		return true
 	}
 	if !plan.Ethertype.Equal(state.Ethertype) {
-		return true
-	}
-	if !plan.Name.Equal(state.Name) {
 		return true
 	}
 	if !plan.Protocol.Equal(state.Protocol) {
@@ -340,5 +340,34 @@ func (plan ACLModel) hasChanges(state ACLModel) bool {
 	if !plan.RemoteIPPrefix.Equal(state.RemoteIPPrefix) {
 		return true
 	}
+
+	if !plan.Name.Equal(state.Name) {
+		if (plan.Name.IsNull() || plan.Name.ValueString() == "") &&
+			(state.Name.IsNull() || state.Name.ValueString() == "") {
+		} else {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (plan *LoadBalancerModel) hasACLChanges(state LoadBalancerModel) bool {
+	if plan.ACLs == nil && state.ACLs == nil {
+		return false
+	}
+	if plan.ACLs == nil || state.ACLs == nil {
+		return true
+	}
+	if len(*plan.ACLs) != len(*state.ACLs) {
+		return true
+	}
+
+	for i, planACL := range *plan.ACLs {
+		if planACL.hasACLChanges((*state.ACLs)[i]) {
+			return true
+		}
+	}
+
 	return false
 }

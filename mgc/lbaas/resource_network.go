@@ -9,9 +9,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -134,7 +136,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the ACL rule.",
-							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+							Computed: true,
 						},
 						"action": schema.StringAttribute{
 							Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
@@ -173,6 +178,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the backend.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"balance_algorithm": schema.StringAttribute{
 							Description: "The load balancing algorithm.",
@@ -193,6 +201,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							Description: "Whether to close connections when a host health check fails.",
 							Optional:    true,
 							Computed:    true,
+							PlanModifiers: []planmodifier.Bool{
+								boolplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the backend.",
@@ -216,6 +227,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 									"id": schema.StringAttribute{
 										Description: "The unique identifier of the target.",
 										Computed:    true,
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
 									},
 									"nic_id": schema.StringAttribute{
 										Description: "The NIC ID of the target. Required when targets_type is 'instance', must be empty when targets_type is 'raw'.",
@@ -339,6 +353,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the listener.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"backend_name": schema.StringAttribute{
 							Description: "The name of the backend associated with this listener.",
@@ -381,6 +398,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the TLS certificate.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"certificate": schema.StringAttribute{
 							Description: "The TLS certificate content.",
@@ -495,7 +515,29 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
+
+		resp.Diagnostics.Append(r.waitLoadBalancerRunning(ctx, planData.ID.ValueString(), resp.Diagnostics)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
+
+	if planData.hasACLChanges(stateData) {
+		stateData.ACLs = planData.ACLs
+		err := r.lbNetworkACL.Replace(ctx, planData.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
+			Acls: planData.ConvertACLsToSDK(),
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+
+		resp.Diagnostics.Append(r.waitLoadBalancerRunning(ctx, planData.ID.ValueString(), resp.Diagnostics)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, stateData)...)
 }
 
@@ -553,4 +595,17 @@ func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID s
 			}
 		}
 	}
+}
+
+func (r *LoadBalancerResource) waitLoadBalancerRunning(ctx context.Context, lbID string, diag diag.Diagnostics) diag.Diagnostics {
+	_, err := r.waitLoadBalancerState(ctx, lbID, lbSDK.LoadBalancerStatusRunning)
+	if err != nil {
+		if httpErr, ok := err.(*clientSDK.HTTPError); ok && httpErr.StatusCode == http.StatusNotFound {
+			diag.AddWarning("Load Balancer Not Found", fmt.Sprintf("Load balancer with ID %s not found during wait for running state.", lbID))
+			return diag
+		}
+		diag.AddError("Failed to wait for Load Balancer Running", fmt.Sprintf("Error waiting for load balancer %s to reach running state: %s", lbID, err.Error()))
+		return diag
+	}
+	return diag
 }

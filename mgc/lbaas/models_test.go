@@ -1413,3 +1413,584 @@ func TestLoadBalancerModel_ToTerraformNetworkResource_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestACLModel_hasACLChanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		plan     ACLModel
+		state    ACLModel
+		expected bool
+	}{
+		{
+			name: "no changes - identical ACLs",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "action changed",
+			plan: ACLModel{
+				Action:         types.StringValue("DENY"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "ethertype changed",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv6"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "protocol changed",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("UDP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "remote IP prefix changed",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "name changed from value to different value",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("new-acl-name"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "name changed from null to value",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringNull(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "name changed from value to null",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringNull(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+		{
+			name: "name - both null, no change",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringNull(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringNull(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "name - empty string vs null, no change",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue(""),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringNull(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "name - both empty strings, no change",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue(""),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue(""),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown action - should return false",
+			plan: ACLModel{
+				Action:         types.StringUnknown(),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown ethertype - should return false",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringUnknown(),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown name - should return false",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringUnknown(),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown protocol - should return false",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringUnknown(),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown remote IP prefix - should return false",
+			plan: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringUnknown(),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: false,
+		},
+		{
+			name: "multiple changes",
+			plan: ACLModel{
+				Action:         types.StringValue("DENY"),
+				Ethertype:      types.StringValue("IPv6"),
+				Name:           types.StringValue("new-acl"),
+				Protocol:       types.StringValue("UDP"),
+				RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+			},
+			state: ACLModel{
+				Action:         types.StringValue("ALLOW"),
+				Ethertype:      types.StringValue("IPv4"),
+				Name:           types.StringValue("test-acl"),
+				Protocol:       types.StringValue("TCP"),
+				RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.plan.hasACLChanges(tt.state)
+			assert.Equal(t, tt.expected, result, "hasACLChanges returned unexpected result")
+		})
+	}
+}
+
+func TestLoadBalancerModel_hasACLChanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		plan     LoadBalancerModel
+		state    LoadBalancerModel
+		expected bool
+	}{
+		{
+			name: "no ACLs in either plan or state",
+			plan: LoadBalancerModel{
+				ACLs: nil,
+			},
+			state: LoadBalancerModel{
+				ACLs: nil,
+			},
+			expected: false,
+		},
+		{
+			name: "no ACLs in plan, ACLs in state",
+			plan: LoadBalancerModel{
+				ACLs: nil,
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "ACLs in plan, no ACLs in state",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: nil,
+			},
+			expected: true,
+		},
+		{
+			name: "identical ACL lists",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "different number of ACLs",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl-1"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl-2"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.2.0/24"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl-1"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "ACL content changed",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("DENY"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("test-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new ACL added",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("existing-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("new-acl"),
+						Protocol:       types.StringValue("UDP"),
+						RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("existing-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "ACL removed",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("remaining-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("remaining-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("removed-acl"),
+						Protocol:       types.StringValue("UDP"),
+						RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "multiple ACLs with some changes",
+			plan: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("unchanged-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+					{
+						Action:         types.StringValue("DENY"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("changed-acl"),
+						Protocol:       types.StringValue("UDP"),
+						RemoteIPPrefix: types.StringValue("10.0.0.0/8"),
+					},
+				},
+			},
+			state: LoadBalancerModel{
+				ACLs: &[]ACLModel{
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("unchanged-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.1.0/24"),
+					},
+					{
+						Action:         types.StringValue("ALLOW"),
+						Ethertype:      types.StringValue("IPv4"),
+						Name:           types.StringValue("changed-acl"),
+						Protocol:       types.StringValue("TCP"),
+						RemoteIPPrefix: types.StringValue("192.168.2.0/24"),
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.plan.hasACLChanges(tt.state)
+			assert.Equal(t, tt.expected, result, "hasACLChanges returned unexpected result")
+		})
+	}
+}
