@@ -524,18 +524,31 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if planData.hasACLChanges(stateData) {
 		stateData.ACLs = planData.ACLs
+		updatedACL := planData.ConvertACLsToSDK()
+		if updatedACL == nil {
+			updatedACL = []lbSDK.CreateNetworkACLRequest{}
+		}
+
+		planData.ConvertACLsToSDK()
 		err := r.lbNetworkACL.Replace(ctx, planData.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
-			Acls: planData.ConvertACLsToSDK(),
+			Acls: updatedACL,
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
 
-		resp.Diagnostics.Append(r.waitLoadBalancerRunning(ctx, planData.ID.ValueString(), resp.Diagnostics)...)
-		if resp.Diagnostics.HasError() {
+		updated, err := r.waitLoadBalancerState(ctx, stateData.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
+		if updated == nil {
+			resp.Diagnostics.AddError("Load Balancer not found", fmt.Sprintf("Load Balancer with ID %s not found after ACL update.", stateData.ID.ValueString()))
+			return
+		}
+
+		stateData.ACLs = stateData.ToTerraformNetworkResource(ctx, *updated).ACLs
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, stateData)...)

@@ -210,16 +210,16 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 		})
 	}
 
-	var aclModels []ACLModel
-	for _, acl := range lbResponse.ACLs {
-		aclModels = append(aclModels, ACLModel{
+	aclModels := make([]ACLModel, len(lbResponse.ACLs))
+	for i, acl := range lbResponse.ACLs {
+		aclModels[i] = ACLModel{
 			ID:             types.StringValue(acl.ID),
 			Action:         types.StringValue(acl.Action),
 			Ethertype:      types.StringValue(string(acl.Ethertype)),
 			Protocol:       types.StringValue(string(acl.Protocol)),
 			Name:           types.StringPointerValue(acl.Name),
 			RemoteIPPrefix: types.StringValue(acl.RemoteIPPrefix),
-		})
+		}
 	}
 
 	backendIDsNames := make(map[string]string)

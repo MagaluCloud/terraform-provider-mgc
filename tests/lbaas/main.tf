@@ -54,6 +54,13 @@ resource "mgc_lbaas_network" "basic_http_lb" {
       ethertype        = "IPv4"
       protocol         = "tcp"
       remote_ip_prefix = "0.0.0.0/0"
+    },
+    {
+      name             = "allow-http-2"
+      action           = "ALLOW"
+      ethertype        = "IPv4"
+      protocol         = "tcp"
+      remote_ip_prefix = "0.0.0.0/0"
     }
   ]
 }
