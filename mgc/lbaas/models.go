@@ -371,3 +371,23 @@ func (plan *LoadBalancerModel) hasACLChanges(state LoadBalancerModel) bool {
 
 	return false
 }
+
+type LbaasNetworksListModel struct {
+	LoadBalancers []lbNetworkItemModel `tfsdk:"load_balancers"`
+}
+
+type lbNetworkItemModel struct {
+	ID              types.String `tfsdk:"id"`
+	Name            types.String `tfsdk:"name"`
+	Description     types.String `tfsdk:"description"`
+	PublicIPID      types.String `tfsdk:"public_ip_id"`
+	SubnetpoolID    types.String `tfsdk:"subnetpool_id"`
+	Type            types.String `tfsdk:"type"`
+	Visibility      types.String `tfsdk:"visibility"`
+	VPCID           types.String `tfsdk:"vpc_id"`
+	ACLs            types.List   `tfsdk:"acls"`
+	Backends        types.List   `tfsdk:"backends"`
+	HealthChecks    types.List   `tfsdk:"health_checks"`
+	Listeners       types.List   `tfsdk:"listeners"`
+	TLSCertificates types.List   `tfsdk:"tls_certificates"`
+}

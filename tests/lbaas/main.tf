@@ -11,8 +11,8 @@ locals {
 
 # Scenario 1: Basic HTTP Load Balancer
 resource "mgc_lbaas_network" "basic_http_lb" {
-  name        = "basic-http-lb-${random_id.suffix.hex}-and-more"
-  description = "Basic HTTP load balancer for web servers"
+  name        = "basic-http-lb-${random_id.suffix.hex}-and-more-and-more"
+  description = "Basic HTTP load balancer for web servers-and-more"
   type        = "proxy"
   visibility  = "internal"
   vpc_id      = local.vpc_id
@@ -63,6 +63,21 @@ resource "mgc_lbaas_network" "basic_http_lb" {
       remote_ip_prefix = "0.0.0.0/0"
     }
   ]
+}
+
+data "mgc_lbaas_network" "basic_http_lb" {
+  id = mgc_lbaas_network.basic_http_lb.id
+}
+
+output "scenario_1" {
+  value = data.mgc_lbaas_network.basic_http_lb
+}
+
+data "mgc_lbaas_networks" "lbs" {
+}
+
+output "all_lbs" {
+  value = data.mgc_lbaas_networks.lbs
 }
 
 # # Scenario 2: HTTPS Load Balancer with SSL Certificate

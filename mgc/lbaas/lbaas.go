@@ -6,7 +6,10 @@ import (
 )
 
 func GetDataSources() []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewDataSourceLbaasNetwork,
+		NewDataSourceLbaasNetworks,
+	}
 }
 
 func GetResources() []func() resource.Resource {
