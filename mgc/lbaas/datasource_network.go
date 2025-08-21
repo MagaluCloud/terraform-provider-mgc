@@ -74,10 +74,37 @@ func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRe
 				Computed:    true,
 				Description: "The ID of the VPC where the load balancer is deployed.",
 			},
-			"acls": schema.ListAttribute{
+			"acls": schema.ListNestedAttribute{
+				Description: "Access Control Lists for the load balancer.",
 				Computed:    true,
-				ElementType: types.StringType,
-				Description: "List of ACL IDs.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Description: "The unique identifier of the ACL rule.",
+							Computed:    true,
+						},
+						"action": schema.StringAttribute{
+							Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
+							Computed:    true,
+						},
+						"ethertype": schema.StringAttribute{
+							Description: "The ethertype for the ACL rule.",
+							Computed:    true,
+						},
+						"name": schema.StringAttribute{
+							Description: "The name of the ACL rule.",
+							Computed:    true,
+						},
+						"protocol": schema.StringAttribute{
+							Description: "The protocol for the ACL rule.",
+							Computed:    true,
+						},
+						"remote_ip_prefix": schema.StringAttribute{
+							Description: "The remote IP prefix for the ACL rule.",
+							Computed:    true,
+						},
+					},
+				},
 			},
 			"backends": schema.ListAttribute{
 				Computed:    true,
@@ -123,13 +150,6 @@ func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRe
 		publicIPID = types.StringNull()
 	}
 
-	aclsIDs := make([]string, 0, len(lb.ACLs))
-	for _, acl := range lb.ACLs {
-		aclsIDs = append(aclsIDs, acl.ID)
-	}
-	aclsList, diags := types.ListValueFrom(ctx, types.StringType, aclsIDs)
-	resp.Diagnostics.Append(diags...)
-
 	backendsIDs := make([]string, 0, len(lb.Backends))
 	for _, b := range lb.Backends {
 		backendsIDs = append(backendsIDs, b.ID)
@@ -158,6 +178,18 @@ func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRe
 	certsList, diags := types.ListValueFrom(ctx, types.StringType, certsIDs)
 	resp.Diagnostics.Append(diags...)
 
+	aclModels := make([]ACLModel, len(lb.ACLs))
+	for i, acl := range lb.ACLs {
+		aclModels[i] = ACLModel{
+			ID:             types.StringValue(acl.ID),
+			Action:         types.StringValue(acl.Action),
+			Ethertype:      types.StringValue(string(acl.Ethertype)),
+			Protocol:       types.StringValue(string(acl.Protocol)),
+			Name:           types.StringPointerValue(acl.Name),
+			RemoteIPPrefix: types.StringValue(acl.RemoteIPPrefix),
+		}
+	}
+
 	state := lbNetworkItemModel{
 		ID:              types.StringValue(lb.ID),
 		Name:            types.StringValue(lb.Name),
@@ -167,7 +199,7 @@ func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRe
 		Type:            types.StringValue(lb.Type),
 		Visibility:      types.StringValue(string(lb.Visibility)),
 		VPCID:           types.StringValue(lb.VPCID),
-		ACLs:            aclsList,
+		ACLs:            aclModels,
 		Backends:        backendsList,
 		HealthChecks:    healthChecksList,
 		Listeners:       listenersList,

@@ -78,10 +78,37 @@ func (r *DataSourceLbaasNetworks) Schema(_ context.Context, _ datasource.SchemaR
 							Computed:    true,
 							Description: "The ID of the VPC where the load balancer is deployed.",
 						},
-						"acls": schema.ListAttribute{
+						"acls": schema.ListNestedAttribute{
+							Description: "Access Control Lists for the load balancer.",
 							Computed:    true,
-							ElementType: types.StringType,
-							Description: "List of ACL IDs.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"id": schema.StringAttribute{
+										Description: "The unique identifier of the ACL rule.",
+										Computed:    true,
+									},
+									"action": schema.StringAttribute{
+										Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
+										Computed:    true,
+									},
+									"ethertype": schema.StringAttribute{
+										Description: "The ethertype for the ACL rule.",
+										Computed:    true,
+									},
+									"name": schema.StringAttribute{
+										Description: "The name of the ACL rule.",
+										Computed:    true,
+									},
+									"protocol": schema.StringAttribute{
+										Description: "The protocol for the ACL rule.",
+										Computed:    true,
+									},
+									"remote_ip_prefix": schema.StringAttribute{
+										Description: "The remote IP prefix for the ACL rule.",
+										Computed:    true,
+									},
+								},
+							},
 						},
 						"backends": schema.ListAttribute{
 							Computed:    true,
@@ -132,13 +159,6 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 			publicIPID = types.StringNull()
 		}
 
-		aclsIDs := make([]string, 0, len(sdkLB.ACLs))
-		for _, a := range sdkLB.ACLs {
-			aclsIDs = append(aclsIDs, a.ID)
-		}
-		aclsList, diags := types.ListValueFrom(ctx, types.StringType, aclsIDs)
-		resp.Diagnostics.Append(diags...)
-
 		backendsIDs := make([]string, 0, len(sdkLB.Backends))
 		for _, b := range sdkLB.Backends {
 			backendsIDs = append(backendsIDs, b.ID)
@@ -167,17 +187,28 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 		certsList, diags := types.ListValueFrom(ctx, types.StringType, certsIDs)
 		resp.Diagnostics.Append(diags...)
 
-		data.LoadBalancers = append(data.LoadBalancers, lbNetworkItemModel{
-			ID:           types.StringValue(sdkLB.ID),
-			Name:         types.StringValue(sdkLB.Name),
-			Description:  types.StringPointerValue(sdkLB.Description),
-			PublicIPID:   publicIPID,
-			SubnetpoolID: types.StringPointerValue(sdkLB.SubnetPoolID),
-			Type:         types.StringValue(sdkLB.Type),
-			Visibility:   types.StringValue(string(sdkLB.Visibility)),
-			VPCID:        types.StringValue(sdkLB.VPCID),
+		aclModels := make([]ACLModel, len(sdkLB.ACLs))
+		for i, acl := range sdkLB.ACLs {
+			aclModels[i] = ACLModel{
+				ID:             types.StringValue(acl.ID),
+				Action:         types.StringValue(acl.Action),
+				Ethertype:      types.StringValue(string(acl.Ethertype)),
+				Protocol:       types.StringValue(string(acl.Protocol)),
+				Name:           types.StringPointerValue(acl.Name),
+				RemoteIPPrefix: types.StringValue(acl.RemoteIPPrefix),
+			}
+		}
 
-			ACLs:            aclsList,
+		data.LoadBalancers = append(data.LoadBalancers, lbNetworkItemModel{
+			ID:              types.StringValue(sdkLB.ID),
+			Name:            types.StringValue(sdkLB.Name),
+			Description:     types.StringPointerValue(sdkLB.Description),
+			PublicIPID:      publicIPID,
+			SubnetpoolID:    types.StringPointerValue(sdkLB.SubnetPoolID),
+			Type:            types.StringValue(sdkLB.Type),
+			Visibility:      types.StringValue(string(sdkLB.Visibility)),
+			VPCID:           types.StringValue(sdkLB.VPCID),
+			ACLs:            aclModels,
 			Backends:        backendsList,
 			HealthChecks:    healthChecksList,
 			Listeners:       listenersList,

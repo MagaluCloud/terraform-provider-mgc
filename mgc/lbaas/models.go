@@ -385,9 +385,51 @@ type lbNetworkItemModel struct {
 	Type            types.String `tfsdk:"type"`
 	Visibility      types.String `tfsdk:"visibility"`
 	VPCID           types.String `tfsdk:"vpc_id"`
-	ACLs            types.List   `tfsdk:"acls"`
+	ACLs            []ACLModel   `tfsdk:"acls"`
 	Backends        types.List   `tfsdk:"backends"`
 	HealthChecks    types.List   `tfsdk:"health_checks"`
 	Listeners       types.List   `tfsdk:"listeners"`
 	TLSCertificates types.List   `tfsdk:"tls_certificates"`
+}
+
+type backendItemModel struct {
+	ID                                  types.String  `tfsdk:"id"`
+	BalanceAlgorithm                    types.String  `tfsdk:"balance_algorithm"`
+	Description                         types.String  `tfsdk:"description"`
+	HealthCheckID                       types.String  `tfsdk:"health_check_id"`
+	Name                                types.String  `tfsdk:"name"`
+	Targets                             []TargetModel `tfsdk:"targets"`
+	TargetsType                         types.String  `tfsdk:"targets_type"`
+	PanicThreshold                      types.Float64 `tfsdk:"panic_threshold"`
+	CloseConnectionsOnHostHealthFailure types.Bool    `tfsdk:"close_connections_on_host_health_failure"`
+}
+
+type networkBackendItemModel struct {
+	LBID types.String `tfsdk:"lb_id"`
+	backendItemModel
+}
+
+func (b backendItemModel) fromSDKBackend(lb *lbSDK.NetworkBackendResponse) backendItemModel {
+	targets := make([]TargetModel, 0, len(lb.Targets))
+	for _, t := range lb.Targets {
+		targets = append(targets, TargetModel{
+			ID:        types.StringValue(t.ID),
+			NICID:     types.StringPointerValue(t.NicID),
+			IPAddress: types.StringPointerValue(t.IPAddress),
+			Port:      types.Int64PointerValue(t.Port),
+		})
+	}
+
+	item := backendItemModel{
+		ID:                                  types.StringValue(lb.ID),
+		Name:                                types.StringValue(lb.Name),
+		Description:                         types.StringPointerValue(lb.Description),
+		BalanceAlgorithm:                    types.StringValue(string(lb.BalanceAlgorithm)),
+		HealthCheckID:                       types.StringPointerValue(lb.HealthCheckID),
+		PanicThreshold:                      types.Float64PointerValue(lb.PanicThreshold),
+		CloseConnectionsOnHostHealthFailure: types.BoolPointerValue(lb.CloseConnectionsOnHostHealthFailure),
+		TargetsType:                         types.StringValue(string(lb.TargetsType)),
+		Targets:                             targets,
+	}
+	return item
 }

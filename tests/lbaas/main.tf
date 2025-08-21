@@ -80,6 +80,74 @@ output "all_lbs" {
   value = data.mgc_lbaas_networks.lbs
 }
 
+data "mgc_lbaas_network_backend" "lbs_network_backend" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+  id    = mgc_lbaas_network.basic_http_lb.backends[0].id
+}
+
+output "lbs_network_backend" {
+  value = data.mgc_lbaas_network_backend.lbs_network_backend
+}
+
+data "mgc_lbaas_network_backends" "lbs_network_backends" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+}
+
+output "lbs_network_backends" {
+  value = data.mgc_lbaas_network_backends.lbs_network_backends
+}
+
+data "mgc_lbaas_network_listener" "lbs_network_listener" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+  id    = mgc_lbaas_network.basic_http_lb.listeners[0].id
+}
+
+output "lbs_network_listener" {
+  value = data.mgc_lbaas_network_listener.lbs_network_listener
+}
+
+data "mgc_lbaas_network_listeners" "lbs_network_listeners" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+}
+
+output "lbs_network_listeners" {
+  value = data.mgc_lbaas_network_listeners.lbs_network_listeners
+}
+
+# data "mgc_lbaas_network_healthcheck" "lbs_network_healthcheck" {
+#   lb_id = mgc_lbaas_network.basic_http_lb.id
+#   id    = mgc_lbaas_network.basic_http_lb.health_checks[0].id
+# }
+
+# output "lbs_network_healthcheck" {
+#   value = data.mgc_lbaas_network_healthcheck.lbs_network_healthcheck
+# }
+
+data "mgc_lbaas_network_healthchecks" "lbs_network_healthchecks" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+}
+
+output "lbs_network_healthchecks" {
+  value = data.mgc_lbaas_network_healthchecks.lbs_network_healthchecks
+}
+
+# data "mgc_lbaas_network_certificate" "lbs_network_certificate" {
+#   lb_id = mgc_lbaas_network.basic_http_lb.id
+#   id    = mgc_lbaas_network.basic_http_lb.tls_certificates[0].id
+# }
+
+# output "lbs_network_certificate" {
+#   value = data.mgc_lbaas_network_certificate.lbs_network_certificate
+# }
+
+data "mgc_lbaas_network_certificates" "lbs_network_certificates" {
+  lb_id = mgc_lbaas_network.basic_http_lb.id
+}
+
+output "lbs_network_certificates" {
+  value = data.mgc_lbaas_network_certificates.lbs_network_certificates
+}
+
 # # Scenario 2: HTTPS Load Balancer with SSL Certificate
 # resource "mgc_lbaas_network" "https_lb_with_ssl" {
 #   name          = "https-lb-ssl-${random_id.suffix.hex}"

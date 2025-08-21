@@ -9,6 +9,14 @@ func GetDataSources() []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewDataSourceLbaasNetwork,
 		NewDataSourceLbaasNetworks,
+		NewDataSourceLbaasNetworkBackend,
+		NewDataSourceLbaasNetworkBackends,
+		NewDataSourceLbaasNetworkHealthCheck,
+		NewDataSourceLbaasNetworkHealthChecks,
+		NewDataSourceLbaasNetworkListener,
+		NewDataSourceLbaasNetworkListeners,
+		NewDataSourceLbaasNetworkCertificate,
+		NewDataSourceLbaasNetworkCertificates,
 	}
 }
 
