@@ -12,8 +12,6 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
-var _ datasource.DataSource = &DataSourceLbaasNetwork{}
-
 type DataSourceLbaasNetwork struct {
 	lbNetworkLB lbSDK.NetworkLoadBalancerService
 }
@@ -42,7 +40,7 @@ func (r *DataSourceLbaasNetwork) Configure(_ context.Context, req datasource.Con
 
 func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get the details of a network load balancer. Only root attributes are exposed.",
+		Description: "Get the details of a network load balancer.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Required:    true,
