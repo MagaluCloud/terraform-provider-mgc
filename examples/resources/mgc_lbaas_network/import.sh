@@ -1,0 +1,1 @@
+terraform import mgc_lbaas_network.http_proxy my_lbaas_id

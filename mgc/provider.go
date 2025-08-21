@@ -5,9 +5,17 @@ import (
 	"fmt"
 	"runtime"
 
-	datasources "github.com/MagaluCloud/terraform-provider-mgc/mgc/datasources"
-	resources "github.com/MagaluCloud/terraform-provider-mgc/mgc/resources"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tfutil"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/containerregistry"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/database"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/network"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/objects"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/platform"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/ssh"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/virtualmachines"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -130,94 +138,41 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 }
 
 func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
-		resources.NewNewNodePoolResource,
-		resources.NewK8sClusterResource,
-		resources.NewObjectStorageBucketsResource,
-		resources.NewVirtualMachineInstancesResource,
-		resources.NewVirtualMachineSnapshotsResource,
-		resources.NewVolumeAttachResource,
-		resources.NewBlockStorageSnapshotsResource,
-		resources.NewBlockStorageVolumesResource,
-		resources.NewSshKeysResource,
-		resources.NewNetworkPublicIPResource,
-		resources.NewNetworkVPCResource,
-		resources.NewNetworkSecurityGroupsResource,
-		resources.NewNetworkSecurityGroupsRulesResource,
-		resources.NewNetworkVPCInterfaceResource,
-		resources.NewNetworkSecurityGroupsAttachResource,
-		resources.NewNetworkPublicIPAttachResource,
-		resources.NewNetworkVpcsSubnetsResource,
-		resources.NewNetworkSubnetpoolsResource,
-		resources.NewDBaaSInstanceResource,
-		resources.NewDBaaSInstanceSnapshotResource,
-		resources.NewContainerRegistryRegistriesResource,
-		resources.NewVirtualMachineInterfaceAttachResource,
-		resources.NewNetworkNatGatewayResource,
-		resources.NewDBaaSParameterGroupsResource,
-		resources.NewDBaaSParameterResource,
-		resources.NewDBaaSReplicaResource,
-		resources.NewDBaaSClusterResource,
-	}
+	var resources []func() resource.Resource
+
+	resources = append(resources, blockstorage.GetResources()...)
+	resources = append(resources, containerregistry.GetResources()...)
+	resources = append(resources, database.GetResources()...)
+	resources = append(resources, kubernetes.GetResources()...)
+	resources = append(resources, lbaas.GetResources()...)
+	resources = append(resources, network.GetResources()...)
+	resources = append(resources, objects.GetResources()...)
+	resources = append(resources, platform.GetResources()...)
+	resources = append(resources, ssh.GetResources()...)
+	resources = append(resources, virtualmachines.GetResources()...)
+
+	return resources
 }
 
 func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		datasources.NewDataSourceKubernetesClusterKubeConfig,
-		datasources.NewDataSourceKubernetesCluster,
-		datasources.NewDataSourceKubernetesFlavor,
-		datasources.NewDataSourceKubernetesVersion,
-		datasources.NewDataSourceKubernetesNodepool,
-		datasources.NewDataSourceKubernetesNode,
-		datasources.NewDataSourceVmMachineType,
-		datasources.NewDataSourceVMIMages,
-		datasources.NewDataSourceVmInstance,
-		datasources.NewDataSourceVmInstances,
-		datasources.NewDataSourceNetworkVPC,
-		datasources.NewDataSourceNetworkVPCs,
-		datasources.NewDataSourceNetworkSecurityGroup,
-		datasources.NewDataSourceNetworkSecurityGroups,
-		datasources.NewDataSourceNetworkVPCInterface,
-		datasources.NewDataSourceNetworkVPCInterfaces,
-		datasources.NewDataSourceNetworkVpcsSubnet,
-		datasources.NewDataSourceNetworkSubnetpool,
-		datasources.NewDataSourceNetworkSubnetpools,
-		datasources.NewDataSourceNetworkPublicIP,
-		datasources.NewDataSourceNetworkPublicIPs,
-		datasources.NewDataSourceBSSnapshots,
-		datasources.NewDataSourceBsVolumes,
-		datasources.NewDataSourceBSSnapshot,
-		datasources.NewDataSourceBsVolume,
-		datasources.NewDataSourceBsVolumeTypes,
-		datasources.NewDataSourceDbaasEngines,
-		datasources.NewDataSourceDbaasInstanceTypes,
-		datasources.NewDataSourceDbaasInstances,
-		datasources.NewDataSourceDbaasInstance,
-		datasources.NewDataSourceDbaasInstancesSnapshots,
-		datasources.NewDataSourceDbaasInstancesSnapshot,
-		datasources.NewDataSourceAvailabilityZones,
-		datasources.NewDataSourceCRImages,
-		datasources.NewDataSourceCRRepositories,
-		datasources.NewDataSourceCRRegistries,
-		datasources.NewDataSourceCRCredentials,
-		datasources.NewDataSourceSSH,
-		datasources.NewDatasourceBucket,
-		datasources.NewDatasourceBuckets,
-		datasources.NewDataSourceVmSnapshots,
-		datasources.NewDataSourceKubernetesClusterList,
-		datasources.NewDataSourceNetworkNatGateway,
-		datasources.NewDataSourceDbReplicaList,
-		datasources.NewDataSourceDbReplica,
-		datasources.NewDataSourceDdbaasParameterGroup,
-		datasources.NewDataSourceDdbaasParameterGroups,
-		datasources.NewDataSourceDbParametersList,
-		datasources.NewDBaaSClusterDataSource,
-		datasources.NewDBaaSClustersDataSource,
-	}
+	var dataSources []func() datasource.DataSource
+
+	dataSources = append(dataSources, blockstorage.GetDataSources()...)
+	dataSources = append(dataSources, containerregistry.GetDataSources()...)
+	dataSources = append(dataSources, database.GetDataSources()...)
+	dataSources = append(dataSources, kubernetes.GetDataSources()...)
+	dataSources = append(dataSources, lbaas.GetDataSources()...)
+	dataSources = append(dataSources, network.GetDataSources()...)
+	dataSources = append(dataSources, objects.GetDataSources()...)
+	dataSources = append(dataSources, platform.GetDataSources()...)
+	dataSources = append(dataSources, ssh.GetDataSources()...)
+	dataSources = append(dataSources, virtualmachines.GetDataSources()...)
+
+	return dataSources
 }
 
-func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
-	output := tfutil.DataConfig{
+func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
+	output := utils.DataConfig{
 		ApiKey: plan.ApiKey.ValueString(),
 		Env:    plan.Env.ValueString(),
 		Region: plan.Region.ValueString(),
@@ -227,13 +182,13 @@ func NewConfigData(plan ProviderModel, tfVersion string) tfutil.DataConfig {
 		plan.ObjectStorage.ObjectKeyPair != nil ||
 		plan.ObjectStorage.ObjectKeyPair.KeyID.IsNull() ||
 		plan.ObjectStorage.ObjectKeyPair.KeySecret.IsNull() {
-		output.Keypair = tfutil.KeyPairData{
+		output.Keypair = utils.KeyPairData{
 			KeyID:     plan.ObjectStorage.ObjectKeyPair.KeyID.ValueString(),
 			KeySecret: plan.ObjectStorage.ObjectKeyPair.KeySecret.ValueString(),
 		}
 	}
 
-	sdkUrl := sdk.MgcUrl(tfutil.RegionToUrl(output.Region, output.Env))
+	sdkUrl := sdk.MgcUrl(utils.RegionToUrl(output.Region, output.Env))
 	tflog.Info(context.Background(), "Using MGC URL: "+sdkUrl.String())
 
 	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
