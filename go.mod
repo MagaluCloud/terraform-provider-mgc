@@ -5,13 +5,11 @@ go 1.24
 require (
 	github.com/MagaluCloud/magalu/mgc/lib v0.33.3
 	github.com/MagaluCloud/magalu/mgc/sdk v0.33.3
-	github.com/MagaluCloud/mgc-sdk-go v0.3.49
+	github.com/MagaluCloud/mgc-sdk-go v0.3.50
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
-
-replace github.com/MagaluCloud/mgc-sdk-go => ../mgc-sdk-go
 
 require (
 	github.com/MagaluCloud/magalu/mgc/core v0.33.3 // indirect
