@@ -37,6 +37,7 @@ output "cluster" {
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
 - `cidr` (String) Available IP addresses used for provisioning nodes in the cluster.
 - `cluster_name` (String) Name of the node pool.
+- `cni` (String) The Container Network Interface (CNI) plugin used for networking in the cluster
 - `controlplane` (Attributes) Object of the node pool response. (see [below for nested schema](#nestedatt--controlplane))
 - `created_at` (String) Creation date of the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.

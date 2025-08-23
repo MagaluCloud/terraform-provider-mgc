@@ -34,6 +34,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
 - `cluster_ipv4_cidr` (String) The IP address range of the Kubernetes cluster.
+- `cni` (String) The CNI (Container Network Interface) used by the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.
 - `enabled_server_group` (Boolean, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.
 - `services_ipv4_cidr` (String) The IP address range of the Kubernetes cluster service.
