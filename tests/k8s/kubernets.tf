@@ -17,6 +17,7 @@ resource "mgc_kubernetes_cluster" "basic_cluster" {
   name        = "${random_pet.name.id}-basic-cluster"
   version     = var.cluster-version
   description = "Basic Kubernetes cluster for smoke test"
+  cni         = "default"
 }
 
 # Full-featured Kubernetes cluster

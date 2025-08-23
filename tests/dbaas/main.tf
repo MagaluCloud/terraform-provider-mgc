@@ -57,7 +57,6 @@ resource "mgc_dbaas_instances" "test_instance" {
   backup_start_at       = "17:00:00"
   availability_zone     = var.availability_zone
   parameter_group       = mgc_dbaas_parameter_groups.instance_pg.id
-  cni                   = "default"
 }
 
 output "dbaas_instance_details" {
