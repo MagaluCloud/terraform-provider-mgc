@@ -39,6 +39,7 @@ type KubernetesClusterCreateResourceModel struct {
 	ID                 types.String   `tfsdk:"id"`
 	ServicesIpV4CIDR   types.String   `tfsdk:"services_ipv4_cidr"`
 	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ipv4_cidr"`
+	CNI                types.String   `tfsdk:"cni"`
 }
 
 type k8sClusterResource struct {
@@ -143,6 +144,15 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"cni": schema.StringAttribute{
+				Description: "The CNI (Container Network Interface) used by the Kubernetes cluster.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					utils.ReplaceIfChangeAndNotIsNotSetOnPlan{},
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -183,6 +193,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		EnabledServerGroup: data.EnabledServerGroup.ValueBoolPointer(),
 		ClusterIPv4CIDR:    data.ClusterIPv4CIDR.ValueStringPointer(),
 		ServicesIpV4CIDR:   data.ServicesIpV4CIDR.ValueStringPointer(),
+		CNI:                data.CNI.ValueStringPointer(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -318,6 +329,7 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 		CreatedAt:        types.StringPointerValue(utils.ConvertTimeToRFC3339(sdkResult.CreatedAt)),
 		ServicesIpV4CIDR: types.StringPointerValue(sdkResult.ServicesIpV4CIDR),
 		ClusterIPv4CIDR:  types.StringPointerValue(sdkResult.ClusterIPv4CIDR),
+		CNI:              types.StringPointerValue(sdkResult.CNI),
 	}
 
 	if sdkResult.Description != nil {

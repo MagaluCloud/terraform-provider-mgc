@@ -35,6 +35,7 @@ type KubernetesCluster struct {
 	Message                    types.String   `tfsdk:"message"`
 	State                      types.String   `tfsdk:"state"`
 	UpdatedAt                  types.String   `tfsdk:"updated_at"`
+	CNI                        types.String   `tfsdk:"cni"`
 }
 
 type Controlplane struct {
@@ -56,7 +57,6 @@ type Controlplane struct {
 	Tags           []types.String `tfsdk:"tags"`
 	Taints         []Taint        `tfsdk:"taints"`
 	UpdatedAt      types.String   `tfsdk:"updated_at"`
-	Zone           []types.String `tfsdk:"zone"`
 }
 
 func NewDataSourceKubernetesCluster() datasource.DataSource {
@@ -102,6 +102,10 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 			},
 			"enabled_bastion": schema.BoolAttribute{
 				Description: "Indicates if a bastion host is enabled for secure access to the cluster.",
+				Computed:    true,
+			},
+			"cni": schema.StringAttribute{
+				Description: "The Container Network Interface (CNI) plugin used for networking in the cluster",
 				Computed:    true,
 			},
 			"node_pools": schema.ListNestedAttribute{
@@ -184,10 +188,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 			},
 			"version": schema.StringAttribute{
 				Description: "The native Kubernetes version of the cluster.",
-				Computed:    true,
-			},
-			"zone": schema.StringAttribute{
-				Description: "Identifier of the zone where the Kubernetes cluster is located.",
 				Computed:    true,
 			},
 			"addons_loadbalance": schema.StringAttribute{
@@ -384,6 +384,7 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 		CreatedAt:          types.StringPointerValue(utils.ConvertTimeToRFC3339(getResult.CreatedAt)),
 		Region:             types.StringValue(*getResult.Region),
 		UpdatedAt:          types.StringPointerValue(utils.ConvertTimeToRFC3339(getResult.UpdatedAt)),
+		CNI:                types.StringPointerValue(getResult.CNI),
 	}
 
 	if getResult.AllowedCIDRs != nil {
@@ -489,13 +490,6 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 				Key:    types.StringValue(taint.Key),
 				Value:  types.StringValue(taint.Value),
 			}
-		}
-	}
-
-	if cp.Zone != nil && len(*cp.Zone) > 0 {
-		controlplane.Zone = make([]types.String, len(*cp.Zone))
-		for i, zone := range *cp.Zone {
-			controlplane.Zone[i] = types.StringPointerValue(&zone)
 		}
 	}
 
