@@ -52,7 +52,6 @@ func TestConvertToControlplane(t *testing.T) {
 		assert.Nil(t, result.SecurityGroups)
 		assert.Nil(t, result.Tags)
 		assert.Nil(t, result.Taints)
-		assert.Nil(t, result.Zone)
 	})
 
 	maxReplicas := 5
@@ -107,7 +106,6 @@ func TestConvertToControlplane(t *testing.T) {
 		assert.Equal(t, "NoSchedule", result.Taints[0].Effect.ValueString())
 		assert.Equal(t, "app", result.Taints[0].Key.ValueString())
 		assert.Equal(t, "critical", result.Taints[0].Value.ValueString())
-		assert.Equal(t, types.StringValue("br-se1-a"), result.Zone[0])
 	})
 }
 

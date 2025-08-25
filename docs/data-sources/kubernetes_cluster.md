@@ -55,7 +55,6 @@ output "cluster" {
 - `subnet_id` (String) Identifier of the internal subnet where the cluster will be provisioned.
 - `updated_at` (String) Date of the last modification of the Kubernetes cluster.
 - `version` (String) The native Kubernetes version of the cluster.
-- `zone` (String) Identifier of the zone where the Kubernetes cluster is located.
 
 <a id="nestedatt--controlplane"></a>
 ### Nested Schema for `controlplane`

@@ -57,7 +57,6 @@ type Controlplane struct {
 	Tags           []types.String `tfsdk:"tags"`
 	Taints         []Taint        `tfsdk:"taints"`
 	UpdatedAt      types.String   `tfsdk:"updated_at"`
-	Zone           []types.String `tfsdk:"zone"`
 }
 
 func NewDataSourceKubernetesCluster() datasource.DataSource {
@@ -189,10 +188,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 			},
 			"version": schema.StringAttribute{
 				Description: "The native Kubernetes version of the cluster.",
-				Computed:    true,
-			},
-			"zone": schema.StringAttribute{
-				Description: "Identifier of the zone where the Kubernetes cluster is located.",
 				Computed:    true,
 			},
 			"addons_loadbalance": schema.StringAttribute{
@@ -495,13 +490,6 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 				Key:    types.StringValue(taint.Key),
 				Value:  types.StringValue(taint.Value),
 			}
-		}
-	}
-
-	if cp.Zone != nil && len(*cp.Zone) > 0 {
-		controlplane.Zone = make([]types.String, len(*cp.Zone))
-		for i, zone := range *cp.Zone {
-			controlplane.Zone[i] = types.StringPointerValue(&zone)
 		}
 	}
 
