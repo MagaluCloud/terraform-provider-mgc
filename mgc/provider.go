@@ -9,7 +9,6 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/containerregistry"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/database"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/kubernetes"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/lbaas"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/objects"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/platform"
@@ -144,7 +143,7 @@ func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource 
 	resources = append(resources, containerregistry.GetResources()...)
 	resources = append(resources, database.GetResources()...)
 	resources = append(resources, kubernetes.GetResources()...)
-	resources = append(resources, lbaas.GetResources()...)
+	// resources = append(resources, lbaas.GetResources()...)
 	resources = append(resources, network.GetResources()...)
 	resources = append(resources, objects.GetResources()...)
 	resources = append(resources, platform.GetResources()...)
@@ -161,7 +160,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	dataSources = append(dataSources, containerregistry.GetDataSources()...)
 	dataSources = append(dataSources, database.GetDataSources()...)
 	dataSources = append(dataSources, kubernetes.GetDataSources()...)
-	dataSources = append(dataSources, lbaas.GetDataSources()...)
+	// dataSources = append(dataSources, lbaas.GetDataSources()...)
 	dataSources = append(dataSources, network.GetDataSources()...)
 	dataSources = append(dataSources, objects.GetDataSources()...)
 	dataSources = append(dataSources, platform.GetDataSources()...)
