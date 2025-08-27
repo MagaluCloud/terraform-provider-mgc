@@ -436,6 +436,7 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	hasResizeUpdate := false
 	var planData DBaaSInstanceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &planData)...)
 	if resp.Diagnostics.HasError() {
@@ -448,36 +449,32 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	var instanceResizeRequest dbSDK.InstanceResizeRequest
+
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
-		currentData.InstanceType = planData.InstanceType
-		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(),
-			currentData.EngineID.ValueString(), dbaasInstanceProductFamily)
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(
+			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), currentData.EngineID.ValueString(), dbaasInstanceProductFamily,
+		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
 		currentData.InstanceTypeId = types.StringValue(instanceTypeID)
-		_, err = r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			InstanceTypeID: &instanceTypeID,
-		})
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-
-		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
+		currentData.InstanceType = planData.InstanceType
+		instanceResizeRequest.InstanceTypeID = &instanceTypeID
+		hasResizeUpdate = true
 	}
 
 	if planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+		instanceResizeRequest.Volume = &dbSDK.InstanceVolumeResizeRequest{
+			Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
+		}
 		currentData.VolumeSize = planData.VolumeSize
-		_, err := r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			Volume: &dbSDK.InstanceVolumeResizeRequest{
-				Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
-			},
-		})
+		hasResizeUpdate = true
+	}
+
+	if hasResizeUpdate {
+		_, err := r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), instanceResizeRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
