@@ -10,11 +10,13 @@ import (
 
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -28,6 +30,7 @@ type DBaaSReplicaModel struct {
 	Name         types.String `tfsdk:"name"`
 	EngineID     types.String `tfsdk:"engine_id"`
 	InstanceType types.String `tfsdk:"instance_type"`
+	VolumeSize   types.Int64  `tfsdk:"volume_size"`
 	Status       types.String `tfsdk:"status"`
 }
 
@@ -85,6 +88,14 @@ func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Computed:    true,
 				Description: "Instance type",
+			},
+			"volume_size": schema.Int64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Size of the storage volume in GB. Can be increased but not decreased after creation.",
+				Validators: []validator.Int64{
+					int64validator.Between(10, 50000),
+				},
 			},
 			"engine_id": schema.StringAttribute{
 				Computed:    true,
@@ -145,6 +156,7 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 	data.SourceID = types.StringValue(found.SourceID)
 	data.Name = types.StringValue(found.Name)
 	data.EngineID = types.StringValue(found.EngineID)
+	data.VolumeSize = types.Int64Value(int64(found.Volume.Size))
 
 	instanceTypeName, err := GetInstanceTypeNameByID(ctx, r.dbaasInstanceTypes.Get, found.InstanceTypeID)
 	if err != nil {
@@ -173,6 +185,7 @@ func (r *DBaaSReplicaResource) Read(ctx context.Context, req resource.ReadReques
 	data.SourceID = types.StringValue(detail.SourceID)
 	data.Name = types.StringValue(detail.Name)
 	data.EngineID = types.StringValue(detail.EngineID)
+	data.VolumeSize = types.Int64Value(int64(detail.Volume.Size))
 
 	instanceType, err := r.dbaasInstanceTypes.Get(ctx, detail.InstanceTypeID)
 	if err != nil {
@@ -187,6 +200,7 @@ func (r *DBaaSReplicaResource) Read(ctx context.Context, req resource.ReadReques
 
 func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan DBaaSReplicaModel
+	hasResizeUpdate := false
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -198,17 +212,31 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if plan.InstanceType.ValueString() != "" && currentData.InstanceType.ValueString() != plan.InstanceType.ValueString() {
-		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(),
-			currentData.EngineID.ValueString(), dbaasReplicaProductFamily)
+	var replicaResizeRequest dbSDK.ReplicaResizeRequest
+
+	if plan.InstanceType.ValueString() != "" && plan.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(
+			ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(), currentData.EngineID.ValueString(), dbaasReplicaProductFamily,
+		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
+		currentData.InstanceType = plan.InstanceType
+		replicaResizeRequest.InstanceTypeID = &instanceTypeID
+		hasResizeUpdate = true
+	}
 
-		_, err = r.dbaasReplicas.Resize(ctx, currentData.ID.ValueString(), dbSDK.ReplicaResizeRequest{
-			InstanceTypeID: instanceTypeID,
-		})
+	if plan.VolumeSize.ValueInt64() != 0 && plan.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+		replicaResizeRequest.Volume = &dbSDK.InstanceVolumeResizeRequest{
+			Size: *utils.ConvertInt64PointerToIntPointer(plan.VolumeSize.ValueInt64Pointer()),
+		}
+		currentData.VolumeSize = plan.VolumeSize
+		hasResizeUpdate = true
+	}
+
+	if hasResizeUpdate {
+		_, err := r.dbaasReplicas.Resize(ctx, currentData.ID.ValueString(), replicaResizeRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -220,7 +248,6 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
-	currentData.InstanceType = plan.InstanceType
 	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
 }
 
