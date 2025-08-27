@@ -448,36 +448,30 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	var instanceResizeRequest dbSDK.InstanceResizeRequest
+
 	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
-		currentData.InstanceType = planData.InstanceType
-		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(),
-			currentData.EngineID.ValueString(), dbaasInstanceProductFamily)
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(
+			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), currentData.EngineID.ValueString(), dbaasInstanceProductFamily,
+		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
 		currentData.InstanceTypeId = types.StringValue(instanceTypeID)
-		_, err = r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			InstanceTypeID: &instanceTypeID,
-		})
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-
-		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
+		instanceResizeRequest.InstanceTypeID = &instanceTypeID
 	}
 
 	if planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+		instanceResizeRequest.Volume = &dbSDK.InstanceVolumeResizeRequest{
+			Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
+		}
+	}
+
+	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() || planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+		currentData.InstanceType = planData.InstanceType
 		currentData.VolumeSize = planData.VolumeSize
-		_, err := r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			Volume: &dbSDK.InstanceVolumeResizeRequest{
-				Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
-			},
-		})
+		_, err := r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), instanceResizeRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
