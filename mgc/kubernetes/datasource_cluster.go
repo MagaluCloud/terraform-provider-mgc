@@ -35,7 +35,6 @@ type KubernetesCluster struct {
 	Message                    types.String   `tfsdk:"message"`
 	State                      types.String   `tfsdk:"state"`
 	UpdatedAt                  types.String   `tfsdk:"updated_at"`
-	CNI                        types.String   `tfsdk:"cni"`
 }
 
 type Controlplane struct {
@@ -102,10 +101,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 			},
 			"enabled_bastion": schema.BoolAttribute{
 				Description: "Indicates if a bastion host is enabled for secure access to the cluster.",
-				Computed:    true,
-			},
-			"cni": schema.StringAttribute{
-				Description: "The Container Network Interface (CNI) plugin used for networking in the cluster",
 				Computed:    true,
 			},
 			"node_pools": schema.ListNestedAttribute{
@@ -384,7 +379,6 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 		CreatedAt:          types.StringPointerValue(utils.ConvertTimeToRFC3339(getResult.CreatedAt)),
 		Region:             types.StringValue(*getResult.Region),
 		UpdatedAt:          types.StringPointerValue(utils.ConvertTimeToRFC3339(getResult.UpdatedAt)),
-		CNI:                types.StringPointerValue(getResult.CNI),
 	}
 
 	if getResult.AllowedCIDRs != nil {
