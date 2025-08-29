@@ -821,7 +821,6 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 				VPCID:        types.StringValue("vpc-123"),
 				ACLs: &[]ACLModel{
 					{
-						ID:             types.StringValue("acl-123"),
 						Action:         types.StringValue("ALLOW"),
 						Ethertype:      types.StringValue("IPv4"),
 						Protocol:       types.StringValue("TCP"),
@@ -841,7 +840,6 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 						TargetsType:                         types.StringValue("INSTANCE"),
 						Targets: []TargetModel{
 							{
-								ID:        types.StringValue("target-123"),
 								Port:      types.Int64Value(8080),
 								NICID:     types.StringValue("nic-123"),
 								IPAddress: types.StringValue("192.168.1.10"),
@@ -1993,4 +1991,660 @@ func TestLoadBalancerModel_hasACLChanges(t *testing.T) {
 			assert.Equal(t, tt.expected, result, "hasACLChanges returned unexpected result")
 		})
 	}
+}
+
+func TestHealthCheckModel_hasHealthCheckChanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		plan     HealthCheckModel
+		state    HealthCheckModel
+		expected bool
+	}{
+		{
+			name: "no changes - identical health checks",
+			plan: HealthCheckModel{
+				Protocol:                types.StringValue("http"),
+				Port:                    types.Int64Value(80),
+				Path:                    types.StringValue("/health"),
+				HealthyStatusCode:       types.Int64Value(200),
+				IntervalSeconds:         types.Int64Value(30),
+				TimeoutSeconds:          types.Int64Value(5),
+				InitialDelaySeconds:     types.Int64Value(10),
+				HealthyThresholdCount:   types.Int64Value(3),
+				UnhealthyThresholdCount: types.Int64Value(2),
+			},
+			state: HealthCheckModel{
+				Protocol:                types.StringValue("http"),
+				Port:                    types.Int64Value(80),
+				Path:                    types.StringValue("/health"),
+				HealthyStatusCode:       types.Int64Value(200),
+				IntervalSeconds:         types.Int64Value(30),
+				TimeoutSeconds:          types.Int64Value(5),
+				InitialDelaySeconds:     types.Int64Value(10),
+				HealthyThresholdCount:   types.Int64Value(3),
+				UnhealthyThresholdCount: types.Int64Value(2),
+			},
+			expected: false,
+		},
+		{
+			name: "protocol changed",
+			plan: HealthCheckModel{
+				Protocol: types.StringValue("tcp"),
+				Port:     types.Int64Value(80),
+			},
+			state: HealthCheckModel{
+				Protocol: types.StringValue("http"),
+				Port:     types.Int64Value(80),
+			},
+			expected: true,
+		},
+		{
+			name: "path null vs empty - no change",
+			plan: HealthCheckModel{
+				Protocol: types.StringValue("http"),
+				Port:     types.Int64Value(80),
+				Path:     types.StringNull(),
+			},
+			state: HealthCheckModel{
+				Protocol: types.StringValue("http"),
+				Port:     types.Int64Value(80),
+				Path:     types.StringValue(""),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown field in plan - returns false",
+			plan: HealthCheckModel{
+				Protocol:        types.StringValue("http"),
+				Port:            types.Int64Value(80),
+				IntervalSeconds: types.Int64Unknown(),
+			},
+			state: HealthCheckModel{
+				Protocol:        types.StringValue("http"),
+				Port:            types.Int64Value(80),
+				IntervalSeconds: types.Int64Value(15),
+			},
+			expected: false,
+		},
+		{
+			name: "healthy_threshold_count changed",
+			plan: HealthCheckModel{
+				Protocol:              types.StringValue("http"),
+				Port:                  types.Int64Value(80),
+				HealthyThresholdCount: types.Int64Value(5),
+			},
+			state: HealthCheckModel{
+				Protocol:              types.StringValue("http"),
+				Port:                  types.Int64Value(80),
+				HealthyThresholdCount: types.Int64Value(3),
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.plan.hasHealthCheckChanges(tt.state)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestLoadBalancerModel_healthChecksToUpdate(t *testing.T) {
+	t.Parallel()
+
+	// Nil cases
+	{
+		plan := LoadBalancerModel{HealthChecks: nil}
+		state := LoadBalancerModel{HealthChecks: nil}
+		has, updates := plan.healthChecksToUpdate(state)
+		assert.False(t, has)
+		assert.Nil(t, updates)
+	}
+
+	// Setup state
+	stateHCs := []HealthCheckModel{
+		{
+			ID:       types.StringValue("hc-1"),
+			Name:     types.StringValue("hc-1"),
+			Protocol: types.StringValue("http"),
+			Port:     types.Int64Value(80),
+			Path:     types.StringValue("/health"),
+		},
+		{
+			ID:       types.StringValue("hc-2"),
+			Name:     types.StringValue("hc-2"),
+			Protocol: types.StringValue("tcp"),
+			Port:     types.Int64Value(443),
+			Path:     types.StringNull(),
+		},
+	}
+	state := LoadBalancerModel{HealthChecks: &stateHCs}
+
+	// Plan changes: hc-1 port change; hc-2 unchanged; hc-3 is new (ignored by update)
+	planHCs := []HealthCheckModel{
+		{
+			ID:       types.StringValue("hc-1"),
+			Name:     types.StringValue("hc-1"),
+			Protocol: types.StringValue("http"),
+			Port:     types.Int64Value(81), // changed
+			Path:     types.StringValue("/health"),
+		},
+		{
+			ID:       types.StringValue("hc-2"),
+			Name:     types.StringValue("hc-2"),
+			Protocol: types.StringValue("tcp"),
+			Port:     types.Int64Value(443),
+			Path:     types.StringNull(),
+		},
+		{
+			Name:     types.StringValue("hc-3"),
+			Protocol: types.StringValue("http"),
+			Port:     types.Int64Value(8080),
+			Path:     types.StringValue("/live"),
+		},
+	}
+	plan := LoadBalancerModel{HealthChecks: &planHCs}
+
+	has, updates := plan.healthChecksToUpdate(state)
+	assert.True(t, has)
+	require.Len(t, updates, 1)
+	// Ensure the returned pointer is to the plan item for hc-1
+	require.Equal(t, "hc-1", updates[0].Name.ValueString())
+	require.Equal(t, int64(81), updates[0].Port.ValueInt64())
+}
+
+func TestBackendModel_hasBackendFieldChanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		plan     BackendModel
+		state    BackendModel
+		expected bool
+	}{
+		{
+			name: "no change",
+			plan: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			state: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			expected: false,
+		},
+		{
+			name: "panic_threshold changed",
+			plan: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.7),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			state: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			expected: true,
+		},
+		{
+			name: "close_connections_on_host_health_failure changed",
+			plan: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(true),
+			},
+			state: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			expected: true,
+		},
+		{
+			name: "unknown in plan returns false",
+			plan: BackendModel{
+				PanicThreshold:                      types.Float64Unknown(),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			state: BackendModel{
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.plan.hasBackendFieldChanges(tt.state)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestBackendModel_hasTargetChanges(t *testing.T) {
+	t.Parallel()
+
+	// Base state with two targets
+	state := BackendModel{
+		Targets: []TargetModel{
+			{
+				Port:      types.Int64Value(80),
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+			},
+			{
+				Port:      types.Int64Value(81),
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.2"),
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		plan     BackendModel
+		expected bool
+	}{
+		{
+			name: "no change - identical",
+			plan: BackendModel{
+				Targets: []TargetModel{
+					{
+						Port:      types.Int64Value(80),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.1"),
+					},
+					{
+						Port:      types.Int64Value(81),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.2"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "length mismatch - removed target",
+			plan: BackendModel{
+				Targets: []TargetModel{
+					{
+						Port:      types.Int64Value(80),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.1"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "port changed on existing target",
+			plan: BackendModel{
+				Targets: []TargetModel{
+					{
+						Port:      types.Int64Value(8080), // changed
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.1"),
+					},
+					{
+						Port:      types.Int64Value(81),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.2"),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "null vs empty string equivalence (nic_id/ip_address) - no change",
+			plan: BackendModel{
+				Targets: []TargetModel{
+					{
+						Port:      types.Int64Value(80),
+						NICID:     types.StringValue(""),
+						IPAddress: types.StringValue("10.0.0.1"),
+					},
+					{
+						Port:      types.Int64Value(81),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.2"),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "unknown in plan target - no change signaled",
+			plan: BackendModel{
+				Targets: []TargetModel{
+					{
+						Port:      types.Int64Unknown(), // unknown
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.1"),
+					},
+					{
+						Port:      types.Int64Value(81),
+						NICID:     types.StringNull(),
+						IPAddress: types.StringValue("10.0.0.2"),
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.plan.hasTargetChanges(state)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestLoadBalancerModel_backendsToUpdate(t *testing.T) {
+	t.Parallel()
+
+	// State with two backends
+	state := LoadBalancerModel{
+		Backends: []BackendModel{
+			{
+				ID:                                  types.StringValue("b1"),
+				Name:                                types.StringValue("backend-a"),
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(80), IPAddress: types.StringValue("10.0.0.1")},
+				},
+			},
+			{
+				ID:                                  types.StringValue("b2"),
+				Name:                                types.StringValue("backend-b"),
+				PanicThreshold:                      types.Float64Value(0.3),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(81), IPAddress: types.StringValue("10.0.0.2")},
+				},
+			},
+		},
+	}
+
+	// Plan: b1 has field change; b2 has target change; b3 is new (ignored)
+	plan := LoadBalancerModel{
+		Backends: []BackendModel{
+			{
+				ID:                                  types.StringValue("b1"),
+				Name:                                types.StringValue("backend-a"),
+				PanicThreshold:                      types.Float64Value(0.7), // field change
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(80), IPAddress: types.StringValue("10.0.0.1")},
+				},
+			},
+			{
+				ID:                                  types.StringValue("b2"),
+				Name:                                types.StringValue("backend-b"),
+				PanicThreshold:                      types.Float64Value(0.3),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(8081), IPAddress: types.StringValue("10.0.0.2")}, // target change
+				},
+			},
+			{
+				Name:                                types.StringValue("backend-new"),
+				PanicThreshold:                      types.Float64Value(0.2),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(true),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(90), IPAddress: types.StringValue("10.0.0.9")},
+				},
+			},
+		},
+	}
+
+	fieldUpdates, targetUpdates := plan.backendsToUpdate(state)
+
+	require.Len(t, fieldUpdates, 1)
+	require.Len(t, targetUpdates, 1)
+
+	assert.Equal(t, "backend-a", fieldUpdates[0].Name.ValueString())
+	assert.Equal(t, "backend-b", targetUpdates[0].Name.ValueString())
+}
+
+func TestTargetModel_hasUnknowns(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		target   TargetModel
+		expected bool
+	}{
+		{
+			name: "no unknowns",
+			target: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown port",
+			target: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Unknown(),
+			},
+			expected: true,
+		},
+		{
+			name: "unknown ip",
+			target: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringUnknown(),
+				Port:      types.Int64Value(80),
+			},
+			expected: true,
+		},
+		{
+			name: "unknown nic",
+			target: TargetModel{
+				NICID:     types.StringUnknown(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.target.hasUnknowns()
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestTargetModel_equalsNormalized(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        TargetModel
+		b        TargetModel
+		expected bool
+	}{
+		{
+			name: "equal with null vs empty nic",
+			a: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			b: TargetModel{
+				NICID:     types.StringValue(""),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			expected: true,
+		},
+		{
+			name: "different IP",
+			a: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			b: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.2"),
+				Port:      types.Int64Value(80),
+			},
+			expected: false,
+		},
+		{
+			name: "unknown on either side yields true (tolerant)",
+			a: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringUnknown(),
+				Port:      types.Int64Value(80),
+			},
+			b: TargetModel{
+				NICID:     types.StringNull(),
+				IPAddress: types.StringValue("10.0.0.1"),
+				Port:      types.Int64Value(80),
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.a.equalsNormalized(tt.b)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestLoadBalancerModel_backendsToUpdate_DualChangeSameBackend(t *testing.T) {
+	t.Parallel()
+
+	// State with one backend and one target
+	state := LoadBalancerModel{
+		Backends: []BackendModel{
+			{
+				ID:                                  types.StringValue("b1"),
+				Name:                                types.StringValue("backend-a"),
+				PanicThreshold:                      types.Float64Value(0.5),
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(false),
+				Targets: []TargetModel{
+					{Port: types.Int64Value(80), IPAddress: types.StringValue("10.0.0.1")},
+				},
+			},
+		},
+	}
+
+	// Plan changes: same backend requires both a field change and a target change
+	plan := LoadBalancerModel{
+		Backends: []BackendModel{
+			{
+				ID:                                  types.StringValue("b1"),
+				Name:                                types.StringValue("backend-a"),
+				PanicThreshold:                      types.Float64Value(0.7), // field change
+				CloseConnectionsOnHostHealthFailure: types.BoolValue(true),   // field change
+				Targets: []TargetModel{
+					{Port: types.Int64Value(8080), IPAddress: types.StringValue("10.0.0.1")}, // target change
+				},
+			},
+		},
+	}
+
+	fieldUpdates, targetUpdates := plan.backendsToUpdate(state)
+
+	require.Len(t, fieldUpdates, 1, "should detect field updates")
+	require.Len(t, targetUpdates, 1, "should detect target updates")
+	assert.Equal(t, "backend-a", fieldUpdates[0].Name.ValueString())
+	assert.Equal(t, "backend-a", targetUpdates[0].Name.ValueString())
+}
+
+func TestLoadBalancerModel_healthChecksToUpdate_MatchByName(t *testing.T) {
+	t.Parallel()
+
+	// State has a HC with name but missing ID
+	stateHCs := []HealthCheckModel{
+		{
+			ID:       types.StringNull(),
+			Name:     types.StringValue("hc-by-name"),
+			Protocol: types.StringValue("http"),
+			Port:     types.Int64Value(80),
+			Path:     types.StringValue("/health"),
+		},
+	}
+	state := LoadBalancerModel{HealthChecks: &stateHCs}
+
+	// Plan changes same HC by name (no ID), port changed
+	planHCs := []HealthCheckModel{
+		{
+			Name:     types.StringValue("hc-by-name"),
+			Protocol: types.StringValue("http"),
+			Port:     types.Int64Value(81), // changed
+			Path:     types.StringValue("/health"),
+		},
+	}
+	plan := LoadBalancerModel{HealthChecks: &planHCs}
+
+	has, updates := plan.healthChecksToUpdate(state)
+	assert.True(t, has)
+	require.Len(t, updates, 1)
+	assert.Equal(t, "hc-by-name", updates[0].Name.ValueString())
+	assert.Equal(t, int64(81), updates[0].Port.ValueInt64())
+}
+
+func Test_backendItemModel_fromSDKBackend(t *testing.T) {
+	t.Parallel()
+
+	in := &lbSDK.NetworkBackendResponse{
+		ID:                                  "backend-123",
+		Name:                                "backend-name",
+		Description:                         stringPtr("desc"),
+		BalanceAlgorithm:                    lbSDK.BackendBalanceAlgorithm("ROUND_ROBIN"),
+		HealthCheckID:                       stringPtr("hc-1"),
+		PanicThreshold:                      float64Ptr(0.9),
+		CloseConnectionsOnHostHealthFailure: boolPtr(true),
+		TargetsType:                         lbSDK.BackendType("INSTANCE"),
+		Targets: []lbSDK.NetworkBackedTarget{
+			{
+				ID:        "t1",
+				Port:      int64Ptr(80),
+				NicID:     stringPtr("nic-1"),
+				IPAddress: stringPtr("10.0.0.1"),
+			},
+			{
+				ID:        "t2",
+				Port:      int64Ptr(81),
+				NicID:     nil,
+				IPAddress: stringPtr("10.0.0.2"),
+			},
+		},
+	}
+
+	var item backendItemModel
+	out := item.fromSDKBackend(in)
+
+	assert.Equal(t, types.StringValue("backend-123"), out.ID)
+	assert.Equal(t, types.StringValue("backend-name"), out.Name)
+	assert.Equal(t, types.StringValue("desc"), out.Description)
+	assert.Equal(t, types.StringValue("ROUND_ROBIN"), out.BalanceAlgorithm)
+	assert.Equal(t, types.StringValue("hc-1"), out.HealthCheckID)
+	assert.Equal(t, types.Float64Value(0.9), out.PanicThreshold)
+	assert.Equal(t, types.BoolValue(true), out.CloseConnectionsOnHostHealthFailure)
+	assert.Equal(t, types.StringValue("INSTANCE"), out.TargetsType)
+
+	require.Len(t, out.Targets, 2)
+	assert.Equal(t, types.Int64Value(80), out.Targets[0].Port)
+	assert.Equal(t, types.StringValue("nic-1"), out.Targets[0].NICID)
+	assert.Equal(t, types.StringValue("10.0.0.1"), out.Targets[0].IPAddress)
+
+	assert.Equal(t, types.Int64Value(81), out.Targets[1].Port)
+	assert.Equal(t, types.StringNull(), out.Targets[1].NICID)
+	assert.Equal(t, types.StringValue("10.0.0.2"), out.Targets[1].IPAddress)
 }

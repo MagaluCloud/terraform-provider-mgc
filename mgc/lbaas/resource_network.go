@@ -2,18 +2,21 @@ package lbaas
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -129,18 +132,11 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"acls": schema.ListNestedAttribute{
+			"acls": schema.SetNestedAttribute{
 				Description: "Access Control Lists for the load balancer.",
 				Optional:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Description: "The unique identifier of the ACL rule.",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-							Computed: true,
-						},
 						"action": schema.StringAttribute{
 							Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
 							Required:    true,
@@ -170,9 +166,12 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 					},
 				},
 			},
-			"backends": schema.ListNestedAttribute{
+			"backends": schema.SetNestedAttribute{
 				Description: "Backend configurations for the load balancer.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Set{
+					utils.SetMembershipChangeRequiresReplace(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -185,6 +184,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"balance_algorithm": schema.StringAttribute{
 							Description: "The load balancing algorithm.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 							Validators: []validator.String{
 								stringvalidator.OneOf("round_robin"),
 							},
@@ -192,10 +194,16 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"description": schema.StringAttribute{
 							Description: "The description of the backend.",
 							Optional:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"health_check_name": schema.StringAttribute{
 							Description: "The name of the health check associated with this backend.",
 							Optional:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"close_connections_on_host_health_failure": schema.BoolAttribute{
 							Description: "Whether to close connections when a host health check fails.",
@@ -208,6 +216,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"name": schema.StringAttribute{
 							Description: "The name of the backend.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"panic_threshold": schema.Float64Attribute{
 							Description: "The panic threshold percentage for the backend.",
@@ -216,21 +227,14 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 								float64validator.Between(0, 100),
 							},
 						},
-						"targets": schema.ListNestedAttribute{
+						"targets": schema.SetNestedAttribute{
 							Description: "The targets for this backend.",
 							Required:    true,
-							Validators: []validator.List{
+							Validators: []validator.Set{
 								TargetValidator{},
 							},
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"id": schema.StringAttribute{
-										Description: "The unique identifier of the target.",
-										Computed:    true,
-										PlanModifiers: []planmodifier.String{
-											stringplanmodifier.UseStateForUnknown(),
-										},
-									},
 									"nic_id": schema.StringAttribute{
 										Description: "The NIC ID of the target. Required when targets_type is 'instance', must be empty when targets_type is 'raw'.",
 										Optional:    true,
@@ -255,22 +259,35 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							Validators: []validator.String{
 								stringvalidator.OneOf("instance", "raw"),
 							},
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 					},
 				},
 			},
-			"health_checks": schema.ListNestedAttribute{
+			"health_checks": schema.SetNestedAttribute{
 				Description: "Health check configurations for the load balancer.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.Set{
+					utils.SetMembershipChangeRequiresReplace(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the health check.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"description": schema.StringAttribute{
 							Description: "The description of the health check.",
 							Optional:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"healthy_status_code": schema.Int64Attribute{
 							Description: "The HTTP status code considered healthy.",
@@ -307,6 +324,10 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"name": schema.StringAttribute{
 							Description: "The name of the health check.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"path": schema.StringAttribute{
 							Description: "The path for HTTP health checks.",
@@ -345,33 +366,45 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 					},
 				},
 			},
-			"listeners": schema.ListNestedAttribute{
+			"listeners": schema.SetNestedAttribute{
 				Description: "Listener configurations for the load balancer.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Set{
+					utils.SetMembershipChangeRequiresReplace(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the listener.",
 							Computed:    true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
 						},
 						"backend_name": schema.StringAttribute{
 							Description: "The name of the backend associated with this listener.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"description": schema.StringAttribute{
 							Description: "The description of the listener.",
 							Optional:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the listener.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"port": schema.Int64Attribute{
 							Description: "The port for the listener.",
 							Required:    true,
+							PlanModifiers: []planmodifier.Int64{
+								int64planmodifier.RequiresReplace(),
+							},
 							Validators: []validator.Int64{
 								int64validator.Between(1, 65535),
 							},
@@ -382,10 +415,18 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							Validators: []validator.String{
 								stringvalidator.OneOf("tcp", "tls"),
 							},
-						},
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							}},
 						"tls_certificate_name": schema.StringAttribute{
 							Description: "The name of the TLS certificate for HTTPS listeners.",
 							Optional:    true,
+							Validators: []validator.String{
+								ListenerTLSValidator{},
+							},
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 					},
 				},
@@ -393,6 +434,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 			"tls_certificates": schema.ListNestedAttribute{
 				Description: "TLS certificate configurations for the load balancer.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -403,7 +447,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 						},
 						"certificate": schema.StringAttribute{
-							Description: "The TLS certificate content.",
+							Description: "The TLS certificate content. Must be base64 encoded.",
 							Required:    true,
 							WriteOnly:   true,
 							Sensitive:   true,
@@ -411,13 +455,19 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"description": schema.StringAttribute{
 							Description: "The description of the TLS certificate.",
 							Optional:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"name": schema.StringAttribute{
 							Description: "The name of the TLS certificate.",
 							Required:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"private_key": schema.StringAttribute{
-							Description: "The private key for the TLS certificate.",
+							Description: "The private key for the TLS certificate, must be base64 encoded.",
 							Required:    true,
 							Sensitive:   true,
 							WriteOnly:   true,
@@ -425,6 +475,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"expiration_date": schema.StringAttribute{
 							Description: "The expiration date of the TLS certificate.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 					},
 				},
@@ -435,7 +488,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 
 func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data LoadBalancerModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -488,7 +541,7 @@ func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	data = data.ToTerraformNetworkResource(ctx, lb)
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -504,54 +557,188 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if !planData.Description.Equal(stateData.Description) || !planData.Name.Equal(stateData.Name) {
-		stateData.Description = planData.Description
-		stateData.Name = planData.Name
-		_, err := r.lbNetworkLB.Update(ctx, planData.ID.ValueString(), lbSDK.UpdateNetworkLoadBalancerRequest{
-			Description: planData.Description.ValueStringPointer(),
-			Name:        planData.Name.ValueStringPointer(),
-		})
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-
-		resp.Diagnostics.Append(r.waitLoadBalancerRunning(ctx, planData.ID.ValueString(), resp.Diagnostics)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if err := r.updateLBNameDescription(ctx, &planData, &stateData); err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
 	}
 
-	if planData.hasACLChanges(stateData) {
-		stateData.ACLs = planData.ACLs
-		updatedACL := planData.ConvertACLsToSDK()
+	if err := r.replaceACLsIfChanged(ctx, &planData, &stateData); err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	if err := r.updateHealthChecks(ctx, &planData, &stateData); err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	if err := r.updateBackendsFields(ctx, &planData, &stateData); err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	if err := r.replaceBackendTargets(ctx, &planData, &stateData); err != nil {
+		var nf healthCheckNotFoundError
+		if errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Health Check Not Found", nf.Error())
+			return
+		}
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &stateData)...)
+}
+
+func (r *LoadBalancerResource) updateLBNameDescription(ctx context.Context, plan, state *LoadBalancerModel) error {
+	if !plan.Description.Equal(state.Description) || !plan.Name.Equal(state.Name) {
+		state.Description = plan.Description
+		state.Name = plan.Name
+		_, err := r.lbNetworkLB.Update(ctx, plan.ID.ValueString(), lbSDK.UpdateNetworkLoadBalancerRequest{
+			Description: plan.Description.ValueStringPointer(),
+			Name:        plan.Name.ValueStringPointer(),
+		})
+		if err != nil {
+			return err
+		}
+		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *LoadBalancerResource) replaceACLsIfChanged(ctx context.Context, plan, state *LoadBalancerModel) error {
+	if plan.hasACLChanges(*state) {
+		state.ACLs = plan.ACLs
+		updatedACL := plan.ConvertACLsToSDK()
 		if updatedACL == nil {
 			updatedACL = []lbSDK.CreateNetworkACLRequest{}
 		}
-
-		planData.ConvertACLsToSDK()
-		err := r.lbNetworkACL.Replace(ctx, planData.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
+		err := r.lbNetworkACL.Replace(ctx, plan.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
 			Acls: updatedACL,
 		})
 		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
+			return err
 		}
-
-		updated, err := r.waitLoadBalancerState(ctx, stateData.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, state.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
+			return err
 		}
-		if updated == nil {
-			resp.Diagnostics.AddError("Load Balancer not found", fmt.Sprintf("Load Balancer with ID %s not found after ACL update.", stateData.ID.ValueString()))
-			return
-		}
+	}
+	return nil
+}
 
-		stateData.ACLs = stateData.ToTerraformNetworkResource(ctx, *updated).ACLs
+func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, state *LoadBalancerModel) error {
+	if hasChange, updatedHealthChecks := plan.healthChecksToUpdate(*state); hasChange {
+		state.HealthChecks = plan.HealthChecks
+		for _, hc := range updatedHealthChecks {
+			err := r.lbNetworkHealthCheck.Update(ctx, state.ID.ValueString(), hc.ID.ValueString(), lbSDK.UpdateNetworkHealthCheckRequest{
+				Protocol:                lbSDK.HealthCheckProtocol(hc.Protocol.ValueString()),
+				Port:                    int(hc.Port.ValueInt64()),
+				Path:                    hc.Path.ValueStringPointer(),
+				HealthyStatusCode:       utils.ConvertInt64PointerToIntPointer(hc.HealthyStatusCode.ValueInt64Pointer()),
+				HealthyThresholdCount:   utils.ConvertInt64PointerToIntPointer(hc.HealthyThresholdCount.ValueInt64Pointer()),
+				InitialDelaySeconds:     utils.ConvertInt64PointerToIntPointer(hc.InitialDelaySeconds.ValueInt64Pointer()),
+				IntervalSeconds:         utils.ConvertInt64PointerToIntPointer(hc.IntervalSeconds.ValueInt64Pointer()),
+				TimeoutSeconds:          utils.ConvertInt64PointerToIntPointer(hc.TimeoutSeconds.ValueInt64Pointer()),
+				UnhealthyThresholdCount: utils.ConvertInt64PointerToIntPointer(hc.UnhealthyThresholdCount.ValueInt64Pointer()),
+			})
+			if err != nil {
+				return err
+			}
+		}
+		_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, state *LoadBalancerModel) error {
+	backendFieldUpdates, _ := plan.backendsToUpdate(*state)
+	if len(backendFieldUpdates) == 0 {
+		return nil
+	}
+	for _, b := range backendFieldUpdates {
+		backendIdx := slices.IndexFunc(state.Backends, func(sb BackendModel) bool {
+			return sb.Name.Equal(b.Name)
+		})
+		if backendIdx != -1 {
+			state.Backends[backendIdx].PanicThreshold = b.PanicThreshold
+			state.Backends[backendIdx].CloseConnectionsOnHostHealthFailure = b.CloseConnectionsOnHostHealthFailure
+		}
+		_, err := r.lbNetworkBackend.Update(ctx, state.ID.ValueString(), b.ID.ValueString(), lbSDK.UpdateNetworkBackendRequest{
+			PanicThreshold:                      b.PanicThreshold.ValueFloat64Pointer(),
+			CloseConnectionsOnHostHealthFailure: b.CloseConnectionsOnHostHealthFailure.ValueBoolPointer(),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, state *LoadBalancerModel) error {
+	_, backendTargetUpdates := plan.backendsToUpdate(*state)
+	if len(backendTargetUpdates) == 0 {
+		return nil
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, stateData)...)
+	healthCheckNameToID := make(map[string]string)
+	if state.HealthChecks != nil {
+		for _, hc := range *state.HealthChecks {
+			healthCheckNameToID[hc.Name.ValueString()] = hc.ID.ValueString()
+		}
+	}
+
+	for _, bu := range backendTargetUpdates {
+		var healthCheckID *string
+		if !bu.HealthCheckName.IsNull() && !bu.HealthCheckName.IsUnknown() {
+			if id, ok := healthCheckNameToID[bu.HealthCheckName.ValueString()]; ok {
+				healthCheckID = &id
+			} else {
+				return healthCheckNotFoundError{backendName: bu.Name.ValueString(), hcName: bu.HealthCheckName.ValueString()}
+			}
+		}
+
+		backendIdx := slices.IndexFunc(state.Backends, func(sb BackendModel) bool {
+			return sb.Name.Equal(bu.Name)
+		})
+		if backendIdx != -1 {
+			state.Backends[backendIdx].Targets = bu.Targets
+		}
+
+		var targets []lbSDK.NetworkBackendInstanceTargetRequest
+		for _, target := range bu.Targets {
+			targets = append(targets, lbSDK.NetworkBackendInstanceTargetRequest{
+				NicID:     target.NICID.ValueStringPointer(),
+				Port:      target.Port.ValueInt64(),
+				IPAddress: target.IPAddress.ValueStringPointer(),
+			})
+		}
+
+		_, err := r.lbNetworkTarget.Replace(ctx, state.ID.ValueString(), bu.ID.ValueString(), lbSDK.CreateNetworkBackendTargetRequest{
+			HealthCheckID: healthCheckID,
+			TargetsType:   lbSDK.BackendType(bu.TargetsType.ValueString()),
+			Targets:       targets,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -608,17 +795,4 @@ func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID s
 			}
 		}
 	}
-}
-
-func (r *LoadBalancerResource) waitLoadBalancerRunning(ctx context.Context, lbID string, diag diag.Diagnostics) diag.Diagnostics {
-	_, err := r.waitLoadBalancerState(ctx, lbID, lbSDK.LoadBalancerStatusRunning)
-	if err != nil {
-		if httpErr, ok := err.(*clientSDK.HTTPError); ok && httpErr.StatusCode == http.StatusNotFound {
-			diag.AddWarning("Load Balancer Not Found", fmt.Sprintf("Load balancer with ID %s not found during wait for running state.", lbID))
-			return diag
-		}
-		diag.AddError("Failed to wait for Load Balancer Running", fmt.Sprintf("Error waiting for load balancer %s to reach running state: %s", lbID, err.Error()))
-		return diag
-	}
-	return diag
 }

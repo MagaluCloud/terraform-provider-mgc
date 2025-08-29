@@ -67,8 +67,8 @@ resource "mgc_lbaas_network" "basic_http_lb" {
 
 ### Required
 
-- `backends` (Attributes List) Backend configurations for the load balancer. (see [below for nested schema](#nestedatt--backends))
-- `listeners` (Attributes List) Listener configurations for the load balancer. (see [below for nested schema](#nestedatt--listeners))
+- `backends` (Attributes Set) Backend configurations for the load balancer. (see [below for nested schema](#nestedatt--backends))
+- `listeners` (Attributes Set) Listener configurations for the load balancer. (see [below for nested schema](#nestedatt--listeners))
 - `name` (String) The name of the load balancer.
 - `type` (String) The type of the load balancer. Only 'proxy' type is currently supported by the API.
 - `visibility` (String) The visibility of the load balancer. Valid values: 'internal' (accessible only within VPC), 'external' (accessible from internet).
@@ -76,9 +76,9 @@ resource "mgc_lbaas_network" "basic_http_lb" {
 
 ### Optional
 
-- `acls` (Attributes List) Access Control Lists for the load balancer. (see [below for nested schema](#nestedatt--acls))
+- `acls` (Attributes Set) Access Control Lists for the load balancer. (see [below for nested schema](#nestedatt--acls))
 - `description` (String) The description of the load balancer.
-- `health_checks` (Attributes List) Health check configurations for the load balancer. (see [below for nested schema](#nestedatt--health_checks))
+- `health_checks` (Attributes Set) Health check configurations for the load balancer. (see [below for nested schema](#nestedatt--health_checks))
 - `public_ip_id` (String) The ID of the public IP associated with the load balancer. Required for external load balancers, must be omitted for internal load balancers.
 - `subnetpool_id` (String) The ID of the subnet pool for the load balancer.
 - `tls_certificates` (Attributes List) TLS certificate configurations for the load balancer. (see [below for nested schema](#nestedatt--tls_certificates))
@@ -94,7 +94,7 @@ Required:
 
 - `balance_algorithm` (String) The load balancing algorithm.
 - `name` (String) The name of the backend.
-- `targets` (Attributes List) The targets for this backend. (see [below for nested schema](#nestedatt--backends--targets))
+- `targets` (Attributes Set) The targets for this backend. (see [below for nested schema](#nestedatt--backends--targets))
 - `targets_type` (String) The type of targets. Valid values: 'instance' (requires nic_id and port), 'raw' (requires ip_address and port).
 
 Optional:
@@ -119,10 +119,6 @@ Optional:
 
 - `ip_address` (String) The IP address of the target. Required when targets_type is 'raw', must be empty when targets_type is 'instance'.
 - `nic_id` (String) The NIC ID of the target. Required when targets_type is 'instance', must be empty when targets_type is 'raw'.
-
-Read-Only:
-
-- `id` (String) The unique identifier of the target.
 
 
 
@@ -160,10 +156,6 @@ Optional:
 - `protocol` (String) The protocol for the ACL rule.
 - `remote_ip_prefix` (String) The remote IP prefix for the ACL rule.
 
-Read-Only:
-
-- `id` (String) The unique identifier of the ACL rule.
-
 
 <a id="nestedatt--health_checks"></a>
 ### Nested Schema for `health_checks`
@@ -195,9 +187,9 @@ Read-Only:
 
 Required:
 
-- `certificate` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The TLS certificate content.
+- `certificate` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The TLS certificate content. Must be base64 encoded.
 - `name` (String) The name of the TLS certificate.
-- `private_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The private key for the TLS certificate.
+- `private_key` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The private key for the TLS certificate, must be base64 encoded.
 
 Optional:
 

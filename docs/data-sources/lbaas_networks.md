@@ -54,7 +54,6 @@ Read-Only:
 
 - `action` (String) The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.
 - `ethertype` (String) The ethertype for the ACL rule.
-- `id` (String) The unique identifier of the ACL rule.
 - `name` (String) The name of the ACL rule.
 - `protocol` (String) The protocol for the ACL rule.
 - `remote_ip_prefix` (String) The remote IP prefix for the ACL rule.
