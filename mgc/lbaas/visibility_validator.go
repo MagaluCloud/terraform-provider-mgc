@@ -19,14 +19,12 @@ func (v VisibilityValidator) MarkdownDescription(ctx context.Context) string {
 }
 
 func (v VisibilityValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	// Skip validation if visibility is not set
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return
 	}
 
 	visibility := req.ConfigValue.ValueString()
 
-	// Get the public_ip_id from the parent load balancer object
 	var publicIPID types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("public_ip_id"), &publicIPID)...)
 	if resp.Diagnostics.HasError() {
