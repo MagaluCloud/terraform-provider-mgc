@@ -79,3 +79,5 @@ release:
   prerelease: true
   header: |
     ## Terraform provider ({{ .Date }})
+changelog:
+  use: github-native

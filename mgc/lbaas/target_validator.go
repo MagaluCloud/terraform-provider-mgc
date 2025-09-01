@@ -18,20 +18,17 @@ func (v TargetValidator) MarkdownDescription(ctx context.Context) string {
 	return "Validates target configuration based on targets_type"
 }
 
-func (v TargetValidator) ValidateList(ctx context.Context, req validator.ListRequest, resp *validator.ListResponse) {
-	// Get targets_type from the parent backend object
+func (v TargetValidator) ValidateSet(ctx context.Context, req validator.SetRequest, resp *validator.SetResponse) {
 	var targetsType types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("targets_type"), &targetsType)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Skip validation if targets_type is not set
 	if targetsType.IsNull() || targetsType.IsUnknown() || targetsType.ValueString() == "" {
 		return
 	}
 
-	// Get the targets list
 	var targets []TargetModel
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path, &targets)...)
 	if resp.Diagnostics.HasError() {
@@ -40,7 +37,6 @@ func (v TargetValidator) ValidateList(ctx context.Context, req validator.ListReq
 
 	targetsTypeValue := targetsType.ValueString()
 
-	// Validate each target
 	for i, target := range targets {
 		targetPath := req.Path.AtListIndex(i)
 
@@ -78,5 +74,49 @@ func (v TargetValidator) ValidateList(ctx context.Context, req validator.ListReq
 				)
 			}
 		}
+	}
+}
+
+// ListenerTLSValidator validates tls_certificate_name according to listener protocol
+type ListenerTLSValidator struct{}
+
+func (v ListenerTLSValidator) Description(ctx context.Context) string {
+	return "Validates that tls_certificate_name usage matches the listener protocol"
+}
+
+func (v ListenerTLSValidator) MarkdownDescription(ctx context.Context) string {
+	return "Validates that tls_certificate_name usage matches the listener protocol"
+}
+
+func validateTLSCertNameForProtocol(protocol types.String, val types.String) (string, string, bool) {
+	if protocol.IsNull() || protocol.IsUnknown() || protocol.ValueString() == "" {
+		return "", "", false
+	}
+	switch protocol.ValueString() {
+	case "tcp":
+		if !val.IsNull() && !val.IsUnknown() && val.ValueString() != "" {
+			return "Value error", "tls_certificate_name should not be provided when protocol is 'tcp'", true
+		}
+	case "tls":
+		if val.IsNull() || val.IsUnknown() || val.ValueString() == "" {
+			return "Missing Required Attribute", "tls_certificate_name must be provided when protocol is 'tls'", true
+		}
+	}
+	return "", "", false
+}
+func (v ListenerTLSValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	var protocol types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("protocol"), &protocol)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	sum, det, has := validateTLSCertNameForProtocol(protocol, req.ConfigValue)
+	if has {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			sum,
+			det,
+		)
 	}
 }

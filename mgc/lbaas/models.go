@@ -2,6 +2,7 @@ package lbaas
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -26,7 +27,6 @@ type LoadBalancerModel struct {
 }
 
 type ACLModel struct {
-	ID             types.String `tfsdk:"id"`
 	Action         types.String `tfsdk:"action"`
 	Ethertype      types.String `tfsdk:"ethertype"`
 	Name           types.String `tfsdk:"name"`
@@ -47,7 +47,6 @@ type BackendModel struct {
 }
 
 type TargetModel struct {
-	ID        types.String `tfsdk:"id"`
 	NICID     types.String `tfsdk:"nic_id"`
 	IPAddress types.String `tfsdk:"ip_address"`
 	Port      types.Int64  `tfsdk:"port"`
@@ -87,7 +86,6 @@ type TLSCertificateModel struct {
 	ExpirationDate types.String `tfsdk:"expiration_date"`
 }
 
-// Converter methods for LoadBalancerModel
 func (lb *LoadBalancerModel) ConvertACLsToSDK() []lbSDK.CreateNetworkACLRequest {
 	if lb.ACLs == nil {
 		return nil
@@ -213,7 +211,6 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 	aclModels := make([]ACLModel, len(lbResponse.ACLs))
 	for i, acl := range lbResponse.ACLs {
 		aclModels[i] = ACLModel{
-			ID:             types.StringValue(acl.ID),
 			Action:         types.StringValue(acl.Action),
 			Ethertype:      types.StringValue(string(acl.Ethertype)),
 			Protocol:       types.StringValue(string(acl.Protocol)),
@@ -229,7 +226,6 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 		var targets []TargetModel
 		for _, target := range backend.Targets {
 			targets = append(targets, TargetModel{
-				ID:        types.StringValue(target.ID),
 				Port:      types.Int64PointerValue(target.Port),
 				NICID:     types.StringPointerValue(target.NicID),
 				IPAddress: types.StringPointerValue(target.IPAddress),
@@ -413,7 +409,6 @@ func (b backendItemModel) fromSDKBackend(lb *lbSDK.NetworkBackendResponse) backe
 	targets := make([]TargetModel, 0, len(lb.Targets))
 	for _, t := range lb.Targets {
 		targets = append(targets, TargetModel{
-			ID:        types.StringValue(t.ID),
 			NICID:     types.StringPointerValue(t.NicID),
 			IPAddress: types.StringPointerValue(t.IPAddress),
 			Port:      types.Int64PointerValue(t.Port),
@@ -432,4 +427,224 @@ func (b backendItemModel) fromSDKBackend(lb *lbSDK.NetworkBackendResponse) backe
 		Targets:                             targets,
 	}
 	return item
+}
+
+func (plan HealthCheckModel) hasHealthCheckChanges(state HealthCheckModel) bool {
+	if plan.Protocol.IsUnknown() ||
+		plan.Port.IsUnknown() ||
+		plan.Path.IsUnknown() ||
+		plan.HealthyStatusCode.IsUnknown() ||
+		plan.IntervalSeconds.IsUnknown() ||
+		plan.TimeoutSeconds.IsUnknown() ||
+		plan.InitialDelaySeconds.IsUnknown() ||
+		plan.HealthyThresholdCount.IsUnknown() ||
+		plan.UnhealthyThresholdCount.IsUnknown() {
+		return false
+	}
+
+	if !plan.Protocol.Equal(state.Protocol) {
+		return true
+	}
+	if !plan.Port.Equal(state.Port) {
+		return true
+	}
+	if !plan.HealthyStatusCode.Equal(state.HealthyStatusCode) {
+		return true
+	}
+	if !plan.IntervalSeconds.Equal(state.IntervalSeconds) {
+		return true
+	}
+	if !plan.TimeoutSeconds.Equal(state.TimeoutSeconds) {
+		return true
+	}
+	if !plan.InitialDelaySeconds.Equal(state.InitialDelaySeconds) {
+		return true
+	}
+	if !plan.HealthyThresholdCount.Equal(state.HealthyThresholdCount) {
+		return true
+	}
+	if !plan.UnhealthyThresholdCount.Equal(state.UnhealthyThresholdCount) {
+		return true
+	}
+
+	if !plan.Path.Equal(state.Path) {
+		if (plan.Path.IsNull() || plan.Path.ValueString() == "") &&
+			(state.Path.IsNull() || state.Path.ValueString() == "") {
+		} else {
+			return true
+		}
+	}
+
+	return false
+}
+
+// healthChecksToUpdate compares the health checks in the plan with those in the current state
+// It returns a boolean indicating whether there are any health checks to update,
+// and a slice of pointers to the health checks that need updating.
+func (plan *LoadBalancerModel) healthChecksToUpdate(state LoadBalancerModel) (bool, []*HealthCheckModel) {
+	if plan.HealthChecks == nil || state.HealthChecks == nil {
+		return false, nil
+	}
+
+	byID := make(map[string]HealthCheckModel)
+	byName := make(map[string]HealthCheckModel)
+	for _, s := range *state.HealthChecks {
+		if !s.ID.IsNull() && !s.ID.IsUnknown() && s.ID.ValueString() != "" {
+			byID[s.ID.ValueString()] = s
+		}
+		if !s.Name.IsNull() && !s.Name.IsUnknown() && s.Name.ValueString() != "" {
+			byName[s.Name.ValueString()] = s
+		}
+	}
+
+	var updates []*HealthCheckModel
+	for i := range *plan.HealthChecks {
+		p := &(*plan.HealthChecks)[i]
+
+		var st HealthCheckModel
+		var ok bool
+
+		if !p.ID.IsNull() && !p.ID.IsUnknown() && p.ID.ValueString() != "" {
+			st, ok = byID[p.ID.ValueString()]
+		}
+
+		if !ok && !p.Name.IsNull() && !p.Name.IsUnknown() && p.Name.ValueString() != "" {
+			st, ok = byName[p.Name.ValueString()]
+		}
+
+		if ok && p.hasHealthCheckChanges(st) {
+			updates = append(updates, p)
+		}
+	}
+
+	return true, updates
+}
+
+func (plan BackendModel) hasBackendFieldChanges(state BackendModel) bool {
+	if plan.PanicThreshold.IsUnknown() || plan.CloseConnectionsOnHostHealthFailure.IsUnknown() {
+		return false
+	}
+	if !plan.PanicThreshold.Equal(state.PanicThreshold) {
+		return true
+	}
+	if !plan.CloseConnectionsOnHostHealthFailure.Equal(state.CloseConnectionsOnHostHealthFailure) {
+		return true
+	}
+	return false
+}
+
+func (t TargetModel) hasUnknowns() bool {
+	return t.NICID.IsUnknown() || t.IPAddress.IsUnknown() || t.Port.IsUnknown()
+}
+
+func (t TargetModel) equalsNormalized(o TargetModel) bool {
+	if t.hasUnknowns() || o.hasUnknowns() {
+		return true
+	}
+	if !t.Port.Equal(o.Port) {
+		return false
+	}
+	nicA := ""
+	if !t.NICID.IsNull() {
+		nicA = t.NICID.ValueString()
+	}
+	nicB := ""
+	if !o.NICID.IsNull() {
+		nicB = o.NICID.ValueString()
+	}
+	if nicA != nicB {
+		return false
+	}
+	ipA := ""
+	if !t.IPAddress.IsNull() {
+		ipA = t.IPAddress.ValueString()
+	}
+	ipB := ""
+	if !o.IPAddress.IsNull() {
+		ipB = o.IPAddress.ValueString()
+	}
+	if ipA != ipB {
+		return false
+	}
+	return true
+}
+
+func (plan BackendModel) hasTargetChanges(state BackendModel) bool {
+	if len(plan.Targets) != len(state.Targets) {
+		return true
+	}
+
+	used := make([]bool, len(state.Targets))
+
+	for _, pt := range plan.Targets {
+		if pt.hasUnknowns() {
+			continue
+		}
+
+		matched := false
+		for i, st := range state.Targets {
+			if used[i] {
+				continue
+			}
+			if pt.equalsNormalized(st) {
+				used[i] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return true
+		}
+	}
+
+	return false
+}
+
+// backendsToUpdate compares plan vs state and returns which backends need field
+// updates and which need target updates. The same backend may appear in both slices.
+func (plan *LoadBalancerModel) backendsToUpdate(state LoadBalancerModel) (fieldUpdates []*BackendModel, targetUpdates []*BackendModel) {
+	if plan == nil {
+		return nil, nil
+	}
+	byID := make(map[string]BackendModel)
+	byName := make(map[string]BackendModel)
+	for _, s := range state.Backends {
+		if !s.ID.IsNull() && !s.ID.IsUnknown() && s.ID.ValueString() != "" {
+			byID[s.ID.ValueString()] = s
+		}
+		if !s.Name.IsNull() && !s.Name.IsUnknown() && s.Name.ValueString() != "" {
+			byName[s.Name.ValueString()] = s
+		}
+	}
+	for i := range plan.Backends {
+		pb := &plan.Backends[i]
+		var sb BackendModel
+		var ok bool
+		if !pb.ID.IsNull() && !pb.ID.IsUnknown() && pb.ID.ValueString() != "" {
+			sb, ok = byID[pb.ID.ValueString()]
+		}
+		if !ok && !pb.Name.IsNull() && !pb.Name.IsUnknown() && pb.Name.ValueString() != "" {
+			sb, ok = byName[pb.Name.ValueString()]
+		}
+		if !ok {
+			// New backend (create) – not an update
+			continue
+		}
+		if pb.hasBackendFieldChanges(sb) {
+			fieldUpdates = append(fieldUpdates, pb)
+		}
+		if pb.hasTargetChanges(sb) {
+			targetUpdates = append(targetUpdates, pb)
+		}
+	}
+	return
+}
+
+type healthCheckNotFoundError struct {
+	backendName string
+	hcName      string
+}
+
+func (e healthCheckNotFoundError) Error() string {
+	return fmt.Sprintf("Health check with name %s not found for backend %s", e.hcName, e.backendName)
 }

@@ -83,10 +83,6 @@ func (r *DataSourceLbaasNetworks) Schema(_ context.Context, _ datasource.SchemaR
 							Computed:    true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"id": schema.StringAttribute{
-										Description: "The unique identifier of the ACL rule.",
-										Computed:    true,
-									},
 									"action": schema.StringAttribute{
 										Description: "The action for the ACL rule. Valid values: 'ALLOW', 'DENY', 'DENY_UNSPECIFIED'. Note: values are case-sensitive and must be uppercase.",
 										Computed:    true,
@@ -190,7 +186,6 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 		aclModels := make([]ACLModel, len(sdkLB.ACLs))
 		for i, acl := range sdkLB.ACLs {
 			aclModels[i] = ACLModel{
-				ID:             types.StringValue(acl.ID),
 				Action:         types.StringValue(acl.Action),
 				Ethertype:      types.StringValue(string(acl.Ethertype)),
 				Protocol:       types.StringValue(string(acl.Protocol)),

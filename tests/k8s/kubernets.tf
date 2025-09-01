@@ -17,71 +17,74 @@ resource "mgc_kubernetes_cluster" "basic_cluster" {
   name        = "${random_pet.name.id}-basic-cluster"
   version     = var.cluster-version
   description = "Basic Kubernetes cluster for smoke test"
-  cni         = "default"
 }
 
-# Full-featured Kubernetes cluster
-resource "mgc_kubernetes_cluster" "full_cluster" {
-  name                 = "${random_pet.name.id}-full-cluster"
-  version              = var.cluster-version
-  description          = "Full-featured Kubernetes cluster for smoke test"
-  enabled_server_group = true
-  allowed_cidrs        = ["10.0.0.0/24", "192.168.1.0/24"]
+data "mgc_kubernetes_cluster" "basic_cluster_data" {
+  id = mgc_kubernetes_cluster.basic_cluster.id
 }
 
-# Outputs for verification
-output "basic_cluster" {
-  value = mgc_kubernetes_cluster.basic_cluster
-}
+# # Full-featured Kubernetes cluster
+# resource "mgc_kubernetes_cluster" "full_cluster" {
+#   name                 = "${random_pet.name.id}-full-cluster"
+#   version              = var.cluster-version
+#   description          = "Full-featured Kubernetes cluster for smoke test"
+#   enabled_server_group = true
+#   allowed_cidrs        = ["10.0.0.0/24", "192.168.1.0/24"]
+# }
 
-output "full_cluster" {
-  value = mgc_kubernetes_cluster.full_cluster
-}
+# # Outputs for verification
+# output "basic_cluster" {
+#   value = mgc_kubernetes_cluster.basic_cluster
+# }
 
-data "mgc_kubernetes_flavor" "available_flavors" {
-}
+# output "full_cluster" {
+#   value = mgc_kubernetes_cluster.full_cluster
+# }
 
-output "flavor_list" {
-  value = data.mgc_kubernetes_flavor.available_flavors
-}
+# data "mgc_kubernetes_flavor" "available_flavors" {
+# }
 
-data "mgc_kubernetes_version" "latest" {
-}
+# output "flavor_list" {
+#   value = data.mgc_kubernetes_flavor.available_flavors
+# }
 
-output "versions_list" {
-  value = data.mgc_kubernetes_version.latest.versions
-}
+# data "mgc_kubernetes_version" "latest" {
+# }
 
-# Basic nodepool for the basic cluster
-resource "mgc_kubernetes_nodepool" "basic_nodepool" {
-  name        = "basic-nodepool"
-  cluster_id  = mgc_kubernetes_cluster.basic_cluster.id
-  flavor_name = var.cluster-flavor
-  replicas    = 1
-}
+# output "versions_list" {
+#   value = data.mgc_kubernetes_version.latest.versions
+# }
 
-# Full-featured nodepool for the full cluster
-resource "mgc_kubernetes_nodepool" "full_nodepool" {
-  name         = "full-nodepool"
-  cluster_id   = mgc_kubernetes_cluster.full_cluster.id
-  flavor_name  = var.cluster-flavor
-  replicas     = 1
-  min_replicas = 1
-  max_replicas = 5
+# # Basic nodepool for the basic cluster
+# resource "mgc_kubernetes_nodepool" "basic_nodepool" {
+#   name        = "basic-nodepool"
+#   cluster_id  = mgc_kubernetes_cluster.basic_cluster.id
+#   flavor_name = var.cluster-flavor
+#   replicas    = 1
+# }
 
-  taints = [
-    {
-      key    = "dedicated"
-      value  = "smoke-test"
-      effect = "NoSchedule"
-    }
-  ]
-}
+# # Full-featured nodepool for the full cluster
+# resource "mgc_kubernetes_nodepool" "full_nodepool" {
+#   name         = "full-nodepool"
+#   cluster_id   = mgc_kubernetes_cluster.full_cluster.id
+#   flavor_name  = var.cluster-flavor
+#   replicas     = 1
+#   min_replicas = 1
+#   max_replicas = 5
 
-output "basic_nodepool" {
-  value = mgc_kubernetes_nodepool.basic_nodepool
-}
+#   taints = [
+#     {
+#       key    = "dedicated"
+#       value  = "smoke-test"
+#       effect = "NoSchedule"
+#     }
+#   ]
+# }
 
-output "full_nodepool" {
-  value = mgc_kubernetes_nodepool.full_nodepool
-}
+# output "basic_nodepool" {
+#   value = mgc_kubernetes_nodepool.basic_nodepool
+# }
+
+# output "full_nodepool" {
+#   value = mgc_kubernetes_nodepool.full_nodepool
+# }
