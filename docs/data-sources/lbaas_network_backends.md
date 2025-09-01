@@ -54,7 +54,6 @@ Read-Only:
 
 Read-Only:
 
-- `id` (String) Target ID.
 - `ip_address` (String) IP address of the target (when applicable).
 - `nic_id` (String) NIC ID of the target (when applicable).
 - `port` (Number) Port of the target.

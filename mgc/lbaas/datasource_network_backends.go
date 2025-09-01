@@ -86,10 +86,6 @@ func (r *DataSourceLbaasNetworkBackends) Schema(_ context.Context, _ datasource.
 							Description: "List of backend targets.",
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"id": schema.StringAttribute{
-										Computed:    true,
-										Description: "Target ID.",
-									},
 									"nic_id": schema.StringAttribute{
 										Computed:    true,
 										Description: "NIC ID of the target (when applicable).",
