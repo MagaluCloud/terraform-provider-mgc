@@ -50,7 +50,6 @@ func TestConvertToControlplane(t *testing.T) {
 		assert.True(t, result.MinReplicas.IsNull())
 		assert.True(t, result.Labels.IsNull())
 		assert.Nil(t, result.SecurityGroups)
-		assert.Nil(t, result.Tags)
 		assert.Nil(t, result.Taints)
 	})
 
@@ -102,7 +101,6 @@ func TestConvertToControlplane(t *testing.T) {
 		assert.Equal(t, types.Int64Value(2), result.MinReplicas)
 		assert.Equal(t, types.StringValue("sg-default"), result.SecurityGroups[0])
 		assert.Equal(t, types.StringValue("ok"), result.StatusMessages[0])
-		assert.Equal(t, types.StringValue("env:prod"), result.Tags[0])
 		assert.Equal(t, "NoSchedule", result.Taints[0].Effect.ValueString())
 		assert.Equal(t, "app", result.Taints[0].Key.ValueString())
 		assert.Equal(t, "critical", result.Taints[0].Value.ValueString())

@@ -53,7 +53,6 @@ type Controlplane struct {
 	SecurityGroups []types.String `tfsdk:"security_groups"`
 	StatusMessages []types.String `tfsdk:"status_messages"`
 	State          types.String   `tfsdk:"state"`
-	Tags           []types.String `tfsdk:"tags"`
 	Taints         []Taint        `tfsdk:"taints"`
 	UpdatedAt      types.String   `tfsdk:"updated_at"`
 }
@@ -112,6 +111,15 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 							Description: "Definition of the CPU, RAM, and storage capacity of the nodes.",
 							Computed:    true,
 						},
+						"max_pods_per_node": schema.Int64Attribute{
+							Description: "Maximum number of pods that can be scheduled on each node in the node pool.",
+							Computed:    true,
+						},
+						"availability_zones": schema.ListAttribute{
+							Description: "List of availability zones where the nodes in the node pool are distributed.",
+							Computed:    true,
+							ElementType: types.StringType,
+						},
 						"name": schema.StringAttribute{
 							Description: "Name of the node pool.",
 							Computed:    true,
@@ -127,11 +135,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 						"min_replicas": schema.Int64Attribute{
 							Description: "Minimum number of replicas for autoscaling.",
 							Computed:    true,
-						},
-						"tags": schema.ListAttribute{
-							Description: "List of tags applied to the node pool.",
-							Computed:    true,
-							ElementType: types.StringType,
 						},
 						"created_at": schema.StringAttribute{
 							Description: "Date of creation of the Kubernetes Node.",
@@ -263,11 +266,6 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 					"state": schema.StringAttribute{
 						Description: "Current state of the node pool or control plane.",
 						Computed:    true,
-					},
-					"tags": schema.ListAttribute{
-						Description: "List of tags applied to the node pool.",
-						Computed:    true,
-						ElementType: types.StringType,
 					},
 					"taints": schema.ListNestedAttribute{
 						Description: "Property for associating a set of nodes.",
@@ -467,13 +465,6 @@ func convertToControlplane(cp *sdkK8s.NodePool) *Controlplane {
 	controlplane.StatusMessages = make([]types.String, len(cp.Status.Messages))
 	for i, msg := range cp.Status.Messages {
 		controlplane.StatusMessages[i] = types.StringValue(msg)
-	}
-
-	if cp.Tags != nil && len(*cp.Tags) > 0 {
-		controlplane.Tags = make([]types.String, len(*cp.Tags))
-		for i, tag := range *cp.Tags {
-			controlplane.Tags[i] = types.StringPointerValue(&tag)
-		}
 	}
 
 	if cp.Taints != nil && len(*cp.Taints) > 0 {
