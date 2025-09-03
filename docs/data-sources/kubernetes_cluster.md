@@ -75,7 +75,6 @@ Read-Only:
 - `security_groups` (List of String) Name of the security group to define rules allowing network traffic in the worker node pool.
 - `state` (String) Current state of the node pool or control plane.
 - `status_messages` (List of String) Detailed message about the status of the node pool or control plane.
-- `tags` (List of String) List of tags applied to the node pool.
 - `taints` (Attributes List) Property for associating a set of nodes. (see [below for nested schema](#nestedatt--controlplane--taints))
 - `updated_at` (String) Date of the last change to the Kubernetes cluster.
 
@@ -95,14 +94,15 @@ Read-Only:
 
 Read-Only:
 
+- `availability_zones` (List of String) List of availability zones where the nodes in the node pool are distributed.
 - `created_at` (String) Date of creation of the Kubernetes Node.
 - `flavor_name` (String) Definition of the CPU, RAM, and storage capacity of the nodes.
 - `id` (String) Node pool's UUID.
+- `max_pods_per_node` (Number) Maximum number of pods that can be scheduled on each node in the node pool.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
 - `name` (String) Name of the node pool.
 - `replicas` (Number) Number of replicas of the nodes in the node pool.
-- `tags` (List of String) List of tags applied to the node pool.
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--node_pools--taints))
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
 
