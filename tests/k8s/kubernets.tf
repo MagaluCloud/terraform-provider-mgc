@@ -55,13 +55,18 @@ data "mgc_kubernetes_cluster" "basic_cluster_data" {
 #   value = data.mgc_kubernetes_version.latest.versions
 # }
 
-# # Basic nodepool for the basic cluster
-# resource "mgc_kubernetes_nodepool" "basic_nodepool" {
-#   name        = "basic-nodepool"
-#   cluster_id  = mgc_kubernetes_cluster.basic_cluster.id
-#   flavor_name = var.cluster-flavor
-#   replicas    = 1
-# }
+# Basic nodepool for the basic cluster
+resource "mgc_kubernetes_nodepool" "basic_nodepool" {
+  name        = "basic-nodepool"
+  cluster_id  = mgc_kubernetes_cluster.basic_cluster.id
+  flavor_name = var.cluster-flavor
+  replicas    = 1
+}
+
+data "mgc_kubernetes_nodepool" "basic_nodepool_data" {
+  id         = mgc_kubernetes_nodepool.basic_nodepool.id
+  cluster_id = mgc_kubernetes_cluster.basic_cluster.id
+}
 
 # # Full-featured nodepool for the full cluster
 # resource "mgc_kubernetes_nodepool" "full_nodepool" {

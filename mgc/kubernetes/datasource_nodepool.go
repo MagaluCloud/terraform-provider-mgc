@@ -215,7 +215,9 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 
 func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool, clusterID, region string) (FlattenedGetResult, error) {
 	if original == nil {
-		return FlattenedGetResult{}, nil
+		return FlattenedGetResult{
+			ClusterID: types.StringValue(clusterID),
+		}, nil
 	}
 
 	flattened := &FlattenedGetResult{
@@ -234,7 +236,6 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		InstanceTemplateFlavorSize: types.Int64Value(int64(original.InstanceTemplate.Flavor.Size)),
 		InstanceTemplateFlavorVcpu: types.Int64Value(int64(original.InstanceTemplate.Flavor.VCPU)),
 		StatusState:                types.StringValue(original.Status.State),
-		MaxPodsPerNode:             types.Int64Value(int64(*original.MaxPodsPerNode)),
 	}
 
 	if original.AutoScale != nil {
@@ -246,8 +247,17 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	labelsMap, _ := types.MapValueFrom(ctx, types.StringType, original.Labels)
-	flattened.Labels = labelsMap
+	if original.MaxPodsPerNode != nil {
+		flattened.MaxPodsPerNode = types.Int64Value(int64(*original.MaxPodsPerNode))
+	}
+
+	if original.Labels != nil {
+		labelsMap, _ := types.MapValueFrom(ctx, types.StringType, original.Labels)
+		flattened.Labels = labelsMap
+	} else {
+		labelsMap, _ := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		flattened.Labels = labelsMap
+	}
 
 	if original.SecurityGroups != nil && len(*original.SecurityGroups) > 0 {
 		flattened.SecurityGroups = make([]types.String, len(*original.SecurityGroups))
@@ -257,9 +267,11 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		}
 	}
 
-	flattened.StatusMessages = make([]types.String, 1)
-	for i, msg := range original.Status.Messages {
-		flattened.StatusMessages[i] = types.StringValue(msg)
+	if len(original.Status.Messages) > 0 {
+		flattened.StatusMessages = make([]types.String, len(original.Status.Messages))
+		for i, msg := range original.Status.Messages {
+			flattened.StatusMessages[i] = types.StringValue(msg)
+		}
 	}
 
 	if original.Taints != nil && len(*original.Taints) > 0 {
