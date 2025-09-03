@@ -97,11 +97,7 @@ func (r *NetworkSecurityGroupsResource) Read(ctx context.Context, req resource.R
 	}
 
 	data.Name = types.StringPointerValue(sc.Name)
-	if sc.Description != nil && *sc.Description == "" {
-		data.Description = types.StringPointerValue(nil)
-	} else {
-		data.Description = types.StringPointerValue(sc.Description)
-	}
+	data.Description = types.StringPointerValue(sc.Description)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
