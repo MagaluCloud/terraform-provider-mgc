@@ -67,6 +67,11 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
+      - name: Spell Check
+        id: cspell
+        continue-on-error: true
+        run: make spell-check
+
       - name: Post PR comment with errors
         if: always()
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
@@ -102,6 +107,6 @@ jobs:
             }
 
       - name: Fail workflow if errors exist
-        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.gendocs.outputs.docs_changed == 'true'
+        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.cspell.outputs.docs_changed == 'true' || steps.gendocs.outputs.docs_changed == 'true'
         run: exit 1
 
