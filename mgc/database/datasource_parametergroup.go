@@ -15,7 +15,7 @@ type DataSourceDbParameter struct {
 	dbaasParameterGroups dbSDK.ParameterGroupService
 }
 
-func NewDataSourceDBaaSParameterGroup() datasource.DataSource {
+func NewDataSourceDbaaSParameterGroup() datasource.DataSource {
 	return &DataSourceDbParameter{}
 }
 
