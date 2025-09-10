@@ -2,9 +2,9 @@ name: Unit Tests
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     types: [opened, synchronize, reopened]
-    
+
 permissions:
   contents: read
   pull-requests: write
@@ -15,29 +15,28 @@ jobs:
     runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }} # settings > secrets and variables > variables > RUNNER_RUNS_ON
 
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
-      with:
-        go-version: ${{ vars.GO_VERSION || '1.24' }} # settings > secrets and variables > variables > GO_VERSION
-        cache: true
-        cache-dependency-path: |
-          **/go.mod
-          **/go.sum
+      - name: Set up Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+        with:
+          go-version: ${{ vars.GO_VERSION || '1.24' }} # settings > secrets and variables > variables > GO_VERSION
+          cache: true
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
 
-    - name: Install dependencies
-      run: go mod download
+      - name: Install dependencies
+        run: go mod download
 
-    - name: Run Unit Tests
-      run: |
-        go test -v -race -coverprofile=coverage.out ./...
-    
+      - name: Run Unit Tests
+        run: |
+          go test -v -race -coverprofile=coverage.out ./...
 
-    - name: Upload Coverage Report to SonarCloud
-      uses: sonarsource/sonarqube-scan-action@bfd4e558cda28cda6b5defafb9232d191be8c203 #v4.2.1
-      with:
-        args: >
-          -Dsonar.token=${{ secrets.MAGALUBOT_SONAR_TOKEN || ''}}
+      - name: Upload Coverage Report to SonarCloud
+        uses: sonarsource/sonarqube-scan-action@v5
+        with:
+          args: >
+            -Dsonar.token=${{ secrets.MAGALUBOT_SONAR_TOKEN || ''}}
