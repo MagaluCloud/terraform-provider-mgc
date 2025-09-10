@@ -1,0 +1,14 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "dictionaries": [
+        "mgc-dict",
+    ],
+    "dictionaryDefinitions": [
+        {
+            "name": "mgc-dict",
+            "path": "./cspell.txt",
+            "addWords": true
+        },
+    ],
+}

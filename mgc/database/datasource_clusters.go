@@ -96,9 +96,9 @@ func (ds *DBaaSClustersDataSource) Read(ctx context.Context, req datasource.Read
 
 	var allSDKClusters []dbSDK.ClusterDetailResponse
 	zeroOffset := 0
-	limiteTop := 25
+	topLimit := 25
 	listOpts.Offset = &zeroOffset
-	listOpts.Limit = &limiteTop
+	listOpts.Limit = &topLimit
 
 	for {
 		sdkClustersPage, err := ds.dbaasClusters.List(ctx, listOpts)
