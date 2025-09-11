@@ -35,6 +35,11 @@ NC     := \033[0m # No Color
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
         tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all
 
+install:
+	@export GOBIN=${PWD}/bin
+	@export PATH=${GOBIN}:${PATH}
+	@go install $(TF_PLUGIN_DOCS)
+
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
