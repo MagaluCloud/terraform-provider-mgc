@@ -119,7 +119,7 @@ func (r *VolumeAttach) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *VolumeAttach) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Update not supported", "Update not supported for this resource")
+	resp.Diagnostics.AddError("Update not suported", "Update not supported for this resource")
 }
 
 func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
