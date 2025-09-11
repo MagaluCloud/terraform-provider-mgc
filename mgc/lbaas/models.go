@@ -309,7 +309,7 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 	}
 
 	if len(lbResponse.PublicIPs) == 1 {
-		loadBalancer.PublicIPID = types.StringValue(lbResponse.PublicIPs[0].ID)
+		loadBalancer.PublicIPID = types.StringValue(lbResponse.PublicIPs[0].ExternalID)
 	} else {
 		loadBalancer.PublicIPID = types.StringNull()
 	}
