@@ -26,16 +26,16 @@ func (v VisibilityValidator) ValidateString(ctx context.Context, req validator.S
 	visibility := req.ConfigValue.ValueString()
 
 	var publicIPID types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("public_ip_id"), &publicIPID)...)
+	resp.Diagnostics.Append(
+		req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("public_ip_id"), &publicIPID)...,
+	)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	hasPublicIP := !publicIPID.IsNull() && !publicIPID.IsUnknown() && publicIPID.ValueString() != ""
-
 	switch visibility {
 	case "external":
-		if !hasPublicIP {
+		if publicIPID.IsNull() || (!publicIPID.IsUnknown() && publicIPID.ValueString() == "") {
 			resp.Diagnostics.AddAttributeError(
 				req.Path.ParentPath().AtName("public_ip_id"),
 				"Public IP Required",
@@ -43,7 +43,7 @@ func (v VisibilityValidator) ValidateString(ctx context.Context, req validator.S
 			)
 		}
 	case "internal":
-		if hasPublicIP {
+		if !publicIPID.IsNull() && !publicIPID.IsUnknown() && publicIPID.ValueString() != "" {
 			resp.Diagnostics.AddAttributeError(
 				req.Path.ParentPath().AtName("public_ip_id"),
 				"Public IP Not Allowed",
