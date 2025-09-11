@@ -128,7 +128,7 @@ build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
 
-before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
+before-commit: go-test go-fmt spell-check generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
 	@echo -e "$(GREEN)All pre-commit checks passed!$(NC)"
 
 debug: ## Run the provider in debug mode
@@ -146,5 +146,5 @@ all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 
 spell-check:
 	@echo "*** Checking code base for miss spellings... ***"
-	@docker run -v $(PWD):/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --unique --words-only --no-progress mgc
+	@docker run -v $(PWD):/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress mgc
 	@echo "*** MGC Terraform Provider is correctly written! ***"
