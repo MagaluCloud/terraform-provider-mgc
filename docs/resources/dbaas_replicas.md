@@ -30,6 +30,7 @@ resource "mgc_dbaas_replicas" "dbaas_replica" {
 ### Optional
 
 - `instance_type` (String) Instance type
+- `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
 ### Read-Only
 
