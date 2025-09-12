@@ -223,6 +223,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"panic_threshold": schema.Float64Attribute{
 							Description: "The panic threshold percentage for the backend.",
 							Optional:    true,
+							Computed:    true,
 							Validators: []validator.Float64{
 								float64validator.Between(0, 100),
 							},
@@ -748,7 +749,7 @@ func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	deletePublicIP := true
+	deletePublicIP := false
 	err := r.lbNetworkLB.Delete(ctx, data.ID.ValueString(), lbSDK.DeleteNetworkLoadBalancerRequest{
 		DeletePublicIP: &deletePublicIP,
 	})

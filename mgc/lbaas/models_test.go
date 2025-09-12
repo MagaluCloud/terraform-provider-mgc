@@ -743,7 +743,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 				VPCID:        "vpc-123",
 				SubnetPoolID: stringPtr("subnet-pool-123"),
 				PublicIPs: []lbSDK.NetworkPublicIPResponse{
-					{ID: "public-ip-123"},
+					{ExternalID: "public-ip-123"},
 				},
 				HealthChecks: []lbSDK.NetworkHealthCheckResponse{
 					{
