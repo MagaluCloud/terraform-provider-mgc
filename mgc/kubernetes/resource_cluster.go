@@ -160,7 +160,7 @@ func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	out := convertSDKCreateResultToTerraformCreateClsuterModel(cluster)
+	out := convertSDKCreateResultToTerraformCreateClusterModel(cluster)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &out)...)
 }
 
@@ -197,7 +197,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	newState := convertSDKCreateResultToTerraformCreateClsuterModel(&createdCluster)
+	newState := convertSDKCreateResultToTerraformCreateClusterModel(&createdCluster)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -306,7 +306,7 @@ func createAllowedCidrs(data []types.String) *[]string {
 	return &allowedCidrs
 }
 
-func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Cluster) *KubernetesClusterCreateResourceModel {
+func convertSDKCreateResultToTerraformCreateClusterModel(sdkResult *k8sSDK.Cluster) *KubernetesClusterCreateResourceModel {
 	if sdkResult == nil {
 		return nil
 	}

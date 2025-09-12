@@ -3,6 +3,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 SKIP_TF_STEP ?= true
+CSPELL_VERSION = "latest"
 
 # Go commands
 GO              := go
@@ -33,6 +34,11 @@ NC     := \033[0m # No Color
 # Declare all targets as phony
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
         tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all
+
+install:
+	@export GOBIN=${PWD}/bin
+	@export PATH=${GOBIN}:${PATH}
+	@go install $(TF_PLUGIN_DOCS)
 
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
@@ -94,12 +100,12 @@ tf-docs-setup: ## Setup terraform-docs
 tf-gen-docs: ## Generate terraform docs
 	@echo -e "$(GREEN)Generating terraform docs with tfplugindocs...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 
 generate-docs: tf-gen-docs ## Generate full documentation
 	@echo -e "$(GREEN)Generating documentation...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 	@echo -e "$(GREEN)Adding subcategories...$(NC)"
 	$(MAKE) update-subcategory
 	@echo -e "$(GREEN)Moving extra docs...$(NC)"
@@ -122,7 +128,7 @@ build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
 
-before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
+before-commit: go-test go-fmt spell-check generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
 	@echo -e "$(GREEN)All pre-commit checks passed!$(NC)"
 
 debug: ## Run the provider in debug mode
@@ -137,3 +143,8 @@ clean: ## Clean build artifacts
 
 all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 	@echo -e "$(GREEN)All tasks completed successfully!$(NC)"
+
+spell-check:
+	@echo "*** Checking code base for miss spellings... ***"
+	@docker run -v $(PWD):/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress mgc
+	@echo "*** MGC Terraform Provider is correctly written! ***"
