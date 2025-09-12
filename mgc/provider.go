@@ -30,9 +30,10 @@ import (
 )
 
 const (
-	providerTypeName = "mgc"
-	defaultRegion    = "br-se1"
-	defaultEnv       = "prod"
+	providerTypeName   = "mgc"
+	defaultRegion      = "br-se1"
+	defaultEnv         = "prod"
+	preProdMaxAttempts = 10
 )
 
 type mgcProvider struct {
@@ -191,9 +192,17 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 	sdkUrl := sdk.MgcUrl(utils.RegionToUrl(output.Region, output.Env))
 	tflog.Info(context.Background(), "Using MGC URL: "+sdkUrl.String())
 
+	var maxAttempts int
+	if plan.Env.ValueString() == defaultEnv {
+		maxAttempts = sdk.DefaultMaxAttempts
+	} else {
+		maxAttempts = preProdMaxAttempts
+	}
+
 	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
 		sdk.WithBaseURL(sdkUrl),
 		sdk.WithUserAgent(fmt.Sprintf("MgcTF/%s (%s; %s)", tfVersion, runtime.GOOS, runtime.GOARCH)),
+		sdk.WithRetryConfig(maxAttempts, sdk.DefaultInitialInterval, sdk.DefaultMaxInterval, sdk.DefaultBackoffFactor),
 	)
 
 	return output
