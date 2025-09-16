@@ -43,6 +43,10 @@ resource "mgc_kubernetes_cluster" "cluster" {
 
 - `created_at` (String) Creation date of the Kubernetes cluster.
 - `id` (String) Cluster's UUID.
+- `machine_types_source` (String) Source of machine types for the cluster.
+- `platform_version` (String) Platform version of the cluster.
+- `region` (String) Region where the Kubernetes cluster is located.
+- `updated_at` (String) Last update date of the Kubernetes cluster.
 
 ## Import
 

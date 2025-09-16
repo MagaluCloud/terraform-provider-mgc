@@ -36,7 +36,7 @@ output "cluster" {
 - `addons_volume` (String) Flag indicating whether the storage class service is configured by default.
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
 - `cidr` (String) Available IP addresses used for provisioning nodes in the cluster.
-- `cluster_name` (String) Name of the node pool.
+- `cluster_ipv4_cidr` (String) The IP address range of the Kubernetes cluster.
 - `controlplane` (Attributes) Object of the node pool response. (see [below for nested schema](#nestedatt--controlplane))
 - `created_at` (String) Creation date of the Kubernetes cluster.
 - `description` (String) A brief description of the Kubernetes cluster.
@@ -46,10 +46,14 @@ output "cluster" {
 - `kube_api_fixed_ip` (String) Fixed IP configured for the Kubernetes API Server.
 - `kube_api_floating_ip` (String) Floating IP created for the Kubernetes API Server.
 - `kube_api_port` (Number) Port used by the Kubernetes API Server.
+- `machine_types_source` (String) Source of machine types for the cluster.
 - `message` (String) Detailed message about the status of the cluster or node.
 - `name` (String) Kubernetes cluster name.
+- `network_name` (String) Name of the cluster network.
 - `node_pools` (Attributes List) An array representing a set of nodes within a Kubernetes cluster. (see [below for nested schema](#nestedatt--node_pools))
+- `platform_version` (String) Platform version of the cluster.
 - `region` (String) Identifier of the region where the Kubernetes cluster is located.
+- `services_ipv4_cidr` (String) The IP address range of the Kubernetes cluster service.
 - `state` (String) Current state of the cluster or node.
 - `subnet_id` (String) Identifier of the internal subnet where the cluster will be provisioned.
 - `updated_at` (String) Date of the last modification of the Kubernetes cluster.

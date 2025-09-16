@@ -33,7 +33,6 @@ type FlattenedGetResult struct {
 	StatusState                types.String   `tfsdk:"status_state"`
 	StatusMessages             []types.String `tfsdk:"status_messages"`
 	Taints                     []Taint        `tfsdk:"taints"`
-	Zone                       []types.String `tfsdk:"zone"`
 	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
 	AvailabilityZones          []types.String `tfsdk:"availability_zones"`
 }
@@ -178,12 +177,6 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 					},
 				},
 			},
-			"zone": schema.ListAttribute{
-				Description:        "List of zones.",
-				ElementType:        types.StringType,
-				Computed:           true,
-				DeprecationMessage: "Deprecated field, will be removed in the next release",
-			},
 			"availability_zones": schema.ListAttribute{
 				Description: "List of availability zones.",
 				ElementType: types.StringType,
@@ -282,13 +275,6 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 				Key:    types.StringValue(taint.Key),
 				Value:  types.StringValue(taint.Value),
 			}
-		}
-	}
-
-	if original.Zone != nil && len(*original.Zone) > 0 {
-		flattened.Zone = make([]types.String, len(*original.Zone))
-		for i, zone := range *original.Zone {
-			flattened.Zone[i] = types.StringValue(zone)
 		}
 	}
 

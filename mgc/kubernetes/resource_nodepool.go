@@ -103,6 +103,17 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					int64validator.AtLeast(0),
 				},
 			},
+
+			"labels": schema.MapAttribute{
+				Description: "Map of labels for the node pool.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"security_groups": schema.SetAttribute{
+				Description: "List of security groups for the node pool.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"max_replicas": schema.Int64Attribute{
 				Description: "Maximum number of replicas for autoscaling.",
 				Optional:    true,
@@ -372,6 +383,21 @@ func convertStringArrayTFToSliceString(tags *[]types.String) *[]string {
 		tagsSlice[i] = tag.ValueString()
 	}
 	return &tagsSlice
+}
+
+func convertStringSetTFToSliceString(set types.Set) *[]string {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+
+	var stringSlice []string
+	set.ElementsAs(context.Background(), &stringSlice, false)
+
+	if len(stringSlice) == 0 {
+		return nil
+	}
+
+	return &stringSlice
 }
 
 func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string, timeout, interval time.Duration) error {

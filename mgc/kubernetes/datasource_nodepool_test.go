@@ -68,11 +68,11 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 						VCPU: 2,
 					},
 				},
-				Labels:            map[string]string{"env": "prod", "tier": "frontend"},
-				SecurityGroups:    &[]string{"sg-1", "sg-2"},
-				Status:            sdkK8s.Status{State: "ACTIVE", Messages: []string{"Nodepool is active"}},
-				Taints:            &[]sdkK8s.Taint{{Effect: "NoSchedule", Key: "app", Value: "critical"}},
-				Zone:              &[]string{"zone-a"},
+				Labels:         map[string]string{"env": "prod", "tier": "frontend"},
+				SecurityGroups: &[]string{"sg-1", "sg-2"},
+				Status:         sdkK8s.Status{State: "ACTIVE", Messages: []string{"Nodepool is active"}},
+				Taints:         &[]sdkK8s.Taint{{Effect: "NoSchedule", Key: "app", Value: "critical"}},
+
 				AvailabilityZones: &[]string{"a"},
 				MaxPodsPerNode:    &maxPods,
 			},
@@ -100,26 +100,26 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusState:                types.StringValue("ACTIVE"),
 				StatusMessages:             []types.String{types.StringValue("Nodepool is active")},
 				Taints:                     []Taint{{Effect: types.StringValue("NoSchedule"), Key: types.StringValue("app"), Value: types.StringValue("critical")}},
-				Zone:                       []types.String{types.StringValue("zone-a")},
-				AvailabilityZones:          []types.String{types.StringValue("br-sao-1-a")},
-				MaxPodsPerNode:             types.Int64Value(110),
+
+				AvailabilityZones: []types.String{types.StringValue("br-sao-1-a")},
+				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
 		{
 			name: "success: minimal data with nils and empty slices",
 			inputSDK: &sdkK8s.NodePool{
-				ID:                "nodepool-uuid-456",
-				Name:              "minimal-nodepool",
-				CreatedAt:         nil,
-				UpdatedAt:         nil,
-				Replicas:          1,
-				AutoScale:         nil,
-				InstanceTemplate:  sdkK8s.InstanceTemplate{},
-				Labels:            map[string]string{},
-				SecurityGroups:    &[]string{},
-				Status:            sdkK8s.Status{State: "CREATING", Messages: []string{}},
-				Taints:            &[]sdkK8s.Taint{},
-				Zone:              &[]string{},
+				ID:               "nodepool-uuid-456",
+				Name:             "minimal-nodepool",
+				CreatedAt:        nil,
+				UpdatedAt:        nil,
+				Replicas:         1,
+				AutoScale:        nil,
+				InstanceTemplate: sdkK8s.InstanceTemplate{},
+				Labels:           map[string]string{},
+				SecurityGroups:   &[]string{},
+				Status:           sdkK8s.Status{State: "CREATING", Messages: []string{}},
+				Taints:           &[]sdkK8s.Taint{},
+
 				AvailabilityZones: &[]string{},
 				MaxPodsPerNode:    &maxPods,
 			},
@@ -147,9 +147,9 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusState:                types.StringValue("CREATING"),
 				StatusMessages:             nil,
 				Taints:                     nil,
-				Zone:                       nil,
-				AvailabilityZones:          nil,
-				MaxPodsPerNode:             types.Int64Value(110),
+
+				AvailabilityZones: nil,
+				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
 		{
@@ -186,9 +186,9 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusState:                types.StringValue("ACTIVE"),
 				StatusMessages:             nil,
 				Taints:                     nil,
-				Zone:                       nil,
-				AvailabilityZones:          nil,
-				MaxPodsPerNode:             types.Int64Null(),
+
+				AvailabilityZones: nil,
+				MaxPodsPerNode:    types.Int64Null(),
 			},
 		},
 		{
@@ -225,9 +225,9 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusState:                types.StringValue("UPDATING"),
 				StatusMessages:             []types.String{types.StringValue("msg1"), types.StringValue("msg2"), types.StringValue("msg3")},
 				Taints:                     nil,
-				Zone:                       nil,
-				AvailabilityZones:          nil,
-				MaxPodsPerNode:             types.Int64Value(110),
+
+				AvailabilityZones: nil,
+				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
 	}
@@ -424,10 +424,7 @@ func TestConvertGetResultToFlattenedEdgeCases(t *testing.T) {
 					}
 					return &taints
 				}(),
-				Zone: func() *[]string {
-					zones := []string{"a", "b", "c", "a", "b", "c"} // Duplicates
-					return &zones
-				}(),
+
 				AvailabilityZones: func() *[]string {
 					azs := []string{"a", "b", "c", "a", "b", "c"} // Duplicates
 					return &azs
@@ -455,11 +452,11 @@ func TestConvertGetResultToFlattenedEdgeCases(t *testing.T) {
 					MaxReplicas: nil,
 					MinReplicas: func() *int { i := 1; return &i }(),
 				},
-				SecurityGroups:    &[]string{}, // Empty slice
-				Taints:            nil,         // Nil pointer
-				Zone:              &[]string{}, // Empty slice
-				AvailabilityZones: nil,         // Nil pointer
-				MaxPodsPerNode:    nil,         // Nil pointer
+				SecurityGroups: &[]string{}, // Empty slice
+				Taints:         nil,         // Nil pointer
+
+				AvailabilityZones: nil, // Nil pointer
+				MaxPodsPerNode:    nil, // Nil pointer
 			},
 			inputClusterID: "cluster-mixed",
 			inputRegion:    "br-sao-1",
@@ -880,16 +877,16 @@ func TestConvertGetResultToFlattenedPotentialFailures(t *testing.T) {
 		{
 			name: "stress_test_multiple_nil_arrays",
 			inputSDK: &sdkK8s.NodePool{
-				ID:                "stress-nil-test",
-				Name:              "stress-nil-nodepool",
-				Replicas:          1,
-				InstanceTemplate:  sdkK8s.InstanceTemplate{},
-				Status:            sdkK8s.Status{State: "ACTIVE"},
-				AutoScale:         nil,
-				Labels:            nil,
-				SecurityGroups:    nil,
-				Taints:            nil,
-				Zone:              nil,
+				ID:               "stress-nil-test",
+				Name:             "stress-nil-nodepool",
+				Replicas:         1,
+				InstanceTemplate: sdkK8s.InstanceTemplate{},
+				Status:           sdkK8s.Status{State: "ACTIVE"},
+				AutoScale:        nil,
+				Labels:           nil,
+				SecurityGroups:   nil,
+				Taints:           nil,
+
 				AvailabilityZones: nil,
 				MaxPodsPerNode:    nil,
 			},
@@ -1459,11 +1456,11 @@ func TestConvertGetResultToFlattenedInvariantsAndPostconditions(t *testing.T) {
 						VCPU: 2,
 					},
 				},
-				Status:            sdkK8s.Status{State: "ACTIVE", Messages: []string{"OK"}},
-				Labels:            map[string]string{"test": "value"},
-				SecurityGroups:    &[]string{"sg-1"},
-				Taints:            &[]sdkK8s.Taint{{Effect: "NoSchedule", Key: "k", Value: "v"}},
-				Zone:              &[]string{"a"},
+				Status:         sdkK8s.Status{State: "ACTIVE", Messages: []string{"OK"}},
+				Labels:         map[string]string{"test": "value"},
+				SecurityGroups: &[]string{"sg-1"},
+				Taints:         &[]sdkK8s.Taint{{Effect: "NoSchedule", Key: "k", Value: "v"}},
+
 				AvailabilityZones: &[]string{"a"},
 				MaxPodsPerNode:    func() *int { i := 110; return &i }(),
 				AutoScale: &sdkK8s.AutoScale{

@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"context"
+
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -15,6 +17,8 @@ type NodePool struct {
 	CreatedAt         types.String    `tfsdk:"created_at"`
 	UpdatedAt         types.String    `tfsdk:"updated_at"`
 	ID                types.String    `tfsdk:"id"`
+	Labels            types.Map       `tfsdk:"labels"`
+	SecurityGroups    types.Set       `tfsdk:"security_groups"`
 	Taints            *[]Taint        `tfsdk:"taints"`
 	MaxPodsPerNode    types.Int64     `tfsdk:"max_pods_per_node"`
 	AvailabilityZones *[]types.String `tfsdk:"availability_zones"`
@@ -63,6 +67,16 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 
 	if np.InstanceTemplate.Flavor.Name != "" {
 		nodePool.Flavor = types.StringValue(np.InstanceTemplate.Flavor.Name)
+	}
+
+	if np.Labels != nil {
+		labelsMap, _ := types.MapValueFrom(context.Background(), types.StringType, np.Labels)
+		nodePool.Labels = labelsMap
+	}
+
+	if np.SecurityGroups != nil {
+		securityGroupsSet, _ := types.SetValueFrom(context.Background(), types.StringType, *np.SecurityGroups)
+		nodePool.SecurityGroups = securityGroupsSet
 	}
 
 	if np.Taints != nil {

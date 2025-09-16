@@ -35,6 +35,10 @@ type KubernetesCluster struct {
 	Message                    types.String   `tfsdk:"message"`
 	State                      types.String   `tfsdk:"state"`
 	UpdatedAt                  types.String   `tfsdk:"updated_at"`
+	ServicesIpV4CIDR           types.String   `tfsdk:"services_ipv4_cidr"`
+	ClusterIPv4CIDR            types.String   `tfsdk:"cluster_ipv4_cidr"`
+	MachineTypesSource         types.String   `tfsdk:"machine_types_source"`
+	PlatformVersion            types.String   `tfsdk:"platform_version"`
 }
 
 type Controlplane struct {
@@ -341,6 +345,22 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 				Description: "Date of the last modification of the Kubernetes cluster.",
 				Computed:    true,
 			},
+			"services_ipv4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster service.",
+				Computed:    true,
+			},
+			"cluster_ipv4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster.",
+				Computed:    true,
+			},
+			"machine_types_source": schema.StringAttribute{
+				Description: "Source of machine types for the cluster.",
+				Computed:    true,
+			},
+			"platform_version": schema.StringAttribute{
+				Description: "Platform version of the cluster.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -421,6 +441,17 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 
 	if getResult.ControlPlane != nil {
 		kubernetesCluster.Controlplane = convertToControlplane(getResult.ControlPlane)
+	}
+
+	kubernetesCluster.ServicesIpV4CIDR = types.StringPointerValue(getResult.ServicesIpV4CIDR)
+	kubernetesCluster.ClusterIPv4CIDR = types.StringPointerValue(getResult.ClusterIPv4CIDR)
+
+	if getResult.MachineTypesSource != nil {
+		kubernetesCluster.MachineTypesSource = types.StringValue(string(*getResult.MachineTypesSource))
+	}
+
+	if getResult.Platform != nil {
+		kubernetesCluster.PlatformVersion = types.StringValue(getResult.Platform.Version)
 	}
 
 	return kubernetesCluster

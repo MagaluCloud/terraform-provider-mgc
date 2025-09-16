@@ -54,7 +54,6 @@ output "nodepool" {
 - `status_state` (String) Current state of the nodepool.
 - `taints` (Attributes List) List of taints. (see [below for nested schema](#nestedatt--taints))
 - `updated_at` (String) Last update timestamp.
-- `zone` (List of String, Deprecated) List of zones.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`
