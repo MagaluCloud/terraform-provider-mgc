@@ -245,8 +245,8 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		cidrs = append(cidrs, c.ValueString())
 	}
 
-	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.AllowedCIDRsUpdateRequest{
-		AllowedCIDRs: cidrs,
+	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.PatchClusterRequest{
+		AllowedCIDRs: &cidrs,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))

@@ -29,7 +29,7 @@ type KubernetesCluster struct {
 	KubeAPIFloatingIP          types.String   `tfsdk:"kube_api_floating_ip"`
 	KubeAPIPort                types.Int64    `tfsdk:"kube_api_port"`
 	CIDR                       types.String   `tfsdk:"cidr"`
-	ClusterName                types.String   `tfsdk:"cluster_name"`
+	NetworkName                types.String   `tfsdk:"network_name"`
 	SubnetID                   types.String   `tfsdk:"subnet_id"`
 	Region                     types.String   `tfsdk:"region"`
 	Message                    types.String   `tfsdk:"message"`
@@ -317,8 +317,8 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 				Description: "Available IP addresses used for provisioning nodes in the cluster.",
 				Computed:    true,
 			},
-			"cluster_name": schema.StringAttribute{
-				Description: "Name of the node pool.",
+			"network_name": schema.StringAttribute{
+				Description: "Name of the cluster network.",
 				Computed:    true,
 			},
 			"subnet_id": schema.StringAttribute{
@@ -387,9 +387,9 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 	}
 
 	if getResult.Addons != nil {
-		kubernetesCluster.AddonsLoadbalance = types.StringPointerValue(getResult.Addons.Loadbalance)
-		kubernetesCluster.AddonsSecrets = types.StringPointerValue(getResult.Addons.Secrets)
-		kubernetesCluster.AddonsVolume = types.StringPointerValue(getResult.Addons.Volume)
+		kubernetesCluster.AddonsLoadbalance = types.StringValue(getResult.Addons.Loadbalance)
+		kubernetesCluster.AddonsSecrets = types.StringValue(getResult.Addons.Secrets)
+		kubernetesCluster.AddonsVolume = types.StringValue(getResult.Addons.Volume)
 	}
 
 	if getResult.KubeApiServer != nil {
@@ -403,7 +403,7 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 
 	if getResult.Network != nil {
 		kubernetesCluster.CIDR = types.StringValue(getResult.Network.CIDR)
-		kubernetesCluster.ClusterName = types.StringValue(*getResult.Network.Name)
+		kubernetesCluster.NetworkName = types.StringValue(getResult.Network.Name)
 		kubernetesCluster.SubnetID = types.StringValue(getResult.Network.SubnetID)
 	}
 
