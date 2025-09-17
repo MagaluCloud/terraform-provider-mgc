@@ -6,6 +6,7 @@ import (
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -34,7 +35,7 @@ type FlattenedGetResult struct {
 	StatusMessages             []types.String `tfsdk:"status_messages"`
 	Taints                     []Taint        `tfsdk:"taints"`
 	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
-	AvailabilityZones          []types.String `tfsdk:"availability_zones"`
+	AvailabilityZones          types.Set      `tfsdk:"availability_zones"`
 }
 
 type DataSourceKubernetesNodepool struct {
@@ -177,7 +178,7 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 					},
 				},
 			},
-			"availability_zones": schema.ListAttribute{
+			"availability_zones": schema.SetAttribute{
 				Description: "List of availability zones.",
 				ElementType: types.StringType,
 				Computed:    true,
@@ -279,10 +280,13 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	}
 
 	if original.AvailabilityZones != nil && len(*original.AvailabilityZones) > 0 {
-		flattened.AvailabilityZones = make([]types.String, len(*original.AvailabilityZones))
+		availabilityZones := make([]attr.Value, len(*original.AvailabilityZones))
 		for i, zone := range *original.AvailabilityZones {
-			flattened.AvailabilityZones[i] = types.StringValue(utils.ConvertXZoneToAvailabilityZone(region, zone))
+			availabilityZones[i] = types.StringValue(utils.ConvertXZoneToAvailabilityZone(region, zone))
 		}
+		flattened.AvailabilityZones = types.SetValueMust(types.StringType, availabilityZones)
+	} else {
+		flattened.AvailabilityZones = types.SetNull(types.StringType)
 	}
 
 	return *flattened, nil

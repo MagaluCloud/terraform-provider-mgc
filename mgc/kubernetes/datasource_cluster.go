@@ -119,7 +119,7 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 							Description: "Maximum number of pods that can be scheduled on each node in the node pool.",
 							Computed:    true,
 						},
-						"availability_zones": schema.ListAttribute{
+						"availability_zones": schema.SetAttribute{
 							Description: "List of availability zones where the nodes in the node pool are distributed.",
 							Computed:    true,
 							ElementType: types.StringType,
@@ -151,6 +151,16 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 						"id": schema.StringAttribute{
 							Description: "Node pool's UUID.",
 							Computed:    true,
+						},
+						"labels": schema.MapAttribute{
+							Description: "Map of labels for the node pool.",
+							Computed:    true,
+							ElementType: types.StringType,
+						},
+						"security_groups": schema.SetAttribute{
+							Description: "List of security groups for the node pool.",
+							Computed:    true,
+							ElementType: types.StringType,
 						},
 						"taints": schema.ListNestedAttribute{
 							Description: "Property associating a set of nodes.",

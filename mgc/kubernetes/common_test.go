@@ -7,6 +7,7 @@ import (
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,10 +27,23 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 		expected NodePool
 	}{
 		{
-			name:     "should return empty struct when input is nil",
-			region:   "br-sao-1",
-			input:    nil,
-			expected: NodePool{},
+			name:   "should return empty struct when input is nil",
+			region: "br-sao-1",
+			input:  nil,
+			expected: NodePool{
+				Flavor:            types.StringNull(),
+				Name:              types.StringNull(),
+				Replicas:          types.Int64Null(),
+				MaxReplicas:       types.Int64Null(),
+				MinReplicas:       types.Int64Null(),
+				CreatedAt:         types.StringNull(),
+				UpdatedAt:         types.StringNull(),
+				ID:                types.StringNull(),
+				Labels:            types.MapNull(types.StringType),
+				SecurityGroups:    types.SetNull(types.StringType),
+				MaxPodsPerNode:    types.Int64Null(),
+				AvailabilityZones: types.SetNull(types.StringType),
+			},
 		},
 		{
 			name:   "should convert a fully populated node pool",
@@ -55,23 +69,25 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				AvailabilityZones: &[]string{"a", "b"},
 			},
 			expected: NodePool{
-				ID:          types.StringValue("np-12345"),
-				Name:        types.StringValue("my-full-nodepool"),
-				Flavor:      types.StringValue("c1.medium"),
-				Replicas:    types.Int64Value(3),
-				MaxReplicas: types.Int64Value(5),
-				MinReplicas: types.Int64Value(2),
-				CreatedAt:   types.StringPointerValue(nowStr),
-				UpdatedAt:   types.StringPointerValue(nowStr),
+				ID:             types.StringValue("np-12345"),
+				Name:           types.StringValue("my-full-nodepool"),
+				Flavor:         types.StringValue("c1.medium"),
+				Replicas:       types.Int64Value(3),
+				MaxReplicas:    types.Int64Value(5),
+				MinReplicas:    types.Int64Value(2),
+				CreatedAt:      types.StringPointerValue(nowStr),
+				UpdatedAt:      types.StringPointerValue(nowStr),
+				Labels:         types.MapNull(types.StringType),
+				SecurityGroups: types.SetNull(types.StringType),
 				Taints: &[]Taint{
 					{Key: types.StringValue("app"), Value: types.StringValue("blue"), Effect: types.StringValue("NoSchedule")},
 					{Key: types.StringValue("storage"), Value: types.StringValue("ssd"), Effect: types.StringValue("NoExecute")},
 				},
 				MaxPodsPerNode: types.Int64Value(110),
-				AvailabilityZones: &[]types.String{
+				AvailabilityZones: types.SetValueMust(types.StringType, []attr.Value{
 					types.StringValue("br-sao-1-a"),
 					types.StringValue("br-sao-1-b"),
-				},
+				}),
 			},
 		},
 		{
@@ -99,13 +115,15 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				Name:              types.StringValue("my-partial-nodepool"),
 				Flavor:            types.StringValue("t2.micro"),
 				Replicas:          types.Int64Value(1),
+				MaxReplicas:       types.Int64Null(),
 				MinReplicas:       types.Int64Value(1),
 				CreatedAt:         types.StringPointerValue(nowStr),
 				UpdatedAt:         types.StringNull(),
-				MaxReplicas:       types.Int64Null(),
+				Labels:            types.MapNull(types.StringType),
+				SecurityGroups:    types.SetNull(types.StringType),
 				Taints:            nil,
 				MaxPodsPerNode:    types.Int64Null(),
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 		{
@@ -125,11 +143,13 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				Flavor:            types.StringNull(),
 				CreatedAt:         types.StringNull(),
 				UpdatedAt:         types.StringNull(),
+				Labels:            types.MapNull(types.StringType),
+				SecurityGroups:    types.SetNull(types.StringType),
 				MaxReplicas:       types.Int64Null(),
 				MinReplicas:       types.Int64Null(),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            &[]Taint{},
-				AvailabilityZones: &[]types.String{},
+				AvailabilityZones: types.SetValueMust(types.StringType, []attr.Value{}),
 			},
 		},
 	}
@@ -137,14 +157,25 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ConvertToNodePoolToTFModel(tc.input, tc.region)
-			assert.Equal(t, tc.expected, result)
+			assert.Equal(t, tc.expected.ID, result.ID)
+			assert.Equal(t, tc.expected.Name, result.Name)
+			assert.Equal(t, tc.expected.Flavor, result.Flavor)
+			assert.Equal(t, tc.expected.Replicas, result.Replicas)
+			assert.Equal(t, tc.expected.MaxReplicas, result.MaxReplicas)
+			assert.Equal(t, tc.expected.MinReplicas, result.MinReplicas)
+			assert.Equal(t, tc.expected.CreatedAt, result.CreatedAt)
+			assert.Equal(t, tc.expected.UpdatedAt, result.UpdatedAt)
+			assert.Equal(t, tc.expected.MaxPodsPerNode, result.MaxPodsPerNode)
+			assert.Equal(t, tc.expected.Taints, result.Taints)
+			assert.True(t, tc.expected.AvailabilityZones.Equal(result.AvailabilityZones))
+			assert.True(t, tc.expected.Labels.Equal(result.Labels))
+			assert.True(t, tc.expected.SecurityGroups.Equal(result.SecurityGroups))
 		})
 	}
 }
 
 func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 	now := time.Now()
-	nowStr := utils.ConvertTimeToRFC3339(&now)
 
 	testCases := []struct {
 		name     string
@@ -171,17 +202,27 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				CreatedAt: &now,
 			},
 			expected: NodePool{
-				ID:                types.StringValue("np-labels-sg"),
-				Name:              types.StringValue("labels-sg-pool"),
-				Flavor:            types.StringValue("c1.large"),
-				Replicas:          types.Int64Value(2),
-				CreatedAt:         types.StringPointerValue(nowStr),
-				UpdatedAt:         types.StringNull(),
-				MaxReplicas:       types.Int64Null(),
-				MinReplicas:       types.Int64Null(),
+				ID:          types.StringValue("np-labels-sg"),
+				Name:        types.StringValue("labels-sg-pool"),
+				Flavor:      types.StringValue("c1.large"),
+				Replicas:    types.Int64Value(2),
+				MaxReplicas: types.Int64Null(),
+				MinReplicas: types.Int64Null(),
+				CreatedAt:   types.StringPointerValue(utils.ConvertTimeToRFC3339(&now)),
+				UpdatedAt:   types.StringNull(),
+				Labels: types.MapValueMust(types.StringType, map[string]attr.Value{
+					"env":  types.StringValue("production"),
+					"tier": types.StringValue("frontend"),
+					"app":  types.StringValue("web"),
+				}),
+				SecurityGroups: types.SetValueMust(types.StringType, []attr.Value{
+					types.StringValue("sg-web"),
+					types.StringValue("sg-app"),
+					types.StringValue("sg-db"),
+				}),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 		{
@@ -208,7 +249,7 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				MinReplicas:       types.Int64Null(),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 		{
@@ -229,13 +270,15 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				Name:              types.StringValue("nil-fields-pool"),
 				Flavor:            types.StringValue("m5.xlarge"),
 				Replicas:          types.Int64Value(3),
-				CreatedAt:         types.StringNull(),
-				UpdatedAt:         types.StringNull(),
 				MaxReplicas:       types.Int64Null(),
 				MinReplicas:       types.Int64Null(),
+				CreatedAt:         types.StringNull(),
+				UpdatedAt:         types.StringNull(),
+				Labels:            types.MapNull(types.StringType),
+				SecurityGroups:    types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 		{
@@ -261,7 +304,7 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				MinReplicas:       types.Int64Null(),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 		{
@@ -287,7 +330,7 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				MinReplicas:       types.Int64Null(),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 			},
 		},
 	}

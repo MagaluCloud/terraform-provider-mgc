@@ -12,6 +12,7 @@ import (
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -101,7 +102,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusMessages:             []types.String{types.StringValue("Nodepool is active")},
 				Taints:                     []Taint{{Effect: types.StringValue("NoSchedule"), Key: types.StringValue("app"), Value: types.StringValue("critical")}},
 
-				AvailabilityZones: []types.String{types.StringValue("br-sao-1-a")},
+				AvailabilityZones: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("br-sao-1-a")}),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
@@ -148,7 +149,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusMessages:             nil,
 				Taints:                     nil,
 
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
@@ -187,7 +188,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusMessages:             nil,
 				Taints:                     nil,
 
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Null(),
 			},
 		},
@@ -226,7 +227,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				StatusMessages:             []types.String{types.StringValue("msg1"), types.StringValue("msg2"), types.StringValue("msg3")},
 				Taints:                     nil,
 
-				AvailabilityZones: nil,
+				AvailabilityZones: types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
@@ -1112,6 +1113,15 @@ func TestConvertGetResultToFlattenedDataCorruption(t *testing.T) {
 	}
 }
 
+// Helper function for length checking
+func getLengths(values []string) []int {
+	lengths := make([]int, len(values))
+	for i, v := range values {
+		lengths[i] = len(v)
+	}
+	return lengths
+}
+
 func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 	ctx := context.Background()
 
@@ -1135,12 +1145,13 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 			inputClusterID: "cluster-region-special",
 			inputRegion:    "BR-SÃO-1!@#$%",
 			validateResult: func(t *testing.T, result FlattenedGetResult) {
-				if len(result.AvailabilityZones) != 3 {
-					t.Errorf("Expected 3 availability zones, got %d", len(result.AvailabilityZones))
+				azElements := result.AvailabilityZones.Elements()
+				if len(azElements) != 3 {
+					t.Errorf("Expected 3 availability zones, got %d", len(azElements))
 				}
 				// Check if special characters are handled
-				for i, az := range result.AvailabilityZones {
-					azValue := az.ValueString()
+				for i, azAttr := range azElements {
+					azValue := azAttr.(types.String).ValueString()
 					if !strings.Contains(azValue, "br-são-1!@#$%") {
 						t.Errorf("AvailabilityZone %d (%s) doesn't contain expected region", i, azValue)
 					}
@@ -1160,15 +1171,27 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 			inputClusterID: "cluster-empty-region",
 			inputRegion:    "",
 			validateResult: func(t *testing.T, result FlattenedGetResult) {
-				if len(result.AvailabilityZones) != 3 {
-					t.Errorf("Expected 3 availability zones, got %d", len(result.AvailabilityZones))
+				azElements := result.AvailabilityZones.Elements()
+				if len(azElements) != 3 {
+					t.Errorf("Expected 3 availability zones, got %d", len(azElements))
 				}
 				// Empty region should result in "-" + zone
 				expectedValues := []string{"-", "-  ", "-\t\n"}
+				azValues := make([]string, len(azElements))
+				for i, azAttr := range azElements {
+					azValues[i] = azAttr.(types.String).ValueString()
+				}
 				for i, expected := range expectedValues {
-					if result.AvailabilityZones[i].ValueString() != expected {
-						t.Errorf("AvailabilityZone %d: expected '%s', got '%s'",
-							i, expected, result.AvailabilityZones[i].ValueString())
+					found := false
+					for _, actual := range azValues {
+						if actual == expected {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("AvailabilityZone %d: expected '%s', not found in actual values %v",
+							i, expected, azValues)
 					}
 				}
 			},
@@ -1189,20 +1212,34 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 			inputClusterID: "cluster-long-region",
 			inputRegion:    strings.Repeat("region", 500),
 			validateResult: func(t *testing.T, result FlattenedGetResult) {
-				if len(result.AvailabilityZones) != 2 {
-					t.Errorf("Expected 2 availability zones, got %d", len(result.AvailabilityZones))
+				azElements := result.AvailabilityZones.Elements()
+				if len(azElements) != 2 {
+					t.Errorf("Expected 2 availability zones, got %d", len(azElements))
 				}
 				// Check that the long strings are handled without truncation
 				expectedLen1 := len(strings.Repeat("region", 500)) + 1 + len(strings.Repeat("a", 1000))
 				expectedLen2 := len(strings.Repeat("region", 500)) + 1 + len(strings.Repeat("b", 2000))
 
-				if len(result.AvailabilityZones[0].ValueString()) != expectedLen1 {
-					t.Errorf("First AZ length incorrect: expected %d, got %d",
-						expectedLen1, len(result.AvailabilityZones[0].ValueString()))
+				azValues := make([]string, len(azElements))
+				for i, azAttr := range azElements {
+					azValues[i] = azAttr.(types.String).ValueString()
 				}
-				if len(result.AvailabilityZones[1].ValueString()) != expectedLen2 {
-					t.Errorf("Second AZ length incorrect: expected %d, got %d",
-						expectedLen2, len(result.AvailabilityZones[1].ValueString()))
+
+				// Find values with expected lengths
+				found1, found2 := false, false
+				for _, azValue := range azValues {
+					if len(azValue) == expectedLen1 {
+						found1 = true
+					}
+					if len(azValue) == expectedLen2 {
+						found2 = true
+					}
+				}
+				if !found1 {
+					t.Errorf("First AZ length incorrect: expected %d, got lengths %v", expectedLen1, getLengths(azValues))
+				}
+				if !found2 {
+					t.Errorf("Second AZ length incorrect: expected %d, got lengths %v", expectedLen2, getLengths(azValues))
 				}
 			},
 			description: "Test very long region and zone strings",
@@ -1219,8 +1256,9 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 			inputClusterID: "cluster-unicode-region",
 			inputRegion:    "região-中国-россия",
 			validateResult: func(t *testing.T, result FlattenedGetResult) {
-				if len(result.AvailabilityZones) != 4 {
-					t.Errorf("Expected 4 availability zones, got %d", len(result.AvailabilityZones))
+				azElements := result.AvailabilityZones.Elements()
+				if len(azElements) != 4 {
+					t.Errorf("Expected 4 availability zones, got %d", len(azElements))
 				}
 				// Verify Unicode characters are preserved and lowercased correctly
 				expectedValues := []string{
@@ -1229,10 +1267,21 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 					"região-中国-россия-🚀",
 					"região-中国-россия-αβγ",
 				}
-				for i, expected := range expectedValues {
-					actual := result.AvailabilityZones[i].ValueString()
-					if actual != expected {
-						t.Errorf("Unicode AZ %d: expected '%s', got '%s'", i, expected, actual)
+				azValues := make([]string, len(azElements))
+				for i, azAttr := range azElements {
+					azValues[i] = azAttr.(types.String).ValueString()
+				}
+
+				for _, expected := range expectedValues {
+					found := false
+					for _, actual := range azValues {
+						if actual == expected {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Unicode AZ: expected '%s', not found in actual values %v", expected, azValues)
 					}
 				}
 			},

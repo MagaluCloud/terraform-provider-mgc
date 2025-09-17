@@ -98,15 +98,17 @@ Read-Only:
 
 Read-Only:
 
-- `availability_zones` (List of String) List of availability zones where the nodes in the node pool are distributed.
+- `availability_zones` (Set of String) List of availability zones where the nodes in the node pool are distributed.
 - `created_at` (String) Date of creation of the Kubernetes Node.
 - `flavor_name` (String) Definition of the CPU, RAM, and storage capacity of the nodes.
 - `id` (String) Node pool's UUID.
+- `labels` (Map of String) Map of labels for the node pool.
 - `max_pods_per_node` (Number) Maximum number of pods that can be scheduled on each node in the node pool.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
 - `name` (String) Name of the node pool.
 - `replicas` (Number) Number of replicas of the nodes in the node pool.
+- `security_groups` (Set of String) List of security groups for the node pool.
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--node_pools--taints))
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
 

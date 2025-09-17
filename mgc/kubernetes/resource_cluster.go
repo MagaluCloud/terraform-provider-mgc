@@ -369,6 +369,9 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 		}
 	}
 
+	// Write Only Attributes
+	tfModel.EnabledServerGroup = types.BoolNull()
+
 	return tfModel
 }
 

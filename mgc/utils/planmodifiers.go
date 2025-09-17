@@ -92,3 +92,60 @@ func countSetElementsGeneric(ctx context.Context, set types.Set) (int, diag.Diag
 	elems := set.Elements()
 	return len(elems), diag.Diagnostics{}
 }
+
+type RequireReplacePlanModifier struct {
+	UseStateForUnknown bool
+}
+
+func RequireReplace() planmodifier.String {
+	return RequireReplacePlanModifier{
+		UseStateForUnknown: false,
+	}
+}
+
+func RequireReplaceWithStateForUnknown() planmodifier.String {
+	return RequireReplacePlanModifier{
+		UseStateForUnknown: true,
+	}
+}
+
+func (m RequireReplacePlanModifier) Description(_ context.Context) string {
+	if m.UseStateForUnknown {
+		return "Requires resource replacement when value changes and uses state value when plan value is unknown."
+	}
+	return "Requires resource replacement when value changes."
+}
+
+func (m RequireReplacePlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m RequireReplacePlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.PlanValue.IsNull() && !req.StateValue.IsNull() {
+		resp.RequiresReplace = true
+		return
+	}
+
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	if req.PlanValue.IsUnknown() && m.UseStateForUnknown {
+		if !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+			resp.PlanValue = req.StateValue
+		}
+		return
+	}
+
+	if req.PlanValue.IsUnknown() {
+		return
+	}
+
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+
+	if !req.StateValue.Equal(req.PlanValue) {
+		resp.RequiresReplace = true
+	}
+}

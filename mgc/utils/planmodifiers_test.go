@@ -6,7 +6,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -178,4 +180,247 @@ func makeStringSet(t *testing.T, values ...string) types.Set {
 		elems = append(elems, types.StringValue(v))
 	}
 	return types.SetValueMust(types.StringType, elems)
+}
+
+func TestRequireReplacePlanModifier_Description(t *testing.T) {
+	tests := []struct {
+		name         string
+		modifier     RequireReplacePlanModifier
+		expectedDesc string
+	}{
+		{
+			name:         "without UseStateForUnknown",
+			modifier:     RequireReplacePlanModifier{UseStateForUnknown: false},
+			expectedDesc: "Requires resource replacement when value changes.",
+		},
+		{
+			name:         "with UseStateForUnknown",
+			modifier:     RequireReplacePlanModifier{UseStateForUnknown: true},
+			expectedDesc: "Requires resource replacement when value changes and uses state value when plan value is unknown.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			desc := tt.modifier.Description(ctx)
+			assert.Equal(t, tt.expectedDesc, desc)
+
+			markdownDesc := tt.modifier.MarkdownDescription(ctx)
+			assert.Equal(t, tt.expectedDesc, markdownDesc)
+		})
+	}
+}
+
+func TestRequireReplace(t *testing.T) {
+	modifier := RequireReplace()
+	reqModifier, ok := modifier.(RequireReplacePlanModifier)
+	assert.True(t, ok, "RequireReplace() should return RequireReplacePlanModifier")
+	assert.False(t, reqModifier.UseStateForUnknown, "RequireReplace() should not use state for unknown")
+}
+
+func TestRequireReplaceWithStateForUnknown(t *testing.T) {
+	modifier := RequireReplaceWithStateForUnknown()
+	reqModifier, ok := modifier.(RequireReplacePlanModifier)
+	assert.True(t, ok, "RequireReplaceWithStateForUnknown() should return RequireReplacePlanModifier")
+	assert.True(t, reqModifier.UseStateForUnknown, "RequireReplaceWithStateForUnknown() should use state for unknown")
+}
+
+func TestRequireReplacePlanModifier_PlanModifyString(t *testing.T) {
+	tests := []struct {
+		name                    string
+		useStateForUnknown      bool
+		stateValue              types.String
+		planValue               types.String
+		configValue             types.String
+		expectedPlanValue       types.String
+		expectedRequiresReplace bool
+		planRaw                 *tftypes.Value
+	}{
+		{
+			name:                    "no change - same value",
+			useStateForUnknown:      false,
+			stateValue:              types.StringValue("value-a"),
+			planValue:               types.StringValue("value-a"),
+			configValue:             types.StringValue("value-a"),
+			expectedPlanValue:       types.StringValue("value-a"),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "change value - requires replace",
+			useStateForUnknown:      false,
+			stateValue:              types.StringValue("value-a"),
+			planValue:               types.StringValue("value-b"),
+			configValue:             types.StringValue("value-b"),
+			expectedPlanValue:       types.StringValue("value-b"),
+			expectedRequiresReplace: true,
+		},
+		{
+			name:                    "new resource - no replace",
+			useStateForUnknown:      false,
+			stateValue:              types.StringNull(),
+			planValue:               types.StringValue("value-a"),
+			configValue:             types.StringValue("value-a"),
+			expectedPlanValue:       types.StringValue("value-a"),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "remove value - requires replace",
+			useStateForUnknown:      false,
+			stateValue:              types.StringValue("value-a"),
+			planValue:               types.StringNull(),
+			configValue:             types.StringNull(),
+			expectedPlanValue:       types.StringNull(),
+			expectedRequiresReplace: true,
+		},
+		{
+			name:                    "unknown plan value without UseStateForUnknown",
+			useStateForUnknown:      false,
+			stateValue:              types.StringValue("value-a"),
+			planValue:               types.StringUnknown(),
+			configValue:             types.StringUnknown(),
+			expectedPlanValue:       types.StringUnknown(),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "unknown plan value with UseStateForUnknown",
+			useStateForUnknown:      true,
+			stateValue:              types.StringValue("value-a"),
+			planValue:               types.StringUnknown(),
+			configValue:             types.StringUnknown(),
+			expectedPlanValue:       types.StringValue("value-a"),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "unknown plan value with UseStateForUnknown but null state",
+			useStateForUnknown:      true,
+			stateValue:              types.StringNull(),
+			planValue:               types.StringUnknown(),
+			configValue:             types.StringUnknown(),
+			expectedPlanValue:       types.StringUnknown(),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "unknown plan value with UseStateForUnknown but unknown state",
+			useStateForUnknown:      true,
+			stateValue:              types.StringUnknown(),
+			planValue:               types.StringUnknown(),
+			configValue:             types.StringUnknown(),
+			expectedPlanValue:       types.StringUnknown(),
+			expectedRequiresReplace: false,
+		},
+		{
+			name:                    "unknown state value - no replace",
+			useStateForUnknown:      false,
+			stateValue:              types.StringUnknown(),
+			planValue:               types.StringValue("value-a"),
+			configValue:             types.StringValue("value-a"),
+			expectedPlanValue:       types.StringValue("value-a"),
+			expectedRequiresReplace: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			modifier := RequireReplacePlanModifier{
+				UseStateForUnknown: tt.useStateForUnknown,
+			}
+
+			planRaw := tt.planRaw
+			if planRaw == nil {
+				if tt.planValue.IsNull() {
+					nullValue := tftypes.NewValue(tftypes.String, nil)
+					planRaw = &nullValue
+				} else if tt.planValue.IsUnknown() {
+					unknownValue := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+					planRaw = &unknownValue
+				} else {
+					value := tftypes.NewValue(tftypes.String, tt.planValue.ValueString())
+					planRaw = &value
+				}
+			}
+
+			req := planmodifier.StringRequest{
+				StateValue:  tt.stateValue,
+				PlanValue:   tt.planValue,
+				ConfigValue: tt.configValue,
+				Plan: tfsdk.Plan{
+					Raw: *planRaw,
+				},
+			}
+
+			resp := &planmodifier.StringResponse{
+				PlanValue: tt.planValue,
+			}
+
+			modifier.PlanModifyString(ctx, req, resp)
+
+			assert.True(t, resp.PlanValue.Equal(tt.expectedPlanValue), "PlanValue = %v, want %v", resp.PlanValue, tt.expectedPlanValue)
+			assert.Equal(t, tt.expectedRequiresReplace, resp.RequiresReplace, "RequiresReplace = %v, want %v", resp.RequiresReplace, tt.expectedRequiresReplace)
+		})
+	}
+}
+
+func TestRequireReplacePlanModifier_PlanModifyString_DestroyPlan(t *testing.T) {
+	ctx := context.Background()
+	modifier := RequireReplacePlanModifier{
+		UseStateForUnknown: true,
+	}
+
+	objType := tftypes.Object{
+		AttributeTypes: map[string]tftypes.Type{
+			"test": tftypes.String,
+		},
+	}
+	nullPlan := tftypes.NewValue(objType, nil)
+
+	req := planmodifier.StringRequest{
+		StateValue:  types.StringValue("value-a"),
+		PlanValue:   types.StringValue("value-b"),
+		ConfigValue: types.StringValue("value-b"),
+		Plan: tfsdk.Plan{
+			Raw: nullPlan,
+		},
+	}
+
+	resp := &planmodifier.StringResponse{
+		PlanValue: types.StringValue("value-b"),
+	}
+
+	modifier.PlanModifyString(ctx, req, resp)
+
+	assert.False(t, resp.RequiresReplace, "RequiresReplace should be false when destroying resource")
+	assert.True(t, resp.PlanValue.Equal(types.StringValue("value-b")), "PlanValue = %v, want %v", resp.PlanValue, types.StringValue("value-b"))
+}
+
+func TestRequireReplacePlanModifier_IntegrationWithFramework(t *testing.T) {
+	var _ planmodifier.String = RequireReplace()
+	var _ planmodifier.String = RequireReplaceWithStateForUnknown()
+	var _ planmodifier.String = RequireReplacePlanModifier{}
+}
+
+func BenchmarkRequireReplacePlanModifier_PlanModifyString(b *testing.B) {
+	ctx := context.Background()
+	modifier := RequireReplacePlanModifier{
+		UseStateForUnknown: true,
+	}
+
+	req := planmodifier.StringRequest{
+		StateValue:  types.StringValue("value-a"),
+		PlanValue:   types.StringValue("value-b"),
+		ConfigValue: types.StringValue("value-b"),
+		Plan: tfsdk.Plan{
+			Raw: tftypes.NewValue(tftypes.String, "value-b"),
+		},
+	}
+
+	resp := &planmodifier.StringResponse{
+		PlanValue: types.StringValue("value-b"),
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		modifier.PlanModifyString(ctx, req, resp)
+	}
 }
