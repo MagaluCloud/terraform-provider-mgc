@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -160,23 +159,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.SetRequest, resp *setplanmodifier.RequiresReplaceIfFuncResponse) {
-						var oldSet, newSet []types.String
-						req.StateValue.ElementsAs(ctx, &oldSet, false)
-						req.PlanValue.ElementsAs(ctx, &newSet, false)
-
-						if len(oldSet) != len(newSet) {
-							resp.RequiresReplace = true
-							return
-						}
-						for i := range oldSet {
-							if oldSet[i].ValueString() != newSet[i].ValueString() {
-								resp.RequiresReplace = true
-								return
-							}
-						}
-						resp.RequiresReplace = false
-					}, "availability_zones changed", "availability_zones changed"),
+					utils.SetRequiresReplaceOnChange(),
 				},
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(stringvalidator.RegexMatches(azRegex, "The availability zone must be in the format 'country-region-availability', example 'br-se1-a'")),

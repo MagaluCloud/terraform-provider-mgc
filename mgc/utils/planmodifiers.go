@@ -149,3 +149,107 @@ func (m RequireReplacePlanModifier) PlanModifyString(ctx context.Context, req pl
 		resp.RequiresReplace = true
 	}
 }
+
+type setRequiresReplaceOnChange struct{}
+
+// SetRequiresReplaceOnChange returns a planmodifier that requires resource replacement
+// when the set contents change (elements added, removed, or modified).
+//
+// This planmodifier is particularly useful for fields like availability_zones where
+// changes to the set membership should trigger resource replacement.
+//
+// Example usage:
+//
+//	"availability_zones": schema.SetAttribute{
+//	  Description: "List of availability zones where the resource is deployed.",
+//	  Optional:    true,
+//	  Computed:    true,
+//	  PlanModifiers: []planmodifier.Set{
+//	    utils.SetRequiresReplaceOnChange(),
+//	  },
+//	  ElementType: types.StringType,
+//	},
+func SetRequiresReplaceOnChange() planmodifier.Set {
+	return setRequiresReplaceOnChange{}
+}
+
+func (m setRequiresReplaceOnChange) Description(_ context.Context) string {
+	return "Requires resource replacement when the set contents change (elements added, removed, or modified)."
+}
+
+func (m setRequiresReplaceOnChange) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m setRequiresReplaceOnChange) PlanModifySet(ctx context.Context, req planmodifier.SetRequest, resp *planmodifier.SetResponse) {
+	// If plan value is unknown, we can't determine if replacement is needed
+	if req.PlanValue.IsUnknown() {
+		return
+	}
+
+	// If state is null/unknown and plan has a value, no replacement needed (resource creation)
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+
+	// If plan is null but state has a value, require replacement
+	if req.PlanValue.IsNull() && !req.StateValue.IsNull() {
+		resp.RequiresReplace = true
+		return
+	}
+
+	// If plan is being destroyed, no replacement needed
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	// Convert both sets to string slices for comparison
+	var stateElements, planElements []types.String
+
+	stateDiags := req.StateValue.ElementsAs(ctx, &stateElements, false)
+	resp.Diagnostics.Append(stateDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	planDiags := req.PlanValue.ElementsAs(ctx, &planElements, false)
+	resp.Diagnostics.Append(planDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If lengths are different, replacement is required
+	if len(stateElements) != len(planElements) {
+		resp.RequiresReplace = true
+		return
+	}
+
+	// Create maps for membership comparison (since sets are unordered)
+	stateMap := make(map[string]bool)
+	for _, elem := range stateElements {
+		stateMap[elem.ValueString()] = true
+	}
+
+	planMap := make(map[string]bool)
+	for _, elem := range planElements {
+		planMap[elem.ValueString()] = true
+	}
+
+	// Check if all state elements exist in plan and vice versa
+	for stateValue := range stateMap {
+		if !planMap[stateValue] {
+			resp.RequiresReplace = true
+			return
+		}
+	}
+
+	for planValue := range planMap {
+		if !stateMap[planValue] {
+			resp.RequiresReplace = true
+			return
+		}
+	}
+
+	// If we reach here, the sets have the same membership
+	resp.RequiresReplace = false
+}

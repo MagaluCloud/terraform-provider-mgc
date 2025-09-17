@@ -424,3 +424,245 @@ func BenchmarkRequireReplacePlanModifier_PlanModifyString(b *testing.B) {
 		modifier.PlanModifyString(ctx, req, resp)
 	}
 }
+
+func TestSetRequiresReplaceOnChange(t *testing.T) {
+	testCases := []struct {
+		name          string
+		stateValue    types.Set
+		planValue     types.Set
+		planRaw       tftypes.Value
+		expectReplace bool
+		expectError   bool
+		description   string
+	}{
+		{
+			name:          "null state, non-null plan - no replacement (creation)",
+			stateValue:    types.SetNull(types.StringType),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a")}),
+			expectReplace: false,
+			description:   "Resource creation should not require replacement",
+		},
+		{
+			name:          "unknown state, non-null plan - no replacement",
+			stateValue:    types.SetUnknown(types.StringType),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a")}),
+			expectReplace: false,
+			description:   "Unknown state should not require replacement",
+		},
+		{
+			name:          "non-null state, null plan - requires replacement (deletion)",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetNull(types.StringType),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, nil),
+			expectReplace: true,
+			description:   "Removing all availability zones should require replacement",
+		},
+		{
+			name:          "unknown plan value - no replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetUnknown(types.StringType),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, tftypes.UnknownValue),
+			expectReplace: false,
+			description:   "Unknown plan value should not require replacement",
+		},
+		{
+			name:          "plan is being destroyed - no replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-b")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, nil),
+			expectReplace: false,
+			description:   "Resource destruction should not require replacement",
+		},
+		{
+			name:          "identical sets - no replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a"), tftypes.NewValue(tftypes.String, "zone-b")}),
+			expectReplace: false,
+			description:   "Identical sets should not require replacement",
+		},
+		{
+			name:          "identical sets different order - no replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-b"), types.StringValue("zone-a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-b"), tftypes.NewValue(tftypes.String, "zone-a")}),
+			expectReplace: false,
+			description:   "Sets with same elements in different order should not require replacement",
+		},
+		{
+			name:          "element added - requires replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a"), tftypes.NewValue(tftypes.String, "zone-b")}),
+			expectReplace: true,
+			description:   "Adding availability zones should require replacement",
+		},
+		{
+			name:          "element removed - requires replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a")}),
+			expectReplace: true,
+			description:   "Removing availability zones should require replacement",
+		},
+		{
+			name:          "element changed - requires replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-b")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-b")}),
+			expectReplace: true,
+			description:   "Changing availability zones should require replacement",
+		},
+		{
+			name:          "multiple elements changed - requires replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-c"), types.StringValue("zone-d")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-c"), tftypes.NewValue(tftypes.String, "zone-d")}),
+			expectReplace: true,
+			description:   "Changing all availability zones should require replacement",
+		},
+		{
+			name:          "empty to non-empty - no replacement (creation case)",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a")}),
+			expectReplace: true,
+			description:   "Adding zones to empty set should require replacement",
+		},
+		{
+			name:          "non-empty to empty - requires replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{}),
+			expectReplace: true,
+			description:   "Removing all zones should require replacement",
+		},
+		{
+			name:          "both empty sets - no replacement",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{}),
+			expectReplace: false,
+			description:   "Both empty sets should not require replacement",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			modifier := SetRequiresReplaceOnChange()
+
+			// Test Description method
+			desc := modifier.Description(ctx)
+			if desc == "" {
+				t.Error("Description should not be empty")
+			}
+
+			// Test MarkdownDescription method
+			mdDesc := modifier.MarkdownDescription(ctx)
+			if mdDesc == "" {
+				t.Error("MarkdownDescription should not be empty")
+			}
+
+			// Create request
+			req := planmodifier.SetRequest{
+				StateValue: tc.stateValue,
+				PlanValue:  tc.planValue,
+				Plan: tfsdk.Plan{
+					Raw: tc.planRaw,
+				},
+			}
+
+			// Create response
+			resp := &planmodifier.SetResponse{}
+
+			// Execute the plan modifier
+			modifier.PlanModifySet(ctx, req, resp)
+
+			// Check for unexpected errors
+			if tc.expectError && !resp.Diagnostics.HasError() {
+				t.Errorf("Expected error but got none")
+			}
+			if !tc.expectError && resp.Diagnostics.HasError() {
+				t.Errorf("Unexpected error: %v", resp.Diagnostics)
+			}
+
+			// Check replacement requirement
+			if resp.RequiresReplace != tc.expectReplace {
+				t.Errorf("Expected RequiresReplace=%v, got %v. %s", tc.expectReplace, resp.RequiresReplace, tc.description)
+			}
+		})
+	}
+}
+
+func TestSetRequiresReplaceOnChangeEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name          string
+		stateValue    types.Set
+		planValue     types.Set
+		planRaw       tftypes.Value
+		expectReplace bool
+		description   string
+	}{
+		{
+			name:          "single element sets with same value",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("us-east-1a")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("us-east-1a")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "us-east-1a")}),
+			expectReplace: false,
+			description:   "Single element sets with same value should not require replacement",
+		},
+		{
+			name:          "large sets with same membership",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-1"), types.StringValue("zone-2"), types.StringValue("zone-3"), types.StringValue("zone-4"), types.StringValue("zone-5")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-5"), types.StringValue("zone-1"), types.StringValue("zone-3"), types.StringValue("zone-2"), types.StringValue("zone-4")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-5"), tftypes.NewValue(tftypes.String, "zone-1"), tftypes.NewValue(tftypes.String, "zone-3"), tftypes.NewValue(tftypes.String, "zone-2"), tftypes.NewValue(tftypes.String, "zone-4")}),
+			expectReplace: false,
+			description:   "Large sets with same membership should not require replacement",
+		},
+		{
+			name:          "sets with special characters",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-with-dashes"), types.StringValue("zone_with_underscores")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone_with_underscores"), types.StringValue("zone-with-dashes")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone_with_underscores"), tftypes.NewValue(tftypes.String, "zone-with-dashes")}),
+			expectReplace: false,
+			description:   "Sets with special characters should work correctly",
+		},
+		{
+			name:          "partial membership change",
+			stateValue:    types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b"), types.StringValue("zone-c")}),
+			planValue:     types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a"), types.StringValue("zone-b"), types.StringValue("zone-d")}),
+			planRaw:       tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, []tftypes.Value{tftypes.NewValue(tftypes.String, "zone-a"), tftypes.NewValue(tftypes.String, "zone-b"), tftypes.NewValue(tftypes.String, "zone-d")}),
+			expectReplace: true,
+			description:   "Partial membership change should require replacement",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			modifier := SetRequiresReplaceOnChange()
+
+			req := planmodifier.SetRequest{
+				StateValue: tc.stateValue,
+				PlanValue:  tc.planValue,
+				Plan: tfsdk.Plan{
+					Raw: tc.planRaw,
+				},
+			}
+
+			resp := &planmodifier.SetResponse{}
+			modifier.PlanModifySet(ctx, req, resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Errorf("Unexpected error: %v", resp.Diagnostics)
+			}
+
+			if resp.RequiresReplace != tc.expectReplace {
+				t.Errorf("Expected RequiresReplace=%v, got %v. %s", tc.expectReplace, resp.RequiresReplace, tc.description)
+			}
+		})
+	}
+}
