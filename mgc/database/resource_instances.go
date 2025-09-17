@@ -24,6 +24,7 @@ import (
 const (
 	instanceStatusTimeout      = 90 * time.Minute
 	dbaasInstanceProductFamily = "SINGLE_INSTANCE"
+	instanceStatusPollInterval = 10 * time.Second
 )
 
 type DBaaSInstanceStatus string
@@ -442,24 +443,39 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	var currentData DBaaSInstanceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	var stateData DBaaSInstanceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &stateData)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if planData.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
-		currentData.InstanceType = planData.InstanceType
-		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(),
-			currentData.EngineID.ValueString(), dbaasInstanceProductFamily)
+	var hasResizeUpdate bool
+	var instanceResizeRequest dbSDK.InstanceResizeRequest
+
+	if planData.InstanceType.ValueString() != stateData.InstanceType.ValueString() {
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(
+			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasInstanceProductFamily,
+		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		currentData.InstanceTypeId = types.StringValue(instanceTypeID)
-		_, err = r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			InstanceTypeID: &instanceTypeID,
-		})
+		stateData.InstanceTypeId = types.StringValue(instanceTypeID)
+		stateData.InstanceType = planData.InstanceType
+		instanceResizeRequest.InstanceTypeID = &instanceTypeID
+		hasResizeUpdate = true
+	}
+
+	if planData.VolumeSize.ValueInt64() != stateData.VolumeSize.ValueInt64() {
+		instanceResizeRequest.Volume = &dbSDK.InstanceVolumeResizeRequest{
+			Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
+		}
+		stateData.VolumeSize = planData.VolumeSize
+		hasResizeUpdate = true
+	}
+
+	if hasResizeUpdate {
+		_, err := r.dbaasInstances.Resize(ctx, stateData.ID.ValueString(), instanceResizeRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -471,27 +487,9 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if planData.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
-		currentData.VolumeSize = planData.VolumeSize
-		_, err := r.dbaasInstances.Resize(ctx, currentData.ID.ValueString(), dbSDK.InstanceResizeRequest{
-			Volume: &dbSDK.InstanceVolumeResizeRequest{
-				Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
-			},
-		})
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-
-		if _, err := r.waitUntilInstanceStatusMatches(ctx, planData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-	}
-
-	if (planData.BackupRetentionDays.ValueInt64() != currentData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != currentData.BackupStartAt.ValueString()) {
-		currentData.BackupRetentionDays = planData.BackupRetentionDays
-		currentData.BackupStartAt = planData.BackupStartAt
+	if (planData.BackupRetentionDays.ValueInt64() != stateData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != stateData.BackupStartAt.ValueString()) {
+		stateData.BackupRetentionDays = planData.BackupRetentionDays
+		stateData.BackupStartAt = planData.BackupStartAt
 
 		_, err := r.dbaasInstances.Update(ctx, planData.ID.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
@@ -508,7 +506,7 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &stateData)...)
 }
 
 func (r *DBaaSInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -550,7 +548,7 @@ func (r *DBaaSInstanceResource) waitUntilInstanceStatusMatches(ctx context.Conte
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
-		case <-time.After(10 * time.Second):
+		case <-time.After(instanceStatusPollInterval):
 			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
 			if err != nil {
 				return nil, err
@@ -573,7 +571,7 @@ func (r *DBaaSInstanceResource) waitUntilInstanceIsDeleted(ctx context.Context, 
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
-		case <-time.After(10 * time.Second):
+		case <-time.After(instanceStatusPollInterval):
 			instance, err := r.dbaasInstances.Get(ctx, instanceID, dbSDK.GetInstanceOptions{})
 			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
 				return nil, nil
