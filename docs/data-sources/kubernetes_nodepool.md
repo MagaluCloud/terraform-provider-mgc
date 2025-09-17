@@ -35,7 +35,7 @@ output "nodepool" {
 
 - `auto_scale_max_replicas` (Number) Maximum number of replicas for auto-scaling.
 - `auto_scale_min_replicas` (Number) Minimum number of replicas for auto-scaling.
-- `availability_zones` (List of String) List of availability zones.
+- `availability_zones` (Set of String) List of availability zones.
 - `created_at` (String) Creation timestamp.
 - `instance_template_disk_size` (Number) Disk size in GB for the instance template.
 - `instance_template_disk_type` (String) Disk type for the instance template.
@@ -54,7 +54,6 @@ output "nodepool" {
 - `status_state` (String) Current state of the nodepool.
 - `taints` (Attributes List) List of taints. (see [below for nested schema](#nestedatt--taints))
 - `updated_at` (String) Last update timestamp.
-- `zone` (List of String, Deprecated) List of zones.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`

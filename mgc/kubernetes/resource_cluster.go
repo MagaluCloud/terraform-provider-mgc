@@ -36,9 +36,13 @@ type KubernetesClusterCreateResourceModel struct {
 	EnabledServerGroup types.Bool     `tfsdk:"enabled_server_group"`
 	Version            types.String   `tfsdk:"version"`
 	CreatedAt          types.String   `tfsdk:"created_at"`
+	UpdatedAt          types.String   `tfsdk:"updated_at"`
 	ID                 types.String   `tfsdk:"id"`
+	Region             types.String   `tfsdk:"region"`
 	ServicesIpV4CIDR   types.String   `tfsdk:"services_ipv4_cidr"`
 	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ipv4_cidr"`
+	MachineTypesSource types.String   `tfsdk:"machine_types_source"`
+	PlatformVersion    types.String   `tfsdk:"platform_version"`
 }
 
 type k8sClusterResource struct {
@@ -117,6 +121,17 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"updated_at": schema.StringAttribute{
+				Description: "Last update date of the Kubernetes cluster.",
+				Computed:    true,
+			},
+			"region": schema.StringAttribute{
+				Description: "Region where the Kubernetes cluster is located.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"id": schema.StringAttribute{
 				Description: "Cluster's UUID.",
 				Computed:    true,
@@ -142,6 +157,14 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					utils.ReplaceIfChangeAndNotIsNotSetOnPlan{},
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"machine_types_source": schema.StringAttribute{
+				Description: "Source of machine types for the cluster.",
+				Computed:    true,
+			},
+			"platform_version": schema.StringAttribute{
+				Description: "Platform version of the cluster.",
+				Computed:    true,
 			},
 		},
 	}
@@ -245,8 +268,8 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		cidrs = append(cidrs, c.ValueString())
 	}
 
-	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.AllowedCIDRsUpdateRequest{
-		AllowedCIDRs: cidrs,
+	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.PatchClusterRequest{
+		AllowedCIDRs: &cidrs,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -316,8 +339,18 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 		ID:               types.StringValue(sdkResult.ID),
 		Version:          types.StringValue(sdkResult.Version),
 		CreatedAt:        types.StringPointerValue(utils.ConvertTimeToRFC3339(sdkResult.CreatedAt)),
+		UpdatedAt:        types.StringPointerValue(utils.ConvertTimeToRFC3339(sdkResult.UpdatedAt)),
+		Region:           types.StringPointerValue(sdkResult.Region),
 		ServicesIpV4CIDR: types.StringPointerValue(sdkResult.ServicesIpV4CIDR),
 		ClusterIPv4CIDR:  types.StringPointerValue(sdkResult.ClusterIPv4CIDR),
+	}
+
+	if sdkResult.MachineTypesSource != nil {
+		tfModel.MachineTypesSource = types.StringValue(string(*sdkResult.MachineTypesSource))
+	}
+
+	if sdkResult.Platform != nil {
+		tfModel.PlatformVersion = types.StringValue(sdkResult.Platform.Version)
 	}
 
 	if sdkResult.Description != nil {
@@ -335,6 +368,9 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 			tfModel.AllowedCidrs = convertStringSliceToTypesStringSlice(*sdkResult.AllowedCIDRs)
 		}
 	}
+
+	// Write Only Attributes
+	tfModel.EnabledServerGroup = types.BoolNull()
 
 	return tfModel
 }

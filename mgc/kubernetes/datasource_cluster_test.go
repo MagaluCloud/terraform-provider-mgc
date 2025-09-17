@@ -81,11 +81,9 @@ func TestConvertToControlplane(t *testing.T) {
 				State:    "Running",
 				Messages: []string{"ok"},
 			},
-			Tags: &[]string{"env:prod"},
 			Taints: &[]sdkK8s.Taint{
 				{Effect: "NoSchedule", Key: "app", Value: "critical"},
 			},
-			Zone: &[]string{"br-se1-a"},
 		}
 
 		result := convertToControlplane(sdkCP)
@@ -150,9 +148,9 @@ func TestConvertToKubernetesCluster(t *testing.T) {
 				"192.168.1.0/24",
 			},
 			Addons: &sdkK8s.Addons{
-				Loadbalance: stringPtr("enabled"),
-				Secrets:     stringPtr("enabled"),
-				Volume:      stringPtr("enabled"),
+				Loadbalance: "enabled",
+				Secrets:     "enabled",
+				Volume:      "enabled",
 			},
 			KubeApiServer: &sdkK8s.KubeApiServer{
 				DisableApiServerFip: boolPtr(false),
@@ -162,7 +160,7 @@ func TestConvertToKubernetesCluster(t *testing.T) {
 			},
 			Network: &sdkK8s.Network{
 				CIDR:     "10.244.0.0/16",
-				Name:     stringPtr("prod-net"),
+				Name:     "prod-net",
 				SubnetID: "subnet-id-abc",
 			},
 			Status: &sdkK8s.MessageState{

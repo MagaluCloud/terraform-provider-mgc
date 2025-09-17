@@ -66,12 +66,10 @@ Read-Only:
 - `infrastructure_os_image` (String) OS image of the node.
 - `name` (String) Node name.
 - `namespace` (String) Namespace of the node.
-- `node_image` (String) Image of the node.
 - `nodepool_name` (String) Name of the nodepool.
 - `status_message` (String) Status message of the node.
 - `status_state` (String) State of the node.
 - `taints` (Attributes List) List of node taints. (see [below for nested schema](#nestedatt--nodes--taints))
-- `zone` (String) Zone of the node.
 
 <a id="nestedatt--nodes--addresses"></a>
 ### Nested Schema for `nodes.addresses`

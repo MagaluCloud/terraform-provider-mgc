@@ -29,12 +29,16 @@ type KubernetesCluster struct {
 	KubeAPIFloatingIP          types.String   `tfsdk:"kube_api_floating_ip"`
 	KubeAPIPort                types.Int64    `tfsdk:"kube_api_port"`
 	CIDR                       types.String   `tfsdk:"cidr"`
-	ClusterName                types.String   `tfsdk:"cluster_name"`
+	NetworkName                types.String   `tfsdk:"network_name"`
 	SubnetID                   types.String   `tfsdk:"subnet_id"`
 	Region                     types.String   `tfsdk:"region"`
 	Message                    types.String   `tfsdk:"message"`
 	State                      types.String   `tfsdk:"state"`
 	UpdatedAt                  types.String   `tfsdk:"updated_at"`
+	ServicesIpV4CIDR           types.String   `tfsdk:"services_ipv4_cidr"`
+	ClusterIPv4CIDR            types.String   `tfsdk:"cluster_ipv4_cidr"`
+	MachineTypesSource         types.String   `tfsdk:"machine_types_source"`
+	PlatformVersion            types.String   `tfsdk:"platform_version"`
 }
 
 type Controlplane struct {
@@ -115,7 +119,7 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 							Description: "Maximum number of pods that can be scheduled on each node in the node pool.",
 							Computed:    true,
 						},
-						"availability_zones": schema.ListAttribute{
+						"availability_zones": schema.SetAttribute{
 							Description: "List of availability zones where the nodes in the node pool are distributed.",
 							Computed:    true,
 							ElementType: types.StringType,
@@ -147,6 +151,16 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 						"id": schema.StringAttribute{
 							Description: "Node pool's UUID.",
 							Computed:    true,
+						},
+						"labels": schema.MapAttribute{
+							Description: "Map of labels for the node pool.",
+							Computed:    true,
+							ElementType: types.StringType,
+						},
+						"security_groups": schema.SetAttribute{
+							Description: "List of security groups for the node pool.",
+							Computed:    true,
+							ElementType: types.StringType,
 						},
 						"taints": schema.ListNestedAttribute{
 							Description: "Property associating a set of nodes.",
@@ -317,8 +331,8 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 				Description: "Available IP addresses used for provisioning nodes in the cluster.",
 				Computed:    true,
 			},
-			"cluster_name": schema.StringAttribute{
-				Description: "Name of the node pool.",
+			"network_name": schema.StringAttribute{
+				Description: "Name of the cluster network.",
 				Computed:    true,
 			},
 			"subnet_id": schema.StringAttribute{
@@ -339,6 +353,22 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "Date of the last modification of the Kubernetes cluster.",
+				Computed:    true,
+			},
+			"services_ipv4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster service.",
+				Computed:    true,
+			},
+			"cluster_ipv4_cidr": schema.StringAttribute{
+				Description: "The IP address range of the Kubernetes cluster.",
+				Computed:    true,
+			},
+			"machine_types_source": schema.StringAttribute{
+				Description: "Source of machine types for the cluster.",
+				Computed:    true,
+			},
+			"platform_version": schema.StringAttribute{
+				Description: "Platform version of the cluster.",
 				Computed:    true,
 			},
 		},
@@ -387,9 +417,9 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 	}
 
 	if getResult.Addons != nil {
-		kubernetesCluster.AddonsLoadbalance = types.StringPointerValue(getResult.Addons.Loadbalance)
-		kubernetesCluster.AddonsSecrets = types.StringPointerValue(getResult.Addons.Secrets)
-		kubernetesCluster.AddonsVolume = types.StringPointerValue(getResult.Addons.Volume)
+		kubernetesCluster.AddonsLoadbalance = types.StringValue(getResult.Addons.Loadbalance)
+		kubernetesCluster.AddonsSecrets = types.StringValue(getResult.Addons.Secrets)
+		kubernetesCluster.AddonsVolume = types.StringValue(getResult.Addons.Volume)
 	}
 
 	if getResult.KubeApiServer != nil {
@@ -403,7 +433,7 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 
 	if getResult.Network != nil {
 		kubernetesCluster.CIDR = types.StringValue(getResult.Network.CIDR)
-		kubernetesCluster.ClusterName = types.StringValue(*getResult.Network.Name)
+		kubernetesCluster.NetworkName = types.StringValue(getResult.Network.Name)
 		kubernetesCluster.SubnetID = types.StringValue(getResult.Network.SubnetID)
 	}
 
@@ -421,6 +451,17 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 
 	if getResult.ControlPlane != nil {
 		kubernetesCluster.Controlplane = convertToControlplane(getResult.ControlPlane)
+	}
+
+	kubernetesCluster.ServicesIpV4CIDR = types.StringPointerValue(getResult.ServicesIpV4CIDR)
+	kubernetesCluster.ClusterIPv4CIDR = types.StringPointerValue(getResult.ClusterIPv4CIDR)
+
+	if getResult.MachineTypesSource != nil {
+		kubernetesCluster.MachineTypesSource = types.StringValue(string(*getResult.MachineTypesSource))
+	}
+
+	if getResult.Platform != nil {
+		kubernetesCluster.PlatformVersion = types.StringValue(getResult.Platform.Version)
 	}
 
 	return kubernetesCluster
