@@ -22,6 +22,7 @@ import (
 
 const (
 	dbaasReplicaProductFamily = "SINGLE_INSTANCE_REPLICA"
+	poolingWaitInterval       = 10 * time.Second
 )
 
 type DBaaSReplicaModel struct {
@@ -199,56 +200,56 @@ func (r *DBaaSReplicaResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan DBaaSReplicaModel
-	hasResizeUpdate := false
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var planData DBaaSReplicaModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &planData)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var currentData DBaaSReplicaModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &currentData)...)
+	var stateData DBaaSReplicaModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &stateData)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var hasResizeUpdate bool
 	var replicaResizeRequest dbSDK.ReplicaResizeRequest
 
-	if plan.InstanceType.ValueString() != "" && plan.InstanceType.ValueString() != currentData.InstanceType.ValueString() {
+	if planData.InstanceType.ValueString() != "" && planData.InstanceType.ValueString() != stateData.InstanceType.ValueString() {
 		instanceTypeID, err := ValidateAndGetInstanceTypeID(
-			ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(), currentData.EngineID.ValueString(), dbaasReplicaProductFamily,
+			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasReplicaProductFamily,
 		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		currentData.InstanceType = plan.InstanceType
+		stateData.InstanceType = planData.InstanceType
 		replicaResizeRequest.InstanceTypeID = &instanceTypeID
 		hasResizeUpdate = true
 	}
 
-	if plan.VolumeSize.ValueInt64() != 0 && plan.VolumeSize.ValueInt64() != currentData.VolumeSize.ValueInt64() {
+	if planData.VolumeSize.ValueInt64() != 0 && planData.VolumeSize.ValueInt64() != stateData.VolumeSize.ValueInt64() {
 		replicaResizeRequest.Volume = &dbSDK.InstanceVolumeResizeRequest{
-			Size: *utils.ConvertInt64PointerToIntPointer(plan.VolumeSize.ValueInt64Pointer()),
+			Size: *utils.ConvertInt64PointerToIntPointer(planData.VolumeSize.ValueInt64Pointer()),
 		}
-		currentData.VolumeSize = plan.VolumeSize
+		stateData.VolumeSize = planData.VolumeSize
 		hasResizeUpdate = true
 	}
 
 	if hasResizeUpdate {
-		_, err := r.dbaasReplicas.Resize(ctx, currentData.ID.ValueString(), replicaResizeRequest)
+		_, err := r.dbaasReplicas.Resize(ctx, stateData.ID.ValueString(), replicaResizeRequest)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
 
-		if _, err := r.waitUntilReplicaStatusMatches(ctx, currentData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
+		if _, err := r.waitUntilReplicaStatusMatches(ctx, stateData.ID.ValueString(), DBaaSInstanceStatusActive.String()); err != nil {
 			resp.Diagnostics.AddError("Error waiting for replica to be active", err.Error())
 			return
 		}
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &currentData)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &stateData)...)
 }
 
 func (r *DBaaSReplicaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -292,7 +293,7 @@ func (r *DBaaSReplicaResource) waitUntilReplicaStatusMatches(ctx context.Context
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for replica %s to reach status %s", instanceID, status)
-		case <-time.After(10 * time.Second):
+		case <-time.After(poolingWaitInterval):
 			instance, err := r.dbaasReplicas.Get(ctx, instanceID)
 			if err != nil {
 				return nil, err
@@ -315,7 +316,7 @@ func (r *DBaaSReplicaResource) waitUntilReplicaIsDeleted(ctx context.Context, in
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to be deleted", instanceID)
-		case <-time.After(10 * time.Second):
+		case <-time.After(poolingWaitInterval):
 			replica, err := r.dbaasReplicas.Get(ctx, instanceID)
 			if err != nil && strings.Contains(err.Error(), strconv.Itoa(http.StatusNotFound)) {
 				return nil, nil
