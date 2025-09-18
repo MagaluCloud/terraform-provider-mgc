@@ -8,6 +8,7 @@ require (
 	github.com/MagaluCloud/mgc-sdk-go v0.4.0
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
+	github.com/hashicorp/terraform-plugin-go v0.27.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
@@ -19,7 +20,6 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/hashicorp/terraform-plugin-go v0.27.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/minio/crc64nvme v1.0.1 // indirect
