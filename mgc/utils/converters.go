@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -164,4 +165,13 @@ func GoToDynamic[T any](val T) (types.Dynamic, error) {
 	default:
 		return types.DynamicNull(), fmt.Errorf("unsupported type %T", v)
 	}
+}
+
+func StringSliceToTypesList(slice []string) types.List {
+	elements := make([]attr.Value, len(slice))
+	for i, v := range slice {
+		elements[i] = types.StringValue(v)
+	}
+	listValue, _ := types.ListValue(types.StringType, elements)
+	return listValue
 }
