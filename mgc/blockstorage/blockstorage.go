@@ -12,6 +12,8 @@ func GetDataSources() []func() datasource.DataSource {
 		NewDataSourceBsVolume,
 		NewDataSourceBsVolumeTypes,
 		NewDataSourceBsVolumes,
+		NewDataSourceBSSchedule,
+		NewDataSourceBSSchedules,
 	}
 }
 
@@ -20,5 +22,7 @@ func GetResources() []func() resource.Resource {
 		NewBlockStorageSnapshotsResource,
 		NewVolumeAttachResource,
 		NewBlockStorageVolumesResource,
+		NewBlockStorageScheduleResource,
+		NewBlockStorageScheduleAttachResource,
 	}
 }
