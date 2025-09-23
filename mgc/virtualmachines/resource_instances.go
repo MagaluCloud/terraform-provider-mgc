@@ -8,8 +8,11 @@ import (
 	"slices"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
@@ -123,16 +126,22 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 }
 
 type vmInstancesResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	Name              types.String `tfsdk:"name"`
-	CreatedAt         types.String `tfsdk:"created_at"`
-	SshKeyName        types.String `tfsdk:"ssh_key_name"`
-	VpcId             types.String `tfsdk:"vpc_id"`
-	MachineType       types.String `tfsdk:"machine_type"`
-	Image             types.String `tfsdk:"image"`
-	UserData          types.String `tfsdk:"user_data"`
-	AvailabilityZone  types.String `tfsdk:"availability_zone"`
-	NetworkInterfaces types.List   `tfsdk:"network_interfaces"`
+	ID                     types.String `tfsdk:"id"`
+	Name                   types.String `tfsdk:"name"`
+	CreatedAt              types.String `tfsdk:"created_at"`
+	SshKeyName             types.String `tfsdk:"ssh_key_name"`
+	VpcID                  types.String `tfsdk:"vpc_id"`
+	MachineType            types.String `tfsdk:"machine_type"`
+	Image                  types.String `tfsdk:"image"`
+	UserData               types.String `tfsdk:"user_data"`
+	AvailabilityZone       types.String `tfsdk:"availability_zone"`
+	NetworkInterfaces      types.List   `tfsdk:"network_interfaces"`
+	NetworkInterfaceId     types.String `tfsdk:"network_interface_id"`
+	AllocatePublicIpv4     types.Bool   `tfsdk:"allocate_public_ipv4"`
+	CreationSecurityGroups types.List   `tfsdk:"creation_security_groups"`
+	LocalIPv4              types.String `tfsdk:"local_ipv4"`
+	IPv6                   types.String `tfsdk:"ipv6"`
+	IPv4                   types.String `tfsdk:"ipv4"`
 }
 
 type VmInstancesNetworkInterfaceModel struct {
@@ -183,7 +192,7 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"vpc_id": schema.StringAttribute{
-				Description: "The ID of the VPC the instance is in.",
+				Description: "The VPC ID where the primary network interface will be created.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -218,8 +227,71 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"network_interface_id": schema.StringAttribute{
+				Description: `The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
+If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
+Read the documentation guides for more details.`,
+				Optional: true,
+				Computed: true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("vpc_id")),
+					stringvalidator.LengthAtLeast(1),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"allocate_public_ipv4": schema.BoolAttribute{
+				Description: `If true, the primary network interface will be created with a public IPv4 address.
+A Public IPv4 address resource will be created and associated with you tenant, when deleting the instance the Public IPv4 will not be deleted and charges may apply.
+If false, the primary network interface will be created without a public IPv4 address.
+Default is false.
+This attribute can only be used when "network_interface_id" is not set.`,
+				Optional:  true,
+				WriteOnly: true,
+				Validators: []validator.Bool{
+					boolvalidator.ConflictsWith(path.MatchRoot("network_interface_id")),
+				},
+			},
+			"creation_security_groups": schema.ListAttribute{
+				Description: `List of security group IDs to be associated with the primary network interface on creation.
+If not specified, the default security group of the VPC will be used.
+For manage security groups after the instance creation, use the network resources.
+Find out more in the documentation guides.
+This attribute can only be used when "network_interface_id" is not set.`,
+				ElementType: types.StringType,
+				Optional:    true,
+				WriteOnly:   true,
+				Validators: []validator.List{
+					listvalidator.ConflictsWith(path.MatchRoot("network_interface_id")),
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
+				},
+			},
+			"local_ipv4": schema.StringAttribute{
+				Description: "The primary network interface IPv4 address of the virtual machine instance.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ipv6": schema.StringAttribute{
+				Description: "The primary network interface IPv6 address of the virtual machine instance.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ipv4": schema.StringAttribute{
+				Description: "The primary network interface public IPv4 address of the virtual machine instance.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Description: "The network interfaces of the virtual machine instance.",
+				Description: "The network interfaces attached to the virtual machine instance.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
@@ -275,12 +347,30 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	state := vmInstancesResourceModel{}
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	createdPublicIp := false
+	if state.AllocatePublicIpv4.String() == "" {
+		state.AllocatePublicIpv4 = types.BoolValue(false)
+	}
+
+	var sg *[]computeSdk.CreateParametersNetworkInterfaceWithID
+	if !state.CreationSecurityGroups.IsNull() {
+		var sgIDs []string
+		resp.Diagnostics.Append(state.CreationSecurityGroups.ElementsAs(ctx, &sgIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		items := make([]computeSdk.CreateParametersNetworkInterfaceWithID, 0, len(sgIDs))
+		for _, id := range sgIDs {
+			items = append(items, computeSdk.CreateParametersNetworkInterfaceWithID{
+				ID: id,
+			})
+		}
+		sg = &items
+	}
 
 	createParams := computeSdk.CreateRequest{
 		Name: state.Name.ValueString(),
@@ -294,21 +384,27 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		AvailabilityZone: state.AvailabilityZone.ValueStringPointer(),
 		SshKeyName:       state.SshKeyName.ValueStringPointer(),
 		Network: &computeSdk.CreateParametersNetwork{
-			AssociatePublicIp: &createdPublicIp,
+			AssociatePublicIp: state.AllocatePublicIpv4.ValueBoolPointer(),
+			Interface: &computeSdk.CreateParametersNetworkInterface{
+				ID: state.NetworkInterfaceId.ValueStringPointer(),
+			},
 		},
 	}
 
-	if state.VpcId.ValueString() != "" {
+	if sg != nil {
+		createParams.Network.Interface.SecurityGroups = sg
+	}
+	if state.VpcID.ValueString() != "" {
 		createParams.Network.Vpc = &computeSdk.IDOrName{
-			ID: state.VpcId.ValueStringPointer(),
+			ID: state.VpcID.ValueStringPointer(),
 		}
 	}
-
 	createdId, err := r.vmInstances.Create(ctx, createParams)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
+
 	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdId, StatusCompleted)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -422,8 +518,25 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 	}
 
 	if server.Network.Vpc != nil {
-		data.VpcId = types.StringValue(*server.Network.Vpc.ID)
+		data.VpcID = types.StringValue(*server.Network.Vpc.ID)
 	}
+
+	data.NetworkInterfaceId = types.StringNull()
+	data.LocalIPv4 = types.StringNull()
+	data.IPv6 = types.StringNull()
+	data.IPv4 = types.StringNull()
+	for _, ni := range interfaces {
+		if ni.Primary.ValueBool() {
+			data.NetworkInterfaceId = ni.ID
+			data.LocalIPv4 = ni.LocalIpv4
+			data.IPv6 = ni.Ipv6
+			data.IPv4 = ni.Ipv4
+			break
+		}
+	}
+
+	data.AllocatePublicIpv4 = types.BoolNull()
+	data.CreationSecurityGroups = types.ListNull(types.StringType)
 
 	return &data
 }

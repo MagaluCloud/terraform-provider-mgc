@@ -13,33 +13,66 @@ Manages virtual machine instances in Magalu Cloud.
 ## Example Usage
 
 ```terraform
-resource "mgc_virtual_machine_instances" "tc1_basic_instance" {
+resource "mgc_virtual_machine_instances" "basic_instance" {
   name         = "basic-instance-name"
   machine_type = "BV1-1-40"
   image        = "cloud-ubuntu-24.04 LTS"
   ssh_key_name = "your-ssh-key-name"
 }
 
-resource "mgc_virtual_machine_instances" "tc2_instance_with_az" {
-  name              = "tc2-instance-with-az"
+resource "mgc_virtual_machine_instances" "instance_with_az" {
+  name              = "instance-with-az"
   availability_zone = "br-ne1-a"
   machine_type      = "BV4-8-100"
   image             = "cloud-ubuntu-24.04 LTS"
   ssh_key_name      = "your-ssh-key-name"
 }
 
-resource "mgc_virtual_machine_instances" "tc3_instance_with_usardata" {
-  name         = "tc3-instance-with-userdata"
+resource "mgc_virtual_machine_instances" "instance_with_usardata" {
+  name         = "instance-with-userdata"
   machine_type = "BV4-8-100"
   image        = "cloud-ubuntu-24.04 LTS"
   ssh_key_name = "your-ssh-key-name"
   user_data    = base64encode("#!/bin/bash\necho 'Hello, World!'")
 }
 
-resource "mgc_virtual_machine_instances" "tc4_instance_with_windows" {
-  name         = "tc4-instance-with-windows"
+resource "mgc_virtual_machine_instances" "instance_with_windows" {
+  name         = "instance-with-windows"
   machine_type = "BV4-8-100"
   image        = "windows-server-2022"
+}
+
+resource "mgc_virtual_machine_instances" "instance_with_custom_interface" {
+  name                 = "instance-with-custom-interface"
+  machine_type         = "BV2-4-10"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
+  network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
+}
+
+resource "mgc_virtual_machine_instances" "instance_with_public_ipv4" {
+  name                 = "instance-with-public-ipv4"
+  machine_type         = "BV2-4-10"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
+  allocate_public_ipv4 = true
+}
+
+resource "mgc_virtual_machine_instances" "instance_with_security_groups" {
+  name                     = "instance-with-security-groups"
+  machine_type             = "BV2-4-10"
+  image                    = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name             = "your-ssh-key-name"
+  creation_security_groups = [mgc_network_security_groups.security_group.id]
+}
+
+resource "mgc_virtual_machine_instances" "instance_with_security_groups_and_public_ipv4" {
+  name                     = "instance_with_security_groups_and_public_ipv4"
+  machine_type             = "BV2-4-10"
+  image                    = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name             = "your-ssh-key-name"
+  allocate_public_ipv4     = true
+  creation_security_groups = [mgc_network_security_groups.security_group.id]
 }
 ```
 
@@ -54,16 +87,34 @@ resource "mgc_virtual_machine_instances" "tc4_instance_with_windows" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `allocate_public_ipv4` (Boolean, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) If true, the primary network interface will be created with a public IPv4 address.
+A Public IPv4 address resource will be created and associated with you tenant, when deleting the instance the Public IPv4 will not be deleted and charges may apply.
+If false, the primary network interface will be created without a public IPv4 address.
+Default is false.
+This attribute can only be used when "network_interface_id" is not set.
 - `availability_zone` (String) The availability zone of the virtual machine instance.
+- `creation_security_groups` (List of String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) List of security group IDs to be associated with the primary network interface on creation.
+If not specified, the default security group of the VPC will be used.
+For manage security groups after the instance creation, use the network resources.
+Find out more in the documentation guides.
+This attribute can only be used when "network_interface_id" is not set.
+- `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
+If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
+Read the documentation guides for more details.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
 - `user_data` (String) User data for instance initialization.
-- `vpc_id` (String) The ID of the VPC the instance is in.
+- `vpc_id` (String) The VPC ID where the primary network interface will be created.
 
 ### Read-Only
 
 - `created_at` (String) The timestamp when the virtual machine instance was created.
 - `id` (String) The unique identifier of the virtual machine instance.
-- `network_interfaces` (Attributes List) The network interfaces of the virtual machine instance. (see [below for nested schema](#nestedatt--network_interfaces))
+- `ipv4` (String) The primary network interface public IPv4 address of the virtual machine instance.
+- `ipv6` (String) The primary network interface IPv6 address of the virtual machine instance.
+- `local_ipv4` (String) The primary network interface IPv4 address of the virtual machine instance.
+- `network_interfaces` (Attributes List) The network interfaces attached to the virtual machine instance. (see [below for nested schema](#nestedatt--network_interfaces))
 
 <a id="nestedatt--network_interfaces"></a>
 ### Nested Schema for `network_interfaces`
