@@ -212,6 +212,8 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	data.EnabledServerGroup = types.BoolNull()
+
 	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, "running", "provisioned")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
