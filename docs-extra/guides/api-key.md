@@ -61,7 +61,6 @@ When you create an API Key in Magalu Cloud, you actually receive multiple creden
    ```
 
 2. Select which scopes the API Key will have access to by pressing enter on the desired scopes.
-
    - For Object Storage operations, select the Object Storage scopes
    - There are separate scopes for read and write operations
 
@@ -96,8 +95,8 @@ provider "mgc" {
   api_key = var.api_key
   region  = var.region
 
-  object_storage {
-    key_pair {
+  object_storage = {
+    key_pair = {
       key_id     = var.mgc_access_key
       key_secret = var.mgc_secret_key
     }
