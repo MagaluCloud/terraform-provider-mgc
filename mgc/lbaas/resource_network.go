@@ -435,6 +435,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 			"tls_certificates": schema.ListNestedAttribute{
 				Description: "TLS certificate configurations for the load balancer.",
 				Optional:    true,
+				Validators: []validator.List{
+					TLSCertificatesValidator{},
+				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
 				},
