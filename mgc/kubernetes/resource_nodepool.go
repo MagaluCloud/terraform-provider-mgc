@@ -147,6 +147,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"max_pods_per_node": schema.Int64Attribute{
 				Description: "Maximum number of pods per node.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
