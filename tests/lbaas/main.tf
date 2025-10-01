@@ -18,12 +18,12 @@ resource "mgc_lbaas_network" "basic_http_lb" {
   vpc_id      = local.vpc_id
 
   tls_certificates = [
-    {
-      name        = "web-ssl-cert"
-      description = "SSL certificate for web application"
-      certificate = base64encode(file("${path.module}/certs/api_certificate.pem"))
-      private_key = base64encode(file("${path.module}/certs/api_private_key.pem"))
-    }
+    # {
+    #   name        = "web-ssl-cert"
+    #   description = "SSL certificate for web application"
+    #   certificate = base64encode(file("${path.module}/certs/api_certificate.pem"))
+    #   private_key = base64encode(file("${path.module}/certs/api_private_key.pem"))
+    # }
   ]
 
   health_checks = [
