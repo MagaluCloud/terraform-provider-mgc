@@ -2,12 +2,15 @@ package containerregistry
 
 import (
 	"context"
-
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"regexp"
 
 	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -34,7 +37,8 @@ type crRegistries struct {
 }
 
 type crRegistriesList struct {
-	Registries []crRegistries `tfsdk:"registries"`
+	Registries []crRegistries    `tfsdk:"registries"`
+	Options    utils.ListOptions `tfsdk:"options"`
 }
 
 func (r *DataSourceCRRegistries) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -83,6 +87,39 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 					},
 				},
 			},
+			"options": schema.SingleNestedAttribute{
+				Description: "Options for listing registries",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"limit": schema.Int64Attribute{
+						Description: "Maximum number of registries to return",
+						Validators: []validator.Int64{
+							int64validator.AtLeast(1),
+						},
+						Optional: true,
+					},
+					"offset": schema.Int64Attribute{
+						Description: "Number of registries to skip before starting to collect the result set",
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+						Optional: true,
+					},
+					"sort": schema.StringAttribute{
+						Description: "Field by which to sort the registries",
+						Validators: []validator.String{
+							stringvalidator.RegexMatches(regexp.MustCompile(`(^[\w-]+:(asc|desc)(,[\w-]+:(asc|desc))*)?$`), "Must be in the format 'field:direction', e.g., 'created_at:asc'"),
+						},
+						Optional: true,
+					},
+					// NOTE: OpenAPI spect doesn't define "expand", but structure from SDK does; what to do?
+					"expand": schema.ListAttribute{
+						Description: "List of related resources to expand in the response",
+						Optional:    true,
+						ElementType: types.StringType,
+					},
+				},
+			},
 		},
 	}
 }
@@ -95,7 +132,15 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	sdkOutputList, err := r.crRegistries.List(ctx, crSDK.ListOptions{ /*TODO: Add options*/ })
+	opts := crSDK.ListOptions{}
+
+	diag := utils.ConvertListOptions(data.Options, &opts)
+	if diag.HasError() {
+		resp.Diagnostics.Append(diag...)
+		return
+	}
+
+	sdkOutputList, err := r.crRegistries.List(ctx, opts)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
