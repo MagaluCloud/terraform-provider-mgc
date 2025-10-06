@@ -2,15 +2,11 @@ package containerregistry
 
 import (
 	"context"
-	"regexp"
 
 	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -37,8 +33,7 @@ type crRegistries struct {
 }
 
 type crRegistriesList struct {
-	Registries []crRegistries    `tfsdk:"registries"`
-	Options    utils.ListOptions `tfsdk:"options"`
+	Registries []crRegistries `tfsdk:"registries"`
 }
 
 func (r *DataSourceCRRegistries) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -87,41 +82,29 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 					},
 				},
 			},
-			"options": schema.SingleNestedAttribute{
-				Description: "Options for listing registries",
-				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"limit": schema.Int64Attribute{
-						Description: "Maximum number of registries to return",
-						Validators: []validator.Int64{
-							int64validator.AtLeast(1),
-						},
-						Optional: true,
-					},
-					"offset": schema.Int64Attribute{
-						Description: "Number of registries to skip before starting to collect the result set",
-						Validators: []validator.Int64{
-							int64validator.AtLeast(0),
-						},
-						Optional: true,
-					},
-					"sort": schema.StringAttribute{
-						Description: "Field by which to sort the registries",
-						Validators: []validator.String{
-							stringvalidator.RegexMatches(regexp.MustCompile(`(^[\w-]+:(asc|desc)(,[\w-]+:(asc|desc))*)?$`), "Must be in the format 'field:direction', e.g., 'created_at:asc'"),
-						},
-						Optional: true,
-					},
-					// NOTE: OpenAPI spect doesn't define "expand", but structure from SDK does; what to do?
-					"expand": schema.ListAttribute{
-						Description: "List of related resources to expand in the response",
-						Optional:    true,
-						ElementType: types.StringType,
-					},
-				},
-			},
 		},
 	}
+}
+
+// getAllRegistries is a helper function to retrieve all registries using listing options.
+func (r *DataSourceCRRegistries) getAllRegistries(ctx context.Context, params crSDK.ListOptions) ([]crSDK.RegistryResponse, error) {
+	var allRegistries []crSDK.RegistryResponse
+
+	for {
+		response, err := r.crRegistries.List(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+
+		registries := response.Registries
+
+		allRegistries = append(allRegistries, registries...)
+		if len(registries) == 0 {
+			break
+		}
+		*params.Offset = *params.Offset + len(registries)
+	}
+	return allRegistries, nil
 }
 
 func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -132,28 +115,29 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	opts := crSDK.ListOptions{}
-
-	diag := utils.ConvertListOptions(data.Options, &opts)
-	if diag.HasError() {
-		resp.Diagnostics.Append(diag...)
-		return
+	params := crSDK.ListOptions{
+		Limit:  new(int),
+		Offset: new(int),
 	}
+	// NOTE: Default value for each call on the API.
+	*params.Limit = 25
 
-	sdkOutputList, err := r.crRegistries.List(ctx, opts)
+	// NOTE: We are getting all registries because we don't want to expose API details to the user with API pagination
+	// details, letting them filter/sort the results using Terraform's built-in tools, turning the user flow simpler.
+	registries, err := r.getAllRegistries(ctx, params)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Registries {
+	for _, registry := range registries {
 
 		var item crRegistries
 
-		item.ID = types.StringValue(sdkOutput.ID)
-		item.Name = types.StringValue(sdkOutput.Name)
-		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
+		item.ID = types.StringValue(registry.ID)
+		item.Name = types.StringValue(registry.Name)
+		item.UpdatedAt = types.StringValue(registry.UpdatedAt)
+		item.CreatedAt = types.StringValue(registry.CreatedAt)
 
 		data.Registries = append(data.Registries, item)
 	}
