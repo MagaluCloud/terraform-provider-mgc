@@ -149,8 +149,8 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 	data.LoadBalancers = make([]lbNetworkItemModel, 0, len(sdkList))
 	for _, sdkLB := range sdkList {
 		var publicIPID types.String
-		if len(sdkLB.PublicIPs) == 1 {
-			publicIPID = types.StringValue(sdkLB.PublicIPs[0].ID)
+		if sdkLB.PublicIP != nil {
+			publicIPID = types.StringValue(sdkLB.PublicIP.ExternalID)
 		} else {
 			publicIPID = types.StringNull()
 		}

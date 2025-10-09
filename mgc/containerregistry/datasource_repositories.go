@@ -99,15 +99,14 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	sdkOutputList, err := r.crRepositories.List(ctx, data.RegistryID.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
+	sdkOutputList, err := r.getAllRepositories(ctx, data.RegistryID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Results {
+	for _, sdkOutput := range sdkOutputList {
 		var item crRepository
-
 		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
 		item.ImageCount = types.Int64Value(int64(sdkOutput.ImageCount))
 		item.RegistryName = types.StringValue(sdkOutput.RegistryName)
@@ -118,4 +117,25 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *DataSourceCRRepositories) getAllRepositories(ctx context.Context, registryID string) ([]crSDK.RepositoryResponse, error) {
+	params := crSDK.ListOptions{
+		Limit:  &listLimit,
+		Offset: new(int),
+	}
+
+	var allRegistries []crSDK.RepositoryResponse
+	for {
+		response, err := r.crRepositories.List(ctx, registryID, params)
+		if err != nil {
+			return nil, err
+		}
+
+		allRegistries = append(allRegistries, response.Results...)
+		if len(allRegistries) == response.Meta.Page.Total {
+			return allRegistries, nil
+		}
+		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
+	}
 }

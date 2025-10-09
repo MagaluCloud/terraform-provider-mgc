@@ -3,15 +3,15 @@ package containerregistry
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-
 	crSDK "github.com/MagaluCloud/mgc-sdk-go/containerregistry"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var _ datasource.DataSource = &DataSourceCRRegistries{}
+var listLimit = 50
 
 type DataSourceCRRegistries struct {
 	crRegistries crSDK.RegistriesService
@@ -87,6 +87,27 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 	}
 }
 
+func (r *DataSourceCRRegistries) getAllRegistries(ctx context.Context) ([]crSDK.RegistryResponse, error) {
+	params := crSDK.ListOptions{
+		Limit:  &listLimit,
+		Offset: new(int),
+	}
+
+	var allRegistries []crSDK.RegistryResponse
+	for {
+		response, err := r.crRegistries.List(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+
+		allRegistries = append(allRegistries, response.Registries...)
+		if len(allRegistries) == response.Meta.Page.Total {
+			return allRegistries, nil
+		}
+		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
+	}
+}
+
 func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data crRegistriesList
 
@@ -95,20 +116,20 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	sdkOutputList, err := r.crRegistries.List(ctx, crSDK.ListOptions{ /*TODO: Add options*/ })
+	registries, err := r.getAllRegistries(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Registries {
+	for _, registry := range registries {
 
 		var item crRegistries
 
-		item.ID = types.StringValue(sdkOutput.ID)
-		item.Name = types.StringValue(sdkOutput.Name)
-		item.UpdatedAt = types.StringValue(sdkOutput.UpdatedAt)
-		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
+		item.ID = types.StringValue(registry.ID)
+		item.Name = types.StringValue(registry.Name)
+		item.UpdatedAt = types.StringValue(registry.UpdatedAt)
+		item.CreatedAt = types.StringValue(registry.CreatedAt)
 
 		data.Registries = append(data.Registries, item)
 	}

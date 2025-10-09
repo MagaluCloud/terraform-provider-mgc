@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/MagaluCloud/magalu/mgc/lib v0.33.3
 	github.com/MagaluCloud/magalu/mgc/sdk v0.33.3
-	github.com/MagaluCloud/mgc-sdk-go v0.4.0
+	github.com/MagaluCloud/mgc-sdk-go v0.4.3
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
 	github.com/hashicorp/terraform-plugin-go v0.27.0
