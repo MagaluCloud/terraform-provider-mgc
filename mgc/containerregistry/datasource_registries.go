@@ -11,6 +11,7 @@ import (
 )
 
 var _ datasource.DataSource = &DataSourceCRRegistries{}
+var listLimit = 50
 
 type DataSourceCRRegistries struct {
 	crRegistries crSDK.RegistriesService
@@ -86,25 +87,25 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 	}
 }
 
-// getAllRegistries is a helper function to retrieve all registries using listing options.
-func (r *DataSourceCRRegistries) getAllRegistries(ctx context.Context, params crSDK.ListOptions) ([]crSDK.RegistryResponse, error) {
-	var allRegistries []crSDK.RegistryResponse
+func (r *DataSourceCRRegistries) getAllRegistries(ctx context.Context) ([]crSDK.RegistryResponse, error) {
+	params := crSDK.ListOptions{
+		Limit:  &listLimit,
+		Offset: new(int),
+	}
 
+	var allRegistries []crSDK.RegistryResponse
 	for {
 		response, err := r.crRegistries.List(ctx, params)
 		if err != nil {
 			return nil, err
 		}
 
-		registries := response.Registries
-
-		allRegistries = append(allRegistries, registries...)
-		if len(registries) == 0 {
-			break
+		allRegistries = append(allRegistries, response.Registries...)
+		if len(allRegistries) == response.Meta.Page.Total {
+			return allRegistries, nil
 		}
-		*params.Offset = *params.Offset + len(registries)
+		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
 	}
-	return allRegistries, nil
 }
 
 func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -115,16 +116,7 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	params := crSDK.ListOptions{
-		Limit:  new(int),
-		Offset: new(int),
-	}
-	// NOTE: Default value for each call on the API.
-	*params.Limit = 25
-
-	// NOTE: We are getting all registries because we don't want to expose API details to the user with API pagination
-	// details, letting them filter/sort the results using Terraform's built-in tools, turning the user flow simpler.
-	registries, err := r.getAllRegistries(ctx, params)
+	registries, err := r.getAllRegistries(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

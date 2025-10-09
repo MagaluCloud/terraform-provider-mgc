@@ -742,9 +742,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 				Visibility:   lbSDK.LoadBalancerVisibility("PUBLIC"),
 				VPCID:        "vpc-123",
 				SubnetPoolID: stringPtr("subnet-pool-123"),
-				PublicIPs: []lbSDK.NetworkPublicIPResponse{
-					{ExternalID: "public-ip-123"},
-				},
+				PublicIP:     &lbSDK.NetworkPublicIPResponse{ExternalID: "public-ip-123"},
 				HealthChecks: []lbSDK.NetworkHealthCheckResponse{
 					{
 						ID:                      "hc-123",
@@ -899,7 +897,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 				Backends:        []lbSDK.NetworkBackendResponse{},
 				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
 				Listeners:       []lbSDK.NetworkListenerResponse{},
-				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+				PublicIP:        &lbSDK.NetworkPublicIPResponse{},
 			},
 			expected: LoadBalancerModel{
 				ID:              types.StringValue("lb-456"),
@@ -910,40 +908,6 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 				Type:            types.StringValue("NETWORK"),
 				Visibility:      types.StringValue("PRIVATE"),
 				VPCID:           types.StringValue("vpc-456"),
-				ACLs:            &[]ACLModel{},
-				Backends:        []BackendModel{},
-				HealthChecks:    &[]HealthCheckModel{},
-				Listeners:       []ListenerModel{},
-				TLSCertificates: &[]TLSCertificateModel{},
-			},
-		},
-		{
-			name: "load balancer with multiple public IPs",
-			input: lbSDK.NetworkLoadBalancerResponse{
-				ID:         "lb-multi-ip",
-				Name:       "multi-ip-lb",
-				Type:       "APPLICATION",
-				Visibility: lbSDK.LoadBalancerVisibility("PUBLIC"),
-				VPCID:      "vpc-multi",
-				PublicIPs: []lbSDK.NetworkPublicIPResponse{
-					{ID: "ip-1"},
-					{ID: "ip-2"},
-				},
-				HealthChecks:    []lbSDK.NetworkHealthCheckResponse{},
-				ACLs:            []lbSDK.NetworkAclResponse{},
-				Backends:        []lbSDK.NetworkBackendResponse{},
-				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
-				Listeners:       []lbSDK.NetworkListenerResponse{},
-			},
-			expected: LoadBalancerModel{
-				ID:              types.StringValue("lb-multi-ip"),
-				Name:            types.StringValue("multi-ip-lb"),
-				Description:     types.StringNull(),
-				PublicIPID:      types.StringNull(), // Should be null when multiple IPs
-				SubnetpoolID:    types.StringNull(),
-				Type:            types.StringValue("APPLICATION"),
-				Visibility:      types.StringValue("PUBLIC"),
-				VPCID:           types.StringValue("vpc-multi"),
 				ACLs:            &[]ACLModel{},
 				Backends:        []BackendModel{},
 				HealthChecks:    &[]HealthCheckModel{},
@@ -1301,7 +1265,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource_EdgeCases(t *testing.T) {
 				Backends:        []lbSDK.NetworkBackendResponse{},
 				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
 				Listeners:       []lbSDK.NetworkListenerResponse{},
-				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+				PublicIP:        &lbSDK.NetworkPublicIPResponse{},
 			},
 			expected: LoadBalancerModel{
 				ID:              types.StringValue(""),
@@ -1342,7 +1306,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource_EdgeCases(t *testing.T) {
 				ACLs:            []lbSDK.NetworkAclResponse{},
 				TLSCertificates: []lbSDK.NetworkTLSCertificateResponse{},
 				Listeners:       []lbSDK.NetworkListenerResponse{},
-				PublicIPs:       []lbSDK.NetworkPublicIPResponse{},
+				PublicIP:        &lbSDK.NetworkPublicIPResponse{},
 			},
 			expected: LoadBalancerModel{
 				ID:           types.StringValue("lb-no-hc"),
