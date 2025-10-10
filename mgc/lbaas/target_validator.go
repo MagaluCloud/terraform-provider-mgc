@@ -20,17 +20,22 @@ func (v TargetValidator) MarkdownDescription(ctx context.Context) string {
 
 func (v TargetValidator) ValidateSet(ctx context.Context, req validator.SetRequest, resp *validator.SetResponse) {
 	var targetsType types.String
+	if req.Config.Schema == nil {
+		return
+	}
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path.ParentPath().AtName("targets_type"), &targetsType)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	if targetsType.IsNull() || targetsType.IsUnknown() || targetsType.ValueString() == "" {
 		return
 	}
 
 	var targets []TargetModel
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, req.Path, &targets)...)
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	resp.Diagnostics.Append(req.ConfigValue.ElementsAs(ctx, &targets, true)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
