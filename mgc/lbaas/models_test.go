@@ -840,7 +840,7 @@ func TestLoadBalancerModel_ToTerraformNetworkResource(t *testing.T) {
 							{
 								Port:      types.Int64Value(8080),
 								NICID:     types.StringValue("nic-123"),
-								IPAddress: types.StringValue("192.168.1.10"),
+								IPAddress: types.StringNull(),
 							},
 						},
 					},
@@ -999,7 +999,7 @@ func TestLoadBalancerModel_ConvertACLsToSDK_EdgeCases(t *testing.T) {
 			name: "large slice of ACLs",
 			input: func() *[]ACLModel {
 				acls := make([]ACLModel, 100)
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					acls[i] = ACLModel{
 						Action:         types.StringValue("ALLOW"),
 						Name:           types.StringValue(fmt.Sprintf("acl-%d", i)),
@@ -1012,7 +1012,7 @@ func TestLoadBalancerModel_ConvertACLsToSDK_EdgeCases(t *testing.T) {
 			}(),
 			expected: func() []lbSDK.CreateNetworkACLRequest {
 				acls := make([]lbSDK.CreateNetworkACLRequest, 100)
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					acls[i] = lbSDK.CreateNetworkACLRequest{
 						Action:         lbSDK.AclActionType("ALLOW"),
 						Name:           stringPtr(fmt.Sprintf("acl-%d", i)),

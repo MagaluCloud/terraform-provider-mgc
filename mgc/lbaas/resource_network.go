@@ -793,7 +793,7 @@ func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID s
 				return nil, err
 			}
 			if lb.Status == lbSDK.LoadBalancerStatusFailed {
-				return nil, fmt.Errorf("load balancer %s is in error state", lbID)
+				return nil, fmt.Errorf("load balancer %s is in error state. %s", lbID, *lb.LastOperationStatus)
 			}
 			if lb.Status == desiredState {
 				return &lb, nil
