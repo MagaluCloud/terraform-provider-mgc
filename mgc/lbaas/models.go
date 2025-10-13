@@ -3,6 +3,7 @@ package lbaas
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -225,11 +226,20 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 		backendIDsNames[backend.ID] = backend.Name
 		var targets []TargetModel
 		for _, target := range backend.Targets {
-			targets = append(targets, TargetModel{
-				Port:      types.Int64PointerValue(target.Port),
-				NICID:     types.StringPointerValue(target.NicID),
-				IPAddress: types.StringPointerValue(target.IPAddress),
-			})
+
+			targetModel := TargetModel{
+				Port: types.Int64PointerValue(target.Port),
+			}
+
+			if strings.EqualFold(string(backend.TargetsType), "instance") {
+				targetModel.NICID = types.StringPointerValue(target.NicID)
+				targetModel.IPAddress = types.StringNull()
+			} else {
+				targetModel.IPAddress = types.StringPointerValue(target.IPAddress)
+				targetModel.NICID = types.StringNull()
+			}
+
+			targets = append(targets, targetModel)
 		}
 
 		var healthCheckName *string

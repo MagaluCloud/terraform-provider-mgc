@@ -48,14 +48,14 @@ func (v TargetValidator) ValidateSet(ctx context.Context, req validator.SetReque
 		switch targetsTypeValue {
 		case "raw":
 			// For raw type: ip_address and port are required, nic_id must be empty
-			if target.IPAddress.IsNull() || target.IPAddress.IsUnknown() || target.IPAddress.ValueString() == "" {
+			if !target.IPAddress.IsUnknown() && (target.IPAddress.IsNull() || target.IPAddress.ValueString() == "") {
 				resp.Diagnostics.AddAttributeError(
 					targetPath.AtName("ip_address"),
 					"Missing Required Attribute",
 					"ip_address is required when targets_type is 'raw'",
 				)
 			}
-			if !target.NICID.IsNull() && !target.NICID.IsUnknown() && target.NICID.ValueString() != "" {
+			if !target.NICID.IsUnknown() && !target.NICID.IsNull() && target.NICID.ValueString() != "" {
 				resp.Diagnostics.AddAttributeError(
 					targetPath.AtName("nic_id"),
 					"Invalid Attribute",
@@ -64,14 +64,14 @@ func (v TargetValidator) ValidateSet(ctx context.Context, req validator.SetReque
 			}
 		case "instance":
 			// For instance type: nic_id and port are required, ip_address must be empty
-			if target.NICID.IsNull() || target.NICID.IsUnknown() || target.NICID.ValueString() == "" {
+			if !target.NICID.IsUnknown() && (target.NICID.IsNull() || target.NICID.ValueString() == "") {
 				resp.Diagnostics.AddAttributeError(
 					targetPath.AtName("nic_id"),
 					"Missing Required Attribute",
 					"nic_id is required when targets_type is 'instance'",
 				)
 			}
-			if !target.IPAddress.IsNull() && !target.IPAddress.IsUnknown() && target.IPAddress.ValueString() != "" {
+			if !target.IPAddress.IsUnknown() && !target.IPAddress.IsNull() && target.IPAddress.ValueString() != "" {
 				resp.Diagnostics.AddAttributeError(
 					targetPath.AtName("ip_address"),
 					"Invalid Attribute",
@@ -97,13 +97,16 @@ func validateTLSCertNameForProtocol(protocol types.String, val types.String) (st
 	if protocol.IsNull() || protocol.IsUnknown() || protocol.ValueString() == "" {
 		return "", "", false
 	}
+	if val.IsUnknown() {
+		return "", "", false
+	}
 	switch protocol.ValueString() {
 	case "tcp":
-		if !val.IsNull() && !val.IsUnknown() && val.ValueString() != "" {
+		if !val.IsNull() && val.ValueString() != "" {
 			return "Value error", "tls_certificate_name should not be provided when protocol is 'tcp'", true
 		}
 	case "tls":
-		if val.IsNull() || val.IsUnknown() || val.ValueString() == "" {
+		if val.IsNull() || val.ValueString() == "" {
 			return "Missing Required Attribute", "tls_certificate_name must be provided when protocol is 'tls'", true
 		}
 	}
