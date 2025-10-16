@@ -140,7 +140,7 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	sdkList, err := r.lbNetworkLB.List(ctx, lbSDK.ListNetworkLoadBalancerRequest{})
+	sdkList, err := r.lbNetworkLB.ListAll(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

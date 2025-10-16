@@ -120,7 +120,7 @@ func (r *DataSourceBsVolumes) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	sdkOutputList, err := r.bsVolumes.List(ctx, bsSDK.ListOptions{ /*TODO: Add options*/ })
+	sdkOutputList, err := r.bsVolumes.ListAll(ctx, []bsSDK.VolumeExpand{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

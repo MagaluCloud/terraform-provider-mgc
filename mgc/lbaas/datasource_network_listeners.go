@@ -97,7 +97,7 @@ func (r *DataSourceLbaasNetworkListeners) Read(ctx context.Context, req datasour
 		return
 	}
 
-	lb, err := r.lbNetworkListener.List(ctx, lbID.ValueString(), lbSDK.ListNetworkLoadBalancerRequest{})
+	lb, err := r.lbNetworkListener.ListAll(ctx, lbID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

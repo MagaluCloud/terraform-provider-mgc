@@ -119,7 +119,7 @@ func (r *DataSourceLbaasNetworkHealthChecks) Read(ctx context.Context, req datas
 		return
 	}
 
-	lb, err := r.lbNetworkHeathCheck.List(ctx, lbID.ValueString(), lbSDK.ListNetworkLoadBalancerRequest{})
+	lb, err := r.lbNetworkHeathCheck.ListAll(ctx, lbID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
