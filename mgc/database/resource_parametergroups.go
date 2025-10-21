@@ -100,7 +100,7 @@ func (r *DBaaSParameterGroupsResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.List, data.EngineName.ValueString(), data.EngineVersion.ValueString())
+	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.ListAll, data.EngineName.ValueString(), data.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engine name", err.Error())
 		return

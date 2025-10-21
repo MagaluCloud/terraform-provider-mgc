@@ -8,13 +8,13 @@ import (
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 )
 
-type ListEngineFunc func(ctx context.Context, opts dbSDK.ListEngineOptions) ([]dbSDK.EngineDetail, error)
-type ListInstanceTypeFunc func(ctx context.Context, opts dbSDK.ListInstanceTypeOptions) ([]dbSDK.InstanceType, error)
+type ListEngineFunc func(ctx context.Context, filterOpts dbSDK.EngineFilterOptions) ([]dbSDK.EngineDetail, error)
+type ListInstanceTypeFunc func(ctx context.Context, filterOpts dbSDK.InstanceTypeFilterOptions) ([]dbSDK.InstanceType, error)
 type GetEngineFunc func(ctx context.Context, id string) (*dbSDK.EngineDetail, error)
 type GetInstanceTypeFunc func(ctx context.Context, id string) (*dbSDK.InstanceType, error)
 
 func ValidateAndGetEngineID(ctx context.Context, listEngineFunc ListEngineFunc, engineName string, engineVersion string) (string, error) {
-	engines, err := listEngineFunc(ctx, dbSDK.ListEngineOptions{})
+	engines, err := listEngineFunc(ctx, dbSDK.EngineFilterOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -28,9 +28,7 @@ func ValidateAndGetEngineID(ctx context.Context, listEngineFunc ListEngineFunc, 
 
 func ValidateAndGetInstanceTypeID(ctx context.Context, listInstanceTypeFunc ListInstanceTypeFunc, instanceType string, engineID string, compatibleProduct string) (string, error) {
 	active := "ACTIVE"
-	maxLimit := 50
-	instanceTypes, err := listInstanceTypeFunc(ctx, dbSDK.ListInstanceTypeOptions{
-		Limit:    &maxLimit,
+	instanceTypes, err := listInstanceTypeFunc(ctx, dbSDK.InstanceTypeFilterOptions{
 		Status:   &active,
 		EngineID: &engineID,
 	})

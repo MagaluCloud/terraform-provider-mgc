@@ -97,10 +97,8 @@ func (r *DataSourceDbEngines) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	limit := 50
-	engines, err := r.dbaasEngines.List(ctx, dbSDK.ListEngineOptions{
+	engines, err := r.dbaasEngines.ListAll(ctx, dbSDK.EngineFilterOptions{
 		Status: data.Status.ValueStringPointer(),
-		Limit:  &limit,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("failed to list db engines", err.Error())

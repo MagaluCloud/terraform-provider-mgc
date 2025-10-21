@@ -104,7 +104,7 @@ func (r *DataSourceVmImages) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	sdkOutput, err := r.vmImageService.List(ctx, vmSDK.ImageListOptions{})
+	sdkOutput, err := r.vmImageService.ListAll(ctx, vmSDK.ImageFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

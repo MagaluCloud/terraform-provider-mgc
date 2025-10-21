@@ -300,7 +300,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 		var instanceTypeID string
 		if data.InstanceType.ValueString() != "" {
-			instanceTypeID, err = ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List,
+			instanceTypeID, err = ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll,
 				data.InstanceType.ValueString(), getInstance.EngineID, dbaasInstanceProductFamily)
 			if err != nil {
 				resp.Diagnostics.AddError("Invalid instance type", err.Error())
@@ -347,13 +347,13 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.List, data.EngineName.ValueString(), data.EngineVersion.ValueString())
+	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.ListAll, data.EngineName.ValueString(), data.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid engine name", err.Error())
 		return
 	}
 
-	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, data.InstanceType.ValueString(), engineID, dbaasInstanceProductFamily)
+	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, data.InstanceType.ValueString(), engineID, dbaasInstanceProductFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid instance type", err.Error())
 		return
@@ -454,7 +454,7 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 
 	if planData.InstanceType.ValueString() != stateData.InstanceType.ValueString() {
 		instanceTypeID, err := ValidateAndGetInstanceTypeID(
-			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasInstanceProductFamily,
+			ctx, r.dbaasInstanceTypes.ListAll, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasInstanceProductFamily,
 		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))

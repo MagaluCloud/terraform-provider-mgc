@@ -99,7 +99,7 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	sdkOutputList, err := r.getAllRepositories(ctx, data.RegistryID.ValueString())
+	sdkOutputList, err := r.crRepositories.ListAll(ctx, data.RegistryID.ValueString(), crSDK.RepositoryFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -117,25 +117,4 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *DataSourceCRRepositories) getAllRepositories(ctx context.Context, registryID string) ([]crSDK.RepositoryResponse, error) {
-	params := crSDK.ListOptions{
-		Limit:  &listLimit,
-		Offset: new(int),
-	}
-
-	var allRegistries []crSDK.RepositoryResponse
-	for {
-		response, err := r.crRepositories.List(ctx, registryID, params)
-		if err != nil {
-			return nil, err
-		}
-
-		allRegistries = append(allRegistries, response.Results...)
-		if len(allRegistries) == response.Meta.Page.Total {
-			return allRegistries, nil
-		}
-		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
-	}
 }

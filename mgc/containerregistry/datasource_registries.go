@@ -87,27 +87,6 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 	}
 }
 
-func (r *DataSourceCRRegistries) getAllRegistries(ctx context.Context) ([]crSDK.RegistryResponse, error) {
-	params := crSDK.ListOptions{
-		Limit:  &listLimit,
-		Offset: new(int),
-	}
-
-	var allRegistries []crSDK.RegistryResponse
-	for {
-		response, err := r.crRegistries.List(ctx, params)
-		if err != nil {
-			return nil, err
-		}
-
-		allRegistries = append(allRegistries, response.Registries...)
-		if len(allRegistries) == response.Meta.Page.Total {
-			return allRegistries, nil
-		}
-		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
-	}
-}
-
 func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data crRegistriesList
 
@@ -116,7 +95,7 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	registries, err := r.getAllRegistries(ctx)
+	registries, err := r.crRegistries.ListAll(ctx, crSDK.RegistryFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

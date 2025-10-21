@@ -116,7 +116,7 @@ func (r *DataSourceVmSnapshots) Read(ctx context.Context, req datasource.ReadReq
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	snapList, err := r.vmSnapshot.List(ctx, vmSDK.ListOptions{})
+	snapList, err := r.vmSnapshot.ListAll(ctx, vmSDK.SnapshotFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

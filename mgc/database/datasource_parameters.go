@@ -84,7 +84,7 @@ func (r *DataSourceDbParametersList) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	list, err := r.dbaasParameters.List(ctx, dbSDK.ListParametersOptions{
+	list, err := r.dbaasParameters.ListAll(ctx, dbSDK.ParameterFilterOptions{
 		ParameterGroupID: data.ParameterGroupID.ValueString(),
 	})
 	if err != nil {

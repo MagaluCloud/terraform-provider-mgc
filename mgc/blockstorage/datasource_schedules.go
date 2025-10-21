@@ -67,7 +67,9 @@ func (r *DataSourceBsSchedules) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	schedulesResponse, err := r.bsScheduler.ListAll(ctx, []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
+	schedulesResponse, err := r.bsScheduler.ListAll(ctx, storageSDK.SchedulerFilterOptions{
+		Expand: []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume},
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

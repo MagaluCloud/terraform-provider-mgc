@@ -106,7 +106,7 @@ func (r *DBaaSParameterResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	all, err := r.dbaasParameters.List(ctx, dbSDK.ListParametersOptions{
+	all, err := r.dbaasParameters.ListAll(ctx, dbSDK.ParameterFilterOptions{
 		ParameterGroupID: data.ParameterGroupID.ValueString(),
 	})
 	if err != nil {

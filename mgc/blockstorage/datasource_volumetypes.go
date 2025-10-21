@@ -102,7 +102,7 @@ func (r *DataSourceBsVolumeTypes) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	sdkOutput, err := r.bsVolumeTypes.ListAll(ctx)
+	sdkOutput, err := r.bsVolumeTypes.ListAll(ctx, bsSDK.VolumeTypeFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
