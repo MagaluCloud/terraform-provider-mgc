@@ -100,9 +100,6 @@ If not specified, the default security group of the VPC will be used.
 For manage security groups after the instance creation, use the network resources.
 Find out more in the documentation guides.
 This attribute can only be used when "network_interface_id" is not set.
-- `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
-If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
-Read the documentation guides for more details.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
 - `user_data` (String) User data for instance initialization.
 - `vpc_id` (String) The VPC ID where the primary network interface will be created.
@@ -114,6 +111,9 @@ Read the documentation guides for more details.
 - `ipv4` (String) The primary network interface public IPv4 address of the virtual machine instance.
 - `ipv6` (String) The primary network interface IPv6 address of the virtual machine instance.
 - `local_ipv4` (String) The primary network interface IPv4 address of the virtual machine instance.
+- `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
+If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
+Read the documentation guides for more details.
 - `network_interfaces` (Attributes List) The network interfaces attached to the virtual machine instance. (see [below for nested schema](#nestedatt--network_interfaces))
 
 <a id="nestedatt--network_interfaces"></a>
