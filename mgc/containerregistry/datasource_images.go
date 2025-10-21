@@ -106,7 +106,7 @@ func (r *DataSourceCRImages) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	sdkOutputList, err := r.getAllImages(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString())
+	sdkOutputList, err := r.crImages.ListAll(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString(), crSDK.ImageFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -128,25 +128,4 @@ func (r *DataSourceCRImages) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *DataSourceCRImages) getAllImages(ctx context.Context, registryID, registryName string) ([]crSDK.ImageResponse, error) {
-	params := crSDK.ListOptions{
-		Limit:  &listLimit,
-		Offset: new(int),
-	}
-
-	var allRegistries []crSDK.ImageResponse
-	for {
-		response, err := r.crImages.List(ctx, registryID, registryName, params)
-		if err != nil {
-			return nil, err
-		}
-
-		allRegistries = append(allRegistries, response.Results...)
-		if len(allRegistries) == response.Meta.Page.Total {
-			return allRegistries, nil
-		}
-		*params.Offset = response.Meta.Page.Offset + response.Meta.Page.Count
-	}
 }

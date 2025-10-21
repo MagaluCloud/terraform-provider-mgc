@@ -24,6 +24,14 @@ func (m *MockSchedulerService) List(ctx context.Context, opts storageSDK.Schedul
 	return args.Get(0).(*storageSDK.SchedulerListResponse), args.Error(1)
 }
 
+func (m *MockSchedulerService) ListAll(ctx context.Context, filter storageSDK.SchedulerFilterOptions) ([]storageSDK.SchedulerResponse, error) {
+	args := m.Called(ctx, filter)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]storageSDK.SchedulerResponse), args.Error(1)
+}
+
 func (m *MockSchedulerService) Create(ctx context.Context, req storageSDK.SchedulerPayload) (string, error) {
 	args := m.Called(ctx, req)
 	return args.String(0), args.Error(1)

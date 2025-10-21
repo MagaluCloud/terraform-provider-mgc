@@ -108,7 +108,7 @@ func (r *DataSourceVmInstances) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	instances, err := r.vmInstance.List(ctx, vmSDK.ListOptions{})
+	instances, err := r.vmInstance.ListAll(ctx, vmSDK.InstanceFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

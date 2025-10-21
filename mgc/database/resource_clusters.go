@@ -327,13 +327,13 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.List, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
+	engineID, err := ValidateAndGetEngineID(ctx, r.dbaasEngines.ListAll, plan.EngineName.ValueString(), plan.EngineVersion.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Engine", fmt.Sprintf("Failed to validate engine '%s' version '%s': %s", plan.EngineName.ValueString(), plan.EngineVersion.ValueString(), err.Error()))
 		return
 	}
 
-	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
+	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Instance Type", fmt.Sprintf("Failed to validate instance type '%s': %s", plan.InstanceType.ValueString(), err.Error()))
 		return

@@ -33,7 +33,7 @@ const (
 
 type InstanceStatus string
 
-var imageExpands []string = []string{computeSdk.InstanceImageExpand, computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
+var imageExpands []computeSdk.InstanceExpand = []computeSdk.InstanceExpand{computeSdk.InstanceImageExpand, computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
 
 var errorStatus = []InstanceStatus{
 	StatusCreatingError,

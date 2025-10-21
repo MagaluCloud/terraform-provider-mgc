@@ -87,7 +87,7 @@ func (r *DataSourceLbaasNetworkCertificates) Read(ctx context.Context, req datas
 		return
 	}
 
-	lb, err := r.lbNetworkTLS.List(ctx, lbID.ValueString(), lbSDK.ListNetworkLoadBalancerRequest{})
+	lb, err := r.lbNetworkTLS.ListAll(ctx, lbID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

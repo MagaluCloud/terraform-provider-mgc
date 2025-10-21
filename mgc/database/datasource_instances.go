@@ -154,23 +154,6 @@ func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaReq
 	}
 }
 
-func (r *DataSourceDbInstances) getAllInstances(ctx context.Context, params dbSDK.ListInstanceOptions) ([]dbSDK.InstanceDetail, error) {
-	var allResults []dbSDK.InstanceDetail
-	params.Offset = new(int)
-	for {
-		instances, err := r.dbaasInstances.List(ctx, params)
-		if err != nil {
-			return nil, err
-		}
-		allResults = append(allResults, instances...)
-		if len(instances) == 0 {
-			break
-		}
-		*params.Offset = *params.Offset + len(instances)
-	}
-	return allResults, nil
-}
-
 func (r *DataSourceDbInstances) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	data := dbInstanceModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -178,16 +161,13 @@ func (r *DataSourceDbInstances) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	params := dbSDK.ListInstanceOptions{
-		Limit: new(int),
-	}
+	params := dbSDK.InstanceFilterOptions{}
 	if data.Status.ValueString() != "" {
 		status := dbSDK.InstanceStatus(data.Status.ValueString())
 		params.Status = &status
 	}
 
-	*params.Limit = 25
-	instances, err := r.getAllInstances(ctx, params)
+	instances, err := r.dbaasInstances.ListAll(ctx, params)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

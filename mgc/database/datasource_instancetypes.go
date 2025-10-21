@@ -102,10 +102,8 @@ func (r *DataSourceDbInstanceTypes) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	limit := 50
-	instanceTypes, err := r.dbaasInstanceTypes.List(ctx, dbSDK.ListInstanceTypeOptions{
+	instanceTypes, err := r.dbaasInstanceTypes.ListAll(ctx, dbSDK.InstanceTypeFilterOptions{
 		Status: data.Status.ValueStringPointer(),
-		Limit:  &limit,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
