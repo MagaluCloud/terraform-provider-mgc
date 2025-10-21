@@ -49,11 +49,11 @@ resource "mgc_network_vpcs_interfaces" "custom_interface" {
 }
 
 resource "mgc_virtual_machine_instances" "instance_with_custom_interface" {
-  name         = "tc4-instance-with-custom-interface-hc"
-  machine_type = var.machine_type
-  image        = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name = mgc_ssh_keys.ssh_key.name
-  # network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
+  name                 = "tc4-instance-with-custom-interface-hc"
+  machine_type         = var.machine_type
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = mgc_ssh_keys.ssh_key.name
+  network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
 }
 
 resource "mgc_virtual_machine_instances" "instance_with_pip" {

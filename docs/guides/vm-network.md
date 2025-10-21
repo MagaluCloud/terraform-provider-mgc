@@ -29,11 +29,11 @@ Every VM in Magalu Cloud automatically comes with a primary network interface. H
 
 ```terraform
 resource "mgc_virtual_machine_instances" "my_vm" {
-  name                  = "my-vm"
-  machine_type          = "BV1-1-40"
-  image                 = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name          = "your-ssh-key-name"
-  allocate_public_ipv4  = true
+  name                 = "my-vm"
+  machine_type         = "BV1-1-40"
+  image               = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name        = "your-ssh-key-name"
+  allocate_public_ipv4 = true
 }
 
 # Easy access to primary interface information
@@ -54,17 +54,68 @@ output "network_interface_id" {
 }
 ```
 
-## Method 1: Quick VM with Public IP
+## Method 1: Using an Existing Network Interface (Recommended)
+
+This method provides full control and management of your network resources. By creating and managing your own network interface, you have complete visibility and control over all network components.
+
+```terraform
+# Create VPC first
+resource "mgc_network_vpcs" "custom_vpc" {
+  name = "custom-vpc"
+}
+
+# Create a custom interface
+resource "mgc_network_vpcs_interfaces" "existing_interface" {
+  name   = "my-existing-interface"
+  vpc_id = mgc_network_vpcs.custom_vpc.id
+}
+
+# Attach a public IP to the interface (optional)
+resource "mgc_network_public_ips" "interface_public_ip" {
+  description = "Public IP for existing interface"
+  vpc_id      = mgc_network_vpcs.custom_vpc.id
+}
+
+resource "mgc_network_public_ips_attach" "attach_public_ip" {
+  public_ip_id = mgc_network_public_ips.interface_public_ip.id
+  interface_id = mgc_network_vpcs_interfaces.existing_interface.id
+}
+
+# Create VM using the existing interface
+# Note: Cannot use vpc_id when network_interface_id is specified
+resource "mgc_virtual_machine_instances" "vm_with_existing_interface" {
+  name                 = "vm-with-existing-interface"
+  machine_type         = "BV1-1-40"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
+  network_interface_id = mgc_network_vpcs_interfaces.existing_interface.id
+}
+
+# Access the interface information
+output "vm_interface_id" {
+  value = mgc_virtual_machine_instances.vm_with_existing_interface.network_interface_id
+}
+
+output "vm_public_ip" {
+  value = mgc_virtual_machine_instances.vm_with_existing_interface.ipv4
+}
+```
+
+This approach gives you full control over your network resources and allows you to manage them independently of the VM lifecycle.
+
+---
+
+## Method 2: Quick VM with Public IP
 
 The simplest way to create a VM with a public IP address is using the `allocate_public_ipv4` argument.
 
 ```terraform
 resource "mgc_virtual_machine_instances" "simple_vm" {
-  name                  = "simple-vm"
-  machine_type          = "BV1-1-40"
-  image                 = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name          = "your-ssh-key-name"
-  allocate_public_ipv4  = true
+  name                 = "simple-vm"
+  machine_type         = "BV1-1-40"
+  image               = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name        = "your-ssh-key-name"
+  allocate_public_ipv4 = true
 }
 
 # Access the public IP directly
@@ -81,7 +132,7 @@ That's it! Your VM now has a public IP address that you can access directly.
 
 ---
 
-## Method 2: VM with Custom Security Groups
+## Method 3: VM with Custom Security Groups
 
 Create a VM with custom security groups for the primary interface:
 
@@ -120,8 +171,8 @@ resource "mgc_network_security_groups_rules" "http_rule" {
 resource "mgc_virtual_machine_instances" "web_vm" {
   name                     = "web-vm"
   machine_type             = "BV1-1-40"
-  image                    = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name             = "your-ssh-key-name"
+  image                   = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name            = "your-ssh-key-name"
   creation_security_groups = [mgc_network_security_groups.web_sg.id]
   allocate_public_ipv4     = true
 }
@@ -134,7 +185,7 @@ output "web_vm_public_ip" {
 
 ---
 
-## Method 3: VM in Custom VPC
+## Method 4: VM in Custom VPC
 
 Create a VM in a specific VPC with custom networking:
 
@@ -163,12 +214,12 @@ resource "mgc_network_vpcs_subnets" "custom_subnet" {
 
 # Create VM in the custom VPC
 resource "mgc_virtual_machine_instances" "custom_vpc_vm" {
-  name                  = "custom-vpc-vm"
-  machine_type          = "BV1-1-40"
-  image                 = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name          = "your-ssh-key-name"
-  vpc_id                = mgc_network_vpcs.custom_vpc.id
-  allocate_public_ipv4  = true
+  name                 = "custom-vpc-vm"
+  machine_type         = "BV1-1-40"
+  image               = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name        = "your-ssh-key-name"
+  vpc_id              = mgc_network_vpcs.custom_vpc.id
+  allocate_public_ipv4 = true
 }
 
 # Access the network information
@@ -183,18 +234,18 @@ output "custom_vm_private_ip" {
 
 ---
 
-## Method 4: Adding Secondary Interfaces
+## Method 5: Adding Secondary Interfaces
 
 You can still add secondary interfaces to your VM for advanced networking:
 
 ```terraform
 # Create VM with primary interface
 resource "mgc_virtual_machine_instances" "multi_interface_vm" {
-  name                  = "multi-interface-vm"
-  machine_type          = "BV1-1-40"
-  image                 = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name          = "your-ssh-key-name"
-  allocate_public_ipv4  = true
+  name                 = "multi-interface-vm"
+  machine_type         = "BV1-1-40"
+  image               = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name        = "your-ssh-key-name"
+  allocate_public_ipv4 = true
 }
 
 # Create secondary interface
@@ -228,9 +279,17 @@ output "network_interface_id" {
 ## Important Notes:
 
 1. **Simplified Access**: Use the read-only attributes (`ipv4`, `local_ipv4`, `ipv6`) and the readable `network_interface_id` for easy access to primary interface information.
+
 2. **Write-Only Arguments**: The `creation_security_groups` and `allocate_public_ipv4` arguments are write-only. The `network_interface_id` is readable after creation.
-3. **Public IPv4 Billing**: When using `allocate_public_ipv4 = true`, remember that the public IP will persist after VM deletion and may incur charges.
-4. **Default VPC**: If you don't specify a `vpc_id`, the VM will be created in the default VPC.
-5. **Security Groups**: If you don't specify `creation_security_groups`, the default security group of the VPC will be used. For managing security groups after instance creation, use the network resources.
+
+3. **Mutually Exclusive Options**:
+   - When `network_interface_id` is specified, you cannot use `vpc_id`, `creation_security_groups`, or `allocate_public_ipv4`
+   - When using `creation_security_groups` or `allocate_public_ipv4`, you cannot specify `network_interface_id`
+
+4. **Public IPv4 Billing**: When using `allocate_public_ipv4 = true`, remember that the public IP will persist after VM deletion and may incur charges.
+
+5. **Default VPC**: If you don't specify a `vpc_id` or `network_interface_id`, the VM will be created in the default VPC.
+
+6. **Security Groups**: If you don't specify `creation_security_groups`, the default security group of the VPC will be used. For managing security groups after instance creation, use the network resources.
 
 This guide shows you the easiest ways to create VMs with public IPs in Magalu Cloud. The primary interface attributes make network configuration simple and intuitive!
