@@ -137,7 +137,7 @@ func (r *DataSourceDbReplicaList) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	list, err := r.dbaasReplicas.List(ctx, dbSDK.ListReplicaOptions{})
+	list, err := r.dbaasReplicas.ListAll(ctx, dbSDK.ReplicaFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

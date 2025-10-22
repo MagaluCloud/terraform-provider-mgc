@@ -45,6 +45,8 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 - `created_at` (String) Date of creation of the Kubernetes Node.
 - `id` (String) Node pool's UUID.
+- `labels` (Map of String) Map of labels for the node pool.
+- `security_groups` (Set of String) List of security groups for the node pool.
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
 
 <a id="nestedatt--taints"></a>

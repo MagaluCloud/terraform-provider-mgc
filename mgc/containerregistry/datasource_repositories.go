@@ -99,15 +99,14 @@ func (r *DataSourceCRRepositories) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	sdkOutputList, err := r.crRepositories.List(ctx, data.RegistryID.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
+	sdkOutputList, err := r.crRepositories.ListAll(ctx, data.RegistryID.ValueString(), crSDK.RepositoryFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Results {
+	for _, sdkOutput := range sdkOutputList {
 		var item crRepository
-
 		item.CreatedAt = types.StringValue(sdkOutput.CreatedAt)
 		item.ImageCount = types.Int64Value(int64(sdkOutput.ImageCount))
 		item.RegistryName = types.StringValue(sdkOutput.RegistryName)

@@ -24,9 +24,7 @@ type NodesResultFlat struct {
 	Flavor                         types.String  `tfsdk:"flavor"`
 	Name                           types.String  `tfsdk:"name"`
 	Namespace                      types.String  `tfsdk:"namespace"`
-	NodeImage                      types.String  `tfsdk:"node_image"`
 	NodepoolName                   types.String  `tfsdk:"nodepool_name"`
-	Zone                           types.String  `tfsdk:"zone"`
 	Addresses                      []AddressItem `tfsdk:"addresses"`
 	StatusMessage                  types.String  `tfsdk:"status_message"`
 	StatusState                    types.String  `tfsdk:"status_state"`
@@ -110,16 +108,8 @@ func (d *DataSourceKubernetesNode) Schema(ctx context.Context, req datasource.Sc
 							Description: "Namespace of the node.",
 							Computed:    true,
 						},
-						"node_image": schema.StringAttribute{
-							Description: "Image of the node.",
-							Computed:    true,
-						},
 						"nodepool_name": schema.StringAttribute{
 							Description: "Name of the nodepool.",
-							Computed:    true,
-						},
-						"zone": schema.StringAttribute{
-							Description: "Zone of the node.",
 							Computed:    true,
 						},
 						"addresses": schema.ListNestedAttribute{
@@ -283,7 +273,7 @@ func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.Read
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func convertToTerraformKubernetesCluster(original *sdkK8s.Node) *NodesResultFlat {
+func convertToTerraformKubernetesCluster(original *sdkK8s.NodeResponse) *NodesResultFlat {
 	if original == nil {
 		return nil
 	}
@@ -295,9 +285,7 @@ func convertToTerraformKubernetesCluster(original *sdkK8s.Node) *NodesResultFlat
 		Flavor:       types.StringValue(original.Flavor),
 		Name:         types.StringValue(original.Name),
 		Namespace:    types.StringValue(original.Namespace),
-		NodeImage:    types.StringValue(original.NodeImage),
 		NodepoolName: types.StringValue(original.NodepoolName),
-		Zone:         types.StringValue(stringPtrToString(original.Zone)),
 		Addresses:    convertAddresses(original.Addresses),
 		Taints:       convertTaints(*original.Taints),
 	}
@@ -336,7 +324,7 @@ func convertToTerraformKubernetesCluster(original *sdkK8s.Node) *NodesResultFlat
 
 // Helper functions
 
-func convertAddresses(addresses []sdkK8s.Addresses) []AddressItem {
+func convertAddresses(addresses []sdkK8s.NodeAddress) []AddressItem {
 	result := make([]AddressItem, len(addresses))
 	for i, addr := range addresses {
 		result[i] = AddressItem{

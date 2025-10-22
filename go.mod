@@ -1,13 +1,14 @@
 module github.com/MagaluCloud/terraform-provider-mgc
 
-go 1.24
+go 1.25.3
 
 require (
 	github.com/MagaluCloud/magalu/mgc/lib v0.33.3
 	github.com/MagaluCloud/magalu/mgc/sdk v0.33.3
-	github.com/MagaluCloud/mgc-sdk-go v0.3.52
+	github.com/MagaluCloud/mgc-sdk-go v0.5.0
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
+	github.com/hashicorp/terraform-plugin-go v0.27.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 )
 
@@ -19,7 +20,6 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/hashicorp/terraform-plugin-go v0.27.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/minio/crc64nvme v1.0.1 // indirect
@@ -28,6 +28,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 )
 

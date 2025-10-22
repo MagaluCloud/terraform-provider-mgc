@@ -86,7 +86,7 @@ func (ds *DBaaSClustersDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	listOpts := dbSDK.ListClustersOptions{}
+	listOpts := dbSDK.ClusterFilterOptions{}
 	if !config.Status.IsNull() && !config.Status.IsUnknown() {
 		sdkStatus := dbSDK.ClusterStatus(config.Status.ValueString())
 		listOpts.Status = &sdkStatus

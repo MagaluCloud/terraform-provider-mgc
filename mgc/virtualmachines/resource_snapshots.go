@@ -90,7 +90,7 @@ func (r *vmSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 }
 
 func (r *vmSnapshots) getVmSnapshot(ctx context.Context, id string) (*computeSdk.Snapshot, error) {
-	getResult, err := r.vmSnapshots.Get(ctx, id, []string{})
+	getResult, err := r.vmSnapshots.Get(ctx, id, []computeSdk.SnapshotExpand{})
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -103,6 +102,17 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					int64validator.AtLeast(0),
 				},
 			},
+
+			"labels": schema.MapAttribute{
+				Description: "Map of labels for the node pool.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"security_groups": schema.SetAttribute{
+				Description: "List of security groups for the node pool.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"max_replicas": schema.Int64Attribute{
 				Description: "Maximum number of replicas for autoscaling.",
 				Optional:    true,
@@ -140,7 +150,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
-					int64planmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
@@ -151,7 +160,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.RequiresReplace(),
+					utils.SetRequiresReplaceOnChange(),
 				},
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(stringvalidator.RegexMatches(azRegex, "The availability zone must be in the format 'country-region-availability', example 'br-se1-a'")),
@@ -229,18 +238,24 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		createParams.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
 	}
 
-	if data.AvailabilityZones != nil {
-		azList := convertStringArrayTFToSliceString(data.AvailabilityZones)
-		var azListConverted []string
-		for _, az := range *azList {
-			converted, err := utils.ConvertAvailabilityZoneToXZone(az)
-			if err != nil {
-				resp.Diagnostics.AddError("Error converting availability zone", err.Error())
-				return
-			}
-			azListConverted = append(azListConverted, converted)
+	if !data.AvailabilityZones.IsNull() && !data.AvailabilityZones.IsUnknown() {
+		azList, err := convertStringSetTFToSliceString(ctx, data.AvailabilityZones)
+		if err != nil {
+			resp.Diagnostics.AddError("Error converting availability zones", err.Error())
+			return
 		}
-		createParams.AvailabilityZones = &azListConverted
+		if azList != nil {
+			var azListConverted []string
+			for _, az := range *azList {
+				converted, err := utils.ConvertAvailabilityZoneToXZone(az)
+				if err != nil {
+					resp.Diagnostics.AddError("Error converting availability zone", err.Error())
+					return
+				}
+				azListConverted = append(azListConverted, converted)
+			}
+			createParams.AvailabilityZones = &azListConverted
+		}
 	}
 
 	nodepool, err := r.sdkNodepool.Create(ctx, data.ClusterID.ValueString(), createParams)
@@ -372,6 +387,28 @@ func convertStringArrayTFToSliceString(tags *[]types.String) *[]string {
 		tagsSlice[i] = tag.ValueString()
 	}
 	return &tagsSlice
+}
+
+func convertStringSetTFToSliceString(ctx context.Context, set types.Set) (*[]string, error) {
+	if set.IsNull() || set.IsUnknown() {
+		return nil, nil
+	}
+
+	var elements []types.String
+	diags := set.ElementsAs(ctx, &elements, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to convert set elements: %v", diags.Errors())
+	}
+
+	if len(elements) == 0 {
+		return &[]string{}, nil
+	}
+
+	result := make([]string, len(elements))
+	for i, element := range elements {
+		result[i] = element.ValueString()
+	}
+	return &result, nil
 }
 
 func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string, timeout, interval time.Duration) error {

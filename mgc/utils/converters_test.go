@@ -602,3 +602,74 @@ func TestDynamicToGoUnknown(t *testing.T) {
 		t.Fatalf("expected error for unknown dynamic, got nil")
 	}
 }
+
+func TestStringSliceToTypesList(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "empty slice",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "nil slice",
+			input:    nil,
+			expected: []string{},
+		},
+		{
+			name:     "single element",
+			input:    []string{"test"},
+			expected: []string{"test"},
+		},
+		{
+			name:     "multiple elements",
+			input:    []string{"first", "second", "third"},
+			expected: []string{"first", "second", "third"},
+		},
+		{
+			name:     "empty strings in slice",
+			input:    []string{"", "test", ""},
+			expected: []string{"", "test", ""},
+		},
+		{
+			name:     "special characters",
+			input:    []string{"hello world", "test@example.com", "path/to/file"},
+			expected: []string{"hello world", "test@example.com", "path/to/file"},
+		},
+		{
+			name:     "unicode characters",
+			input:    []string{"тест", "测试", "🚀"},
+			expected: []string{"тест", "测试", "🚀"},
+		},
+		{
+			name:     "large slice",
+			input:    []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
+			expected: []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StringSliceToTypesList(tt.input)
+
+			// Verify the result is a List type
+			assert.False(t, result.IsNull())
+			assert.False(t, result.IsUnknown())
+
+			// Convert back to slice to verify contents
+			elements := result.Elements()
+			assert.Equal(t, len(tt.expected), len(elements))
+
+			for i, element := range elements {
+				stringElement, ok := element.(types.String)
+				assert.True(t, ok, "element at index %d should be types.String", i)
+				assert.Equal(t, tt.expected[i], stringElement.ValueString())
+			}
+		})
+	}
+}

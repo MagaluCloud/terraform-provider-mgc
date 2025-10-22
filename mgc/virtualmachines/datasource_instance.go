@@ -216,7 +216,7 @@ func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	instance, err := r.vmInstance.Get(ctx, data.ID.ValueString(), []string{vmSDK.InstanceNetworkExpand, vmSDK.InstanceImageExpand, vmSDK.InstanceMachineTypeExpand})
+	instance, err := r.vmInstance.Get(ctx, data.ID.ValueString(), []vmSDK.InstanceExpand{vmSDK.InstanceNetworkExpand, vmSDK.InstanceImageExpand, vmSDK.InstanceMachineTypeExpand})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

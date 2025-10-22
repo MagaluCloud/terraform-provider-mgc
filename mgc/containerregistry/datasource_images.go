@@ -106,14 +106,13 @@ func (r *DataSourceCRImages) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	sdkOutputList, err := r.crImages.List(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString(), crSDK.ListOptions{ /*TODO: Add options*/ })
-
+	sdkOutputList, err := r.crImages.ListAll(ctx, data.RegistryID.ValueString(), data.RepositoryName.ValueString(), crSDK.ImageFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	for _, sdkOutput := range sdkOutputList.Results {
+	for _, sdkOutput := range sdkOutputList {
 		var item crImage
 
 		item.Digest = types.StringValue(sdkOutput.Digest)

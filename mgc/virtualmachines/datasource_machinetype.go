@@ -104,7 +104,7 @@ func (r *DataSourceVmMachineType) Read(ctx context.Context, req datasource.ReadR
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.vmType.List(ctx, vmSDK.InstanceTypeListOptions{})
+	sdkOutput, err := r.vmType.ListAll(ctx, vmSDK.InstanceTypeFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

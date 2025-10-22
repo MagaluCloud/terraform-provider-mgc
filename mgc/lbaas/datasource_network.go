@@ -140,8 +140,8 @@ func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	var publicIPID types.String
-	if len(lb.PublicIPs) == 1 {
-		publicIPID = types.StringValue(lb.PublicIPs[0].ID)
+	if lb.PublicIP != nil {
+		publicIPID = types.StringValue(lb.PublicIP.ExternalID)
 	} else {
 		publicIPID = types.StringNull()
 	}

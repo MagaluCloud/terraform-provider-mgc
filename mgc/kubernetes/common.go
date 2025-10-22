@@ -1,23 +1,28 @@
 package kubernetes
 
 import (
+	"context"
+
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type NodePool struct {
-	Flavor            types.String    `tfsdk:"flavor_name"`
-	Name              types.String    `tfsdk:"name"`
-	Replicas          types.Int64     `tfsdk:"replicas"`
-	MaxReplicas       types.Int64     `tfsdk:"max_replicas"`
-	MinReplicas       types.Int64     `tfsdk:"min_replicas"`
-	CreatedAt         types.String    `tfsdk:"created_at"`
-	UpdatedAt         types.String    `tfsdk:"updated_at"`
-	ID                types.String    `tfsdk:"id"`
-	Taints            *[]Taint        `tfsdk:"taints"`
-	MaxPodsPerNode    types.Int64     `tfsdk:"max_pods_per_node"`
-	AvailabilityZones *[]types.String `tfsdk:"availability_zones"`
+	Flavor            types.String `tfsdk:"flavor_name"`
+	Name              types.String `tfsdk:"name"`
+	Replicas          types.Int64  `tfsdk:"replicas"`
+	MaxReplicas       types.Int64  `tfsdk:"max_replicas"`
+	MinReplicas       types.Int64  `tfsdk:"min_replicas"`
+	CreatedAt         types.String `tfsdk:"created_at"`
+	UpdatedAt         types.String `tfsdk:"updated_at"`
+	ID                types.String `tfsdk:"id"`
+	Labels            types.Map    `tfsdk:"labels"`
+	SecurityGroups    types.Set    `tfsdk:"security_groups"`
+	Taints            *[]Taint     `tfsdk:"taints"`
+	MaxPodsPerNode    types.Int64  `tfsdk:"max_pods_per_node"`
+	AvailabilityZones types.Set    `tfsdk:"availability_zones"`
 }
 
 type Taint struct {
@@ -28,7 +33,20 @@ type Taint struct {
 
 func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 	if np == nil {
-		return NodePool{}
+		return NodePool{
+			Flavor:            types.StringNull(),
+			Name:              types.StringNull(),
+			Replicas:          types.Int64Null(),
+			MaxReplicas:       types.Int64Null(),
+			MinReplicas:       types.Int64Null(),
+			CreatedAt:         types.StringNull(),
+			UpdatedAt:         types.StringNull(),
+			ID:                types.StringNull(),
+			Labels:            types.MapNull(types.StringType),
+			SecurityGroups:    types.SetNull(types.StringType),
+			MaxPodsPerNode:    types.Int64Null(),
+			AvailabilityZones: types.SetNull(types.StringType),
+		}
 	}
 
 	nodePool := NodePool{
@@ -40,29 +58,56 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 	}
 
 	if np.AvailabilityZones != nil {
-		availabilityZones := make([]types.String, len(*np.AvailabilityZones))
+		availabilityZones := make([]attr.Value, len(*np.AvailabilityZones))
 		for i, zone := range *np.AvailabilityZones {
 			availabilityZones[i] = types.StringValue(utils.ConvertXZoneToAvailabilityZone(region, zone))
 		}
-		nodePool.AvailabilityZones = &availabilityZones
+		nodePool.AvailabilityZones = types.SetValueMust(types.StringType, availabilityZones)
+	} else {
+		nodePool.AvailabilityZones = types.SetNull(types.StringType)
 	}
 
 	if np.MaxPodsPerNode != nil {
 		nodePool.MaxPodsPerNode = types.Int64Value(int64(*np.MaxPodsPerNode))
+	} else {
+		nodePool.MaxPodsPerNode = types.Int64Null()
 	}
 
 	if np.AutoScale != nil {
 		if np.AutoScale.MaxReplicas != nil {
 			nodePool.MaxReplicas = types.Int64Value(int64(*np.AutoScale.MaxReplicas))
+		} else {
+			nodePool.MaxReplicas = types.Int64Null()
 		}
 
 		if np.AutoScale.MinReplicas != nil {
 			nodePool.MinReplicas = types.Int64Value(int64(*np.AutoScale.MinReplicas))
+		} else {
+			nodePool.MinReplicas = types.Int64Null()
 		}
+	} else {
+		nodePool.MaxReplicas = types.Int64Null()
+		nodePool.MinReplicas = types.Int64Null()
 	}
 
 	if np.InstanceTemplate.Flavor.Name != "" {
 		nodePool.Flavor = types.StringValue(np.InstanceTemplate.Flavor.Name)
+	} else {
+		nodePool.Flavor = types.StringNull()
+	}
+
+	if np.Labels != nil {
+		labelsMap, _ := types.MapValueFrom(context.Background(), types.StringType, np.Labels)
+		nodePool.Labels = labelsMap
+	} else {
+		nodePool.Labels = types.MapNull(types.StringType)
+	}
+
+	if np.SecurityGroups != nil {
+		securityGroupsSet, _ := types.SetValueFrom(context.Background(), types.StringType, *np.SecurityGroups)
+		nodePool.SecurityGroups = securityGroupsSet
+	} else {
+		nodePool.SecurityGroups = types.SetNull(types.StringType)
 	}
 
 	if np.Taints != nil {
