@@ -405,7 +405,7 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if plan.InstanceType.ValueString() != "" && plan.InstanceType.ValueString() != state.InstanceType.ValueString() {
 		instanceTypeID, err := ValidateAndGetInstanceTypeID(
-			ctx, r.dbaasInstanceTypes.List, plan.InstanceType.ValueString(), state.EngineID.ValueString(), dbaasClusterProductFamily,
+			ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), state.EngineID.ValueString(), dbaasClusterProductFamily,
 		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
