@@ -125,7 +125,7 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
-		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.List, data.InstanceType.ValueString(),
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, data.InstanceType.ValueString(),
 			sourceData.EngineID, dbaasReplicaProductFamily)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -217,7 +217,7 @@ func (r *DBaaSReplicaResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if planData.InstanceType.ValueString() != "" && planData.InstanceType.ValueString() != stateData.InstanceType.ValueString() {
 		instanceTypeID, err := ValidateAndGetInstanceTypeID(
-			ctx, r.dbaasInstanceTypes.List, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasReplicaProductFamily,
+			ctx, r.dbaasInstanceTypes.ListAll, planData.InstanceType.ValueString(), stateData.EngineID.ValueString(), dbaasReplicaProductFamily,
 		)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))

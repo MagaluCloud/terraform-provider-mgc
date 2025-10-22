@@ -81,7 +81,7 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	sdkOutputList, err := r.bsSnapshotService.List(ctx, bsSDK.ListOptions{ /*TODO: Add options*/ })
+	sdkOutputList, err := r.bsSnapshotService.ListAll(ctx, bsSDK.SnapshotFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

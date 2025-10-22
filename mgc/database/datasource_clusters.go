@@ -86,7 +86,7 @@ func (ds *DBaaSClustersDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	listOpts := dbSDK.ListClustersOptions{}
+	listOpts := dbSDK.ClusterFilterOptions{}
 	if !config.Status.IsNull() && !config.Status.IsUnknown() {
 		sdkStatus := dbSDK.ClusterStatus(config.Status.ValueString())
 		listOpts.Status = &sdkStatus
@@ -94,24 +94,10 @@ func (ds *DBaaSClustersDataSource) Read(ctx context.Context, req datasource.Read
 	listOpts.EngineID = config.EngineID.ValueStringPointer()
 	listOpts.ParameterGroupID = config.ParameterGroupID.ValueStringPointer()
 
-	var allSDKClusters []dbSDK.ClusterDetailResponse
-	zeroOffset := 0
-	limiteTop := 25
-	listOpts.Offset = &zeroOffset
-	listOpts.Limit = &limiteTop
-
-	for {
-		sdkClustersPage, err := ds.dbaasClusters.List(ctx, listOpts)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to list clusters", fmt.Sprintf("Error: %s", err.Error()))
-			return
-		}
-		allSDKClusters = append(allSDKClusters, sdkClustersPage...)
-
-		if len(sdkClustersPage) < *listOpts.Limit {
-			break
-		}
-		*listOpts.Offset += *listOpts.Limit
+	allSDKClusters, err := ds.dbaasClusters.ListAll(ctx, listOpts)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to list clusters", fmt.Sprintf("Error: %s", err.Error()))
+		return
 	}
 
 	var resultClusters []dbaasClusterDataModel

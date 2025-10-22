@@ -96,7 +96,7 @@ func (r *DataSourceDbSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	snapshots, err := r.dbaasInstances.ListSnapshots(ctx, data.InstanceID.ValueString(), dbSDK.ListSnapshotOptions{})
+	snapshots, err := r.dbaasInstances.ListAllSnapshots(ctx, data.InstanceID.ValueString(), dbSDK.SnapshotFilterOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

@@ -67,7 +67,7 @@ func (r *DataSourceBsSchedules) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	schedulesResponse, err := r.bsScheduler.List(ctx, storageSDK.SchedulerListOptions{
+	schedulesResponse, err := r.bsScheduler.ListAll(ctx, storageSDK.SchedulerFilterOptions{
 		Expand: []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume},
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func (r *DataSourceBsSchedules) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	var schedulesData []bsScheduleDataSourceModel
-	for _, schedule := range schedulesResponse.Schedulers {
+	for _, schedule := range schedulesResponse {
 		model := SchedulerResponseToModel(&schedule)
 
 		scheduleModel := bsScheduleDataSourceModel{
