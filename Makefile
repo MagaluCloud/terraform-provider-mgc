@@ -94,12 +94,12 @@ tf-docs-setup: ## Setup terraform-docs
 tf-gen-docs: ## Generate terraform docs
 	@echo -e "$(GREEN)Generating terraform docs with tfplugindocs...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 
 generate-docs: tf-gen-docs ## Generate full documentation
 	@echo -e "$(GREEN)Generating documentation...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 	@echo -e "$(GREEN)Adding subcategories...$(NC)"
 	$(MAKE) update-subcategory
 	@echo -e "$(GREEN)Moving extra docs...$(NC)"
