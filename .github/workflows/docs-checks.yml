@@ -71,7 +71,7 @@ jobs:
         id: cspell
         continue-on-error: true
         run: |
-          make spell-check 2>&1 | tee cspell_errors.txt
+          make spell-check-docs 2>&1 | tee cspell_errors.txt
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "cspell_errors<<EOF" >> $GITHUB_OUTPUT
             cat cspell_errors.txt >> $GITHUB_OUTPUT

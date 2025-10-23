@@ -144,7 +144,13 @@ clean: ## Clean build artifacts
 all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 	@echo -e "$(GREEN)All tasks completed successfully!$(NC)"
 
-spell-check:
+spell-check-docs: ## Spell check documentation
+	@echo "*** Checking docs for miss spellings... ***"
+	@grep . cspell.txt | sort > .cspell.txt && mv .cspell.txt cspell.txt
+	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique docs
+	@echo "*** MGC Terraform Provider is correctly written! ***"
+
+spell-check-code: ## Spell check codebase
 	@echo "*** Checking code base for miss spellings... ***"
-	@docker run -v $(PWD):/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress mgc
+	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique mgc
 	@echo "*** MGC Terraform Provider is correctly written! ***"
