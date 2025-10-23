@@ -100,12 +100,12 @@ tf-docs-setup: ## Setup terraform-docs
 tf-gen-docs: ## Generate terraform docs
 	@echo -e "$(GREEN)Generating terraform docs with tfplugindocs...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
 
 generate-docs: tf-gen-docs ## Generate full documentation
 	@echo -e "$(GREEN)Generating documentation...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
 	@echo -e "$(GREEN)Adding subcategories...$(NC)"
 	$(MAKE) update-subcategory
 	@echo -e "$(GREEN)Moving extra docs...$(NC)"
@@ -128,7 +128,7 @@ build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
 
-before-commit: go-test go-fmt spell-check generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
+before-commit: go-test go-fmt spell-check-docs generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
 	@echo -e "$(GREEN)All pre-commit checks passed!$(NC)"
 
 debug: ## Run the provider in debug mode
