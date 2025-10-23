@@ -81,7 +81,6 @@ resource "mgc_virtual_machine_instances" "instance_with_security_groups_and_publ
 
 ### Required
 
-- `image` (String) The image name used for the virtual machine instance.
 - `machine_type` (String) The machine type name of the virtual machine instance.
 - `name` (String) The name of the virtual machine instance.
 
@@ -100,6 +99,10 @@ If not specified, the default security group of the VPC will be used.
 For manage security groups after the instance creation, use the network resources.
 Find out more in the documentation guides.
 This attribute can only be used when "network_interface_id" is not set.
+- `image` (String) The image name used for the virtual machine instance.
+			 This attribute is required when not creating the instance from a snapshot (i.e., when "snapshot_id" is not set).
+			 If "snapshot_id" is provided, the snapshot will be used instead of an image.
+- `snapshot_id` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
 - `user_data` (String) User data for instance initialization.
 - `vpc_id` (String) The VPC ID where the primary network interface will be created.
