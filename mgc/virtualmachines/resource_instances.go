@@ -231,14 +231,14 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: `The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
 If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
 Read the documentation guides for more details.`,
-				// Optional: true,
-				Computed:   true,
+				Optional: true,
+				Computed: true,
 				Validators: []validator.String{
-					// stringvalidator.ConflictsWith(path.MatchRoot("vpc_id")),
-					// stringvalidator.LengthAtLeast(1),
+					stringvalidator.ConflictsWith(path.MatchRoot("vpc_id")),
+					stringvalidator.LengthAtLeast(1),
 				},
 				PlanModifiers: []planmodifier.String{
-					// stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -385,8 +385,8 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		SshKeyName:       state.SshKeyName.ValueStringPointer(),
 		Network: &computeSdk.CreateParametersNetwork{
 			AssociatePublicIp: state.AllocatePublicIpv4.ValueBoolPointer(),
-			Interface:         &computeSdk.CreateParametersNetworkInterface{
-				// ID: state.NetworkInterfaceId.ValueStringPointer(),
+			Interface: &computeSdk.CreateParametersNetworkInterface{
+				ID: state.NetworkInterfaceId.ValueStringPointer(),
 			},
 		},
 	}
