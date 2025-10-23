@@ -193,7 +193,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 			},
 			"instance_type": schema.StringAttribute{
-				Description: "Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.",
+				Description: "Compute and memory capacity of the instance (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),

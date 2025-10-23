@@ -31,7 +31,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Required
 
-- `instance_type` (String) Compute and memory capacity of the instance (e.g., 'BV1-4-10'). Can be changed to scale the instance.
+- `instance_type` (String) Compute and memory capacity of the instance (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS instance. Must be unique within your account. Cannot be changed after creation.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
