@@ -12,8 +12,10 @@ GOVET           := go vet
 GOTEST          := go test
 
 # Directories
+DOCS_DIR_PATH   := docs
+MGC_DIR_PATH    := mgc
 SCRIPT_DIR      := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-DOCS_DIR        := $(SCRIPT_DIR)/docs
+DOCS_DIR        := $(SCRIPT_DIR)/$(DOCS_DIR_PATH)
 RESOURCES_DIR   := $(DOCS_DIR)/resources
 DATA_SOURCES_DIR := $(DOCS_DIR)/data-sources
 DOCS_EXTRA_DIR  := $(SCRIPT_DIR)/docs-extra
@@ -145,12 +147,12 @@ all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 	@echo -e "$(GREEN)All tasks completed successfully!$(NC)"
 
 spell-check-docs: ## Spell check documentation
-	@echo "*** Checking docs for miss spellings... ***"
+	@echo -e "$(GREEN)*** Checking docs for miss spellings... ***$(NC)"
 	@grep . cspell.txt | sort > .cspell.txt && mv .cspell.txt cspell.txt
-	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique docs
-	@echo "*** MGC Terraform Provider is correctly written! ***"
+	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique $(DOCS_DIR_PATH)
+	@echo -e "$(GREEN)*** MGC Terraform Provider is correctly written! ***$(NC)"
 
 spell-check-code: ## Spell check codebase
-	@echo "*** Checking code base for miss spellings... ***"
-	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique mgc
-	@echo "*** MGC Terraform Provider is correctly written! ***"
+	@echo -e "$(GREEN)*** Checking code base for miss spellings... ***$(NC)"
+	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique $(MGC_DIR_PATH)
+	@echo -e "$(GREEN)*** MGC Terraform Provider is correctly written! ***$(NC)"
