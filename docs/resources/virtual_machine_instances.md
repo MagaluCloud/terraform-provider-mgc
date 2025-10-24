@@ -28,7 +28,7 @@ resource "mgc_virtual_machine_instances" "instance_with_az" {
   ssh_key_name      = "your-ssh-key-name"
 }
 
-resource "mgc_virtual_machine_instances" "instance_with_usardata" {
+resource "mgc_virtual_machine_instances" "instance_with_userdata" {
   name         = "instance-with-userdata"
   machine_type = "BV4-8-100"
   image        = "cloud-ubuntu-24.04 LTS"
