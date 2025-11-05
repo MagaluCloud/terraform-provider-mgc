@@ -15,18 +15,32 @@ API Keys are used for authentication with the Magalu Cloud API when using the Te
 
 ```terraform
 provider "mgc" {
-  api_key = var.api_key
-  region  = var.region
+  api_key    = var.api_key
+  region     = var.region
+  access_key = var.mgc_access_key
+  secret_key = var.mgc_secret_key
 }
 ```
 
-It's recommended to use variables for sensitive information like API keys:
+It's recommended to use variables for sensitive information like API keys and key pairs:
 
 ```terraform
 variable "api_key" {
   type        = string
   sensitive   = true
   description = "The Magalu Cloud API Key"
+}
+
+variable "mgc_access_key" {
+  type        = string
+  sensitive   = true
+  description = "The Magalu Cloud Object Storage Access Key"
+}
+
+variable "mgc_secret_key" {
+  type        = string
+  sensitive   = true
+  description = "The Magalu Cloud Object Storage Secret Key"
 }
 ```
 
@@ -88,19 +102,14 @@ The response will include:
 
 When working with Object Storage in the Magalu Cloud Terraform Provider, you'll need to configure the Key Pair (Access Key and Secret Key) that was generated along with your API Key. This is only necessary for object storage operations in the provider; other operations only require the API key.
 
-Configure the provider with both the API key and object storage credentials:
+Provide the credentials using the `access_key` and `secret_key` arguments in the provider configuration:
 
 ```terraform
 provider "mgc" {
-  api_key = var.api_key
-  region  = var.region
-
-  object_storage = {
-    key_pair = {
-      key_id     = var.mgc_access_key
-      key_secret = var.mgc_secret_key
-    }
-  }
+  api_key    = var.api_key
+  region     = var.region
+  access_key = var.mgc_access_key
+  secret_key = var.mgc_secret_key
 }
 ```
 

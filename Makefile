@@ -52,7 +52,11 @@ update-subcategory: ## Update subcategories in documentation files
 		patterns=$$(echo "$$patterns" | tr -d '"'); \
 		echo "Processing category: $$category, patterns: $$patterns"; \
 		for pattern in $$patterns; do \
-			find "$(RESOURCES_DIR)" "$(DATA_SOURCES_DIR)" -type f -name "$$pattern" | xargs -I {} sed -i "s/subcategory: .*/subcategory: \"$$category\"/" {}; \
+			find "$(RESOURCES_DIR)" "$(DATA_SOURCES_DIR)" -type f -name "$$pattern" -print0 | \
+			while IFS= read -r -d '' file; do \
+				tmp_file="$$file.tmp"; \
+				sed "s/subcategory: .*/subcategory: \"$$category\"/" "$$file" > "$$tmp_file" && mv "$$tmp_file" "$$file"; \
+			done; \
 		done; \
 	done
 	@echo -e "$(GREEN)Subcategories updated successfully.$(NC)"
