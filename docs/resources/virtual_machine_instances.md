@@ -42,14 +42,6 @@ resource "mgc_virtual_machine_instances" "instance_with_windows" {
   image        = "windows-server-2022"
 }
 
-resource "mgc_virtual_machine_instances" "instance_with_custom_interface" {
-  name                 = "instance-with-custom-interface"
-  machine_type         = "BV2-4-10"
-  image                = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name         = "your-ssh-key-name"
-  network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
-}
-
 resource "mgc_virtual_machine_instances" "instance_with_public_ipv4" {
   name                 = "instance-with-public-ipv4"
   machine_type         = "BV2-4-10"
