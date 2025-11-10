@@ -48,8 +48,8 @@ provider "mgc" {
   api_key    = var.api_key
   region     = var.region
   env        = var.env
-  access_key = var.access_key
-  secret_key = var.secret_key
+  key_pair_id = var.key_pair_id
+  key_pair_secret = var.key_pair_secret
 }
 ```
 
@@ -65,10 +65,10 @@ provider "mgc" {
 
 - `env` (String) The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.
 - `region` (String) The region to use for resources. Options: br-ne1 / br-se1 / br-mgl1 / br-mc1. Default is br-se1.
-- `access_key` (String) Access Key (Access ID) for Object Storage. Requires `secret_key`.
-- `secret_key` (String) Secret Key for Object Storage. Requires `access_key`.
+- `key_pair_id` (String) Key Pair ID for Object Storage. Requires `key_pair_secret`.
+- `key_pair_secret` (String) Key Pair Secret for Object Storage. Requires `key_pair_id`.
 
-When configuring Object Storage features, provide both `access_key` and `secret_key` together to enable authenticated Bucket operations.
+When configuring Object Storage features, provide both `key_pair_id` and `key_pair_secret` together to enable authenticated Bucket operations.
 
 ## Contributing
 
