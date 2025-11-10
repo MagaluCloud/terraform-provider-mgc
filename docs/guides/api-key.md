@@ -102,7 +102,7 @@ The response will include:
 
 When working with Object Storage in the Magalu Cloud Terraform Provider, you'll need to configure the Key Pair (ID and Secret) that was generated along with your API Key. This is only necessary for object storage operations in the provider; other operations only require the API key.
 
-Provide the credentials using the `access_key` and `secret_key` arguments in the provider configuration:
+Provide the credentials using the `key_pair_id` and `key_pair_secret` arguments in the provider configuration:
 
 ```terraform
 provider "mgc" {
