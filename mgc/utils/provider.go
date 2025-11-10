@@ -5,10 +5,10 @@ import (
 )
 
 type DataConfig struct {
-	ApiKey     string
-	Env        string
-	Region     string
-	AccessKey  string
-	SecretKey  string
-	CoreConfig sdk.CoreClient
+	ApiKey        string
+	Env           string
+	Region        string
+	KeyPairID     string
+	KeyPairSecret string
+	CoreConfig    sdk.CoreClient
 }
