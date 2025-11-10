@@ -18,14 +18,14 @@ variable "mgc_api_key" {
   sensitive   = true
 }
 
-variable "mgc_access_key" {
-  description = "Magalu Cloud access key."
+variable "mgc_key_pair_id" {
+  description = "Magalu Cloud key pair id."
   type        = string
   sensitive   = true
 }
 
-variable "mgc_secret_key" {
-  description = "Magalu Cloud secret key."
+variable "mgc_key_pair_secret" {
+  description = "Magalu Cloud key pair secret."
   type        = string
   sensitive   = true
 }
@@ -33,6 +33,6 @@ variable "mgc_secret_key" {
 provider "mgc" {
   region     = var.mgc_region
   api_key    = var.mgc_api_key
-  access_key = var.mgc_access_key
-  secret_key = var.mgc_secret_key
+  key_pair_id = var.mgc_key_pair_id
+  key_pair_secret = var.mgc_key_pair_secret
 }

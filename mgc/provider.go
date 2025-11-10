@@ -43,11 +43,11 @@ type mgcProvider struct {
 var rgxUUIDv4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type ProviderModel struct {
-	Region    types.String `tfsdk:"region"`
-	Env       types.String `tfsdk:"env"`
-	ApiKey    types.String `tfsdk:"api_key"`
-	AccessKey types.String `tfsdk:"access_key"`
-	SecretKey types.String `tfsdk:"secret_key"`
+	Region        types.String `tfsdk:"region"`
+	Env           types.String `tfsdk:"env"`
+	ApiKey        types.String `tfsdk:"api_key"`
+	KeyPairID     types.String `tfsdk:"key_pair_id"`
+	KeyPairSecret types.String `tfsdk:"key_pair_secret"`
 }
 
 func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -81,22 +81,22 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud API key"),
 				},
 			},
-			"access_key": schema.StringAttribute{
-				Description: "Access Key (Access ID) for Object Storage.",
+			"key_pair_id": schema.StringAttribute{
+				Description: "Key Pair ID for Object Storage.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud access key"),
-					stringvalidator.AlsoRequires(path.MatchRoot("secret_key")),
+					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud key pair id"),
+					stringvalidator.AlsoRequires(path.MatchRoot("key_pair_secret")),
 				},
 			},
-			"secret_key": schema.StringAttribute{
-				Description: "Secret Key for Object Storage.",
+			"key_pair_secret": schema.StringAttribute{
+				Description: "Key Pair Secret for Object Storage.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud secret key"),
-					stringvalidator.AlsoRequires(path.MatchRoot("access_key")),
+					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud key pair secret"),
+					stringvalidator.AlsoRequires(path.MatchRoot("key_pair_id")),
 				},
 			},
 		},
@@ -159,11 +159,11 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 
 func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 	output := utils.DataConfig{
-		ApiKey:    plan.ApiKey.ValueString(),
-		Env:       plan.Env.ValueString(),
-		Region:    plan.Region.ValueString(),
-		AccessKey: plan.AccessKey.ValueString(),
-		SecretKey: plan.SecretKey.ValueString(),
+		ApiKey:        plan.ApiKey.ValueString(),
+		Env:           plan.Env.ValueString(),
+		Region:        plan.Region.ValueString(),
+		KeyPairID:     plan.KeyPairID.ValueString(),
+		KeyPairSecret: plan.KeyPairSecret.ValueString(),
 	}
 
 	sdkUrl := sdk.MgcUrl(utils.RegionToUrl(output.Region, output.Env))

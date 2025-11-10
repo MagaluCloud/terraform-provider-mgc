@@ -68,7 +68,7 @@ func (r *objectStorageBuckets) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	a, err := objSdk.New(&dataConfig.CoreConfig, dataConfig.AccessKey, dataConfig.SecretKey, objSdk.WithEndpoint(endpoint))
+	a, err := objSdk.New(&dataConfig.CoreConfig, dataConfig.KeyPairID, dataConfig.KeyPairSecret, objSdk.WithEndpoint(endpoint))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to configure object storage", "Invalid credentials data")
 		return
