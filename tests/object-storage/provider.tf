@@ -6,33 +6,33 @@ terraform {
   }
 }
 
+variable "mgc_region" {
+  description = "Region for Magalu Cloud object storage."
+  type        = string
+  default     = "br-ne1"
+}
+
+variable "mgc_api_key" {
+  description = "Magalu Cloud API key."
+  type        = string
+  sensitive   = true
+}
+
+variable "mgc_access_key" {
+  description = "Magalu Cloud access key."
+  type        = string
+  sensitive   = true
+}
+
+variable "mgc_secret_key" {
+  description = "Magalu Cloud secret key."
+  type        = string
+  sensitive   = true
+}
+
 provider "mgc" {
-  region  = var.region
-  api_key = var.api_key
-
-  object_storage = {
-    key_pair = {
-      key_id     = var.key_id
-      key_secret = var.key_secret
-    }
-  }
-}
-
-variable "region" {
-  type    = string
-  default = "br-ne1"
-}
-variable "api_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "key_id" {
-  type      = string
-  sensitive = true
-}
-
-variable "key_secret" {
-  type      = string
-  sensitive = true
+  region     = var.mgc_region
+  api_key    = var.mgc_api_key
+  access_key = var.mgc_access_key
+  secret_key = var.mgc_secret_key
 }

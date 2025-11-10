@@ -3,12 +3,12 @@
 page_title: "mgc_object_storage_buckets Data Source - terraform-provider-mgc"
 subcategory: "Object Storage"
 description: |-
-  Get all buckets.
+  Retrieves a list of all object storage bucket names.
 ---
 
 # mgc_object_storage_buckets (Data Source)
 
-Get all buckets.
+Retrieves a list of all object storage bucket names.
 
 ## Example Usage
 
@@ -26,12 +26,4 @@ output "buckets" {
 
 ### Read-Only
 
-- `buckets` (Attributes List) List of ssh-keys. (see [below for nested schema](#nestedatt--buckets))
-
-<a id="nestedatt--buckets"></a>
-### Nested Schema for `buckets`
-
-Read-Only:
-
-- `creation_date` (String) Bucket creation date
-- `name` (String) Bucket name
+- `buckets` (List of String) List of bucket names.
