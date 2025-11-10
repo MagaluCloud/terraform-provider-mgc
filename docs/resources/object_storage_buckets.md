@@ -20,6 +20,7 @@ resource "mgc_object_storage_buckets" "basic" {
 
 resource "mgc_object_storage_buckets" "locked" {
   bucket = "example-locked-bucket"
+  versioning = true # required for lock
   lock   = true
 }
 
