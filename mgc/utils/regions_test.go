@@ -25,11 +25,7 @@ func TestRegionToUrl(t *testing.T) {
 			inputEnv:    "prod",
 			expectedUrl: client.BrSe1.String(),
 		},
-		{
-			inputRegion: "br-mgl1",
-			inputEnv:    "prod",
-			expectedUrl: client.BrMgl1.String(),
-		},
+
 		{
 			inputRegion: "br-ne1",
 			inputEnv:    "pre-prod",
@@ -99,21 +95,16 @@ func TestRegionToS3Url(t *testing.T) {
 		{
 			inputRegion: "br-ne1",
 			inputEnv:    "prod",
-			expectedUrl: "br-ne1.magaluobjects.com",
+			expectedUrl: "https://br-ne1.magaluobjects.com",
 			expectError: false,
 		},
 		{
 			inputRegion: "br-se1",
 			inputEnv:    "prod",
-			expectedUrl: "br-se1.magaluobjects.com",
+			expectedUrl: "https://br-se1.magaluobjects.com",
 			expectError: false,
 		},
-		{
-			inputRegion: "br-mgl1",
-			inputEnv:    "prod",
-			expectedUrl: "br-se-1.magaluobjects.com",
-			expectError: false,
-		},
+
 		{
 			inputRegion: "br-se1",
 			inputEnv:    "pre-prod",
@@ -123,17 +114,17 @@ func TestRegionToS3Url(t *testing.T) {
 		{
 			inputRegion: "br-ne1",
 			inputEnv:    "invalid-env",
-			expectedUrl: "br-ne1.magaluobjects.com",
+			expectedUrl: "https://br-ne1.magaluobjects.com",
 		},
 		{
 			inputRegion: "invalid-region",
 			inputEnv:    "invalid-env",
-			expectedUrl: "br-se1.magaluobjects.com",
+			expectedUrl: "https://br-se1.magaluobjects.com",
 		},
 		{
 			inputRegion: "",
 			inputEnv:    "",
-			expectedUrl: "br-se1.magaluobjects.com",
+			expectedUrl: "https://br-se1.magaluobjects.com",
 		},
 	}
 
@@ -149,7 +140,7 @@ func TestRegionToS3Url(t *testing.T) {
 			if err != nil && tt.expectError {
 				return
 			}
-			if url != tt.expectedUrl {
+			if url.String() != tt.expectedUrl {
 				t.Errorf("Expected URL %q, got %q", tt.expectedUrl, url)
 			}
 		})

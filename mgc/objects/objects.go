@@ -7,8 +7,8 @@ import (
 
 func GetDataSources() []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewDatasourceBucket,
-		NewDatasourceBuckets,
+		NewObjectStorageBucketDataSource,
+		NewObjectStorageBucketsDataSource,
 	}
 }
 

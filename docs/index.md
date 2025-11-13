@@ -45,8 +45,11 @@ terraform {
 }
 
 provider "mgc" {
-  api_key = var.api_key
-  region  = var.region
+  api_key    = var.api_key
+  region     = var.region
+  env        = var.env
+  key_pair_id = var.key_pair_id
+  key_pair_secret = var.key_pair_secret
 }
 ```
 
@@ -60,25 +63,12 @@ provider "mgc" {
 
 ### Optional
 
-- `object_storage` (Attributes) Configuration settings for Object Storage (see [below for nested schema](#nestedatt--object_storage))
-- `region` (String) The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.
+- `env` (String) The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.
+- `region` (String) The region to use for resources. Options: br-ne1 / br-se1 / br-mgl1 / br-mc1. Default is br-se1.
+- `key_pair_id` (String) Key Pair ID for Object Storage. Requires `key_pair_secret`.
+- `key_pair_secret` (String) Key Pair Secret for Object Storage. Requires `key_pair_id`.
 
-<a id="nestedatt--object_storage"></a>
-
-### Nested Schema for `object_storage`
-
-Optional:
-
-- `key_pair` (Attributes) Bucket Key Pair configuration (see [below for nested schema](#nestedatt--object_storage--key_pair))
-
-<a id="nestedatt--object_storage--key_pair"></a>
-
-### Nested Schema for `object_storage.key_pair`
-
-Required:
-
-- `key_id` (String) The Key Pair Access ID.
-- `key_secret` (String) The Key Pair Access Secret.
+When configuring Object Storage features, provide both `key_pair_id` and `key_pair_secret` together to enable authenticated Bucket operations.
 
 ## Contributing
 

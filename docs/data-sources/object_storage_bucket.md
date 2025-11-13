@@ -3,12 +3,12 @@
 page_title: "mgc_object_storage_bucket Data Source - terraform-provider-mgc"
 subcategory: "Object Storage"
 description: |-
-  Get details of bucket.
+  Retrieves information about an object storage bucket.
 ---
 
 # mgc_object_storage_bucket (Data Source)
 
-Get details of bucket.
+Retrieves information about an object storage bucket.
 
 ## Example Usage
 
@@ -27,10 +27,24 @@ output "bucket" {
 
 ### Required
 
-- `name` (String) Bucket name
+- `bucket` (String) Name of the bucket.
 
 ### Read-Only
 
-- `mfadelete` (String) MFA Delete
-- `policy` (String) Access policy
-- `versioning` (String) Versioning status
+- `cors` (Attributes) CORS configuration for the bucket. (see [below for nested schema](#nestedatt--cors))
+- `lock` (Boolean) Whether object lock is enabled for this bucket.
+- `policy` (String) Bucket policy document as a JSON string.
+- `region` (String) The region where the bucket is located.
+- `url` (String) The URL endpoint of the bucket.
+- `versioning` (Boolean) Whether versioning is enabled for this bucket.
+
+<a id="nestedatt--cors"></a>
+### Nested Schema for `cors`
+
+Read-Only:
+
+- `allowed_headers` (List of String) Allowed headers for CORS requests.
+- `allowed_methods` (List of String) Allowed HTTP methods for CORS requests.
+- `allowed_origins` (List of String) Allowed origins for CORS requests.
+- `expose_headers` (List of String) Headers exposed to the browser for CORS requests.
+- `max_age_seconds` (Number) Maximum age in seconds for CORS preflight cache.

@@ -60,7 +60,11 @@ update-subcategory: ## Update subcategories in documentation files
 		patterns=$$(echo "$$patterns" | tr -d '"'); \
 		echo "Processing category: $$category, patterns: $$patterns"; \
 		for pattern in $$patterns; do \
-			find "$(RESOURCES_DIR)" "$(DATA_SOURCES_DIR)" -type f -name "$$pattern" | xargs -I {} sed -i "s/subcategory: .*/subcategory: \"$$category\"/" {}; \
+			find "$(RESOURCES_DIR)" "$(DATA_SOURCES_DIR)" -type f -name "$$pattern" -print0 | \
+			while IFS= read -r -d '' file; do \
+				tmp_file="$$file.tmp"; \
+				sed "s/subcategory: .*/subcategory: \"$$category\"/" "$$file" > "$$tmp_file" && mv "$$tmp_file" "$$file"; \
+			done; \
 		done; \
 	done
 	@echo -e "$(GREEN)Subcategories updated successfully.$(NC)"
@@ -102,12 +106,12 @@ tf-docs-setup: ## Setup terraform-docs
 tf-gen-docs: ## Generate terraform docs
 	@echo -e "$(GREEN)Generating terraform docs with tfplugindocs...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 
 generate-docs: tf-gen-docs ## Generate full documentation
 	@echo -e "$(GREEN)Generating documentation...$(NC)"
 	@mkdir -p $(DOCS_DIR)
-	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)"
+	@$(GO) run $(TF_PLUGIN_DOCS) generate --provider-dir="$(SCRIPT_DIR)" --provider-name="terraform-provider-mgc"
 	@echo -e "$(GREEN)Adding subcategories...$(NC)"
 	$(MAKE) update-subcategory
 	@echo -e "$(GREEN)Moving extra docs...$(NC)"
