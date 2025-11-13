@@ -39,6 +39,7 @@ var imageExpands []computeSdk.InstanceExpand = []computeSdk.InstanceExpand{compu
 var errorStatus = []InstanceStatus{
 	StatusCreatingError,
 	StatusCreatingNetworkError,
+	StatusCreatingErrorCapacity,
 	StatusCreatingErrorQuota,
 	StatusCreatingErrorQuotaRam,
 	StatusCreatingErrorQuotaVcpu,
@@ -61,6 +62,7 @@ const (
 	StatusProvisioning                 InstanceStatus = "provisioning"
 	StatusCreating                     InstanceStatus = "creating"
 	StatusCreatingError                InstanceStatus = "creating_error"
+	StatusCreatingErrorCapacity        InstanceStatus = "creating_error_capacity"
 	StatusCreatingNetworkError         InstanceStatus = "creating_network_error"
 	StatusCreatingErrorQuota           InstanceStatus = "creating_error_quota"
 	StatusCreatingErrorQuotaRam        InstanceStatus = "creating_error_quota_ram"
