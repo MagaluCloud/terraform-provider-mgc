@@ -219,8 +219,14 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"user_data": schema.StringAttribute{
-				Description: "User data for instance initialization.",
+				Description: "User data for instance initialization (encoded in base64).",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[A-Za-z0-9+/]*={0,2}$`),
+						"The user data must be encoded in base64. You can use Terraform's builtin base64encode() for that.",
+					),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
