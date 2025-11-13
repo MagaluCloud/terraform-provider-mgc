@@ -271,8 +271,18 @@ func TestInstanceStatusList_ContainsExpectedErrors(t *testing.T) {
 	expectedErrors := []InstanceStatus{
 		StatusCreatingError,
 		StatusCreatingNetworkError,
+		StatusCreatingErrorCapacity,
 		StatusCreatingErrorQuota,
+		StatusCreatingErrorQuotaRam,
+		StatusCreatingErrorQuotaVcpu,
+		StatusCreatingErrorQuotaDisk,
+		StatusCreatingErrorQuotaInstance,
+		StatusCreatingErrorQuotaFloatingIP,
+		StatusCreatingErrorQuotaNetwork,
 		StatusRetypingError,
+		StatusRetypingErrorQuotaRam,
+		StatusRetypingErrorQuotaVcpu,
+		StatusRetypingErrorQuota,
 		StatusDeletingError,
 	}
 
