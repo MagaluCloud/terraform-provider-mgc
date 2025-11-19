@@ -19,7 +19,7 @@ resource "mgc_dbaas_instances" "test_instance" {
   password             = "examplepassword"
   engine_name          = "mysql"
   engine_version       = "8.0"
-  instance_type        = "cloud-dbaas-gp1.small"
+  instance_type        = "DP2-8-40"
   volume_size          = 50
   backup_retention_days = 10
   backup_start_at      = "16:00:00"
@@ -31,7 +31,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Required
 
-- `instance_type` (String) Compute and memory capacity of the instance (e.g., 'DP2-16-40'). Can be changed to scale the instance.
+- `instance_type` (String) Compute and memory capacity of the instance determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS instance. Must be unique within your account. Cannot be changed after creation.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 

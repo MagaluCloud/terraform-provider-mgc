@@ -4,7 +4,7 @@ resource "mgc_dbaas_instances" "test_instance" {
   password             = "examplepassword"
   engine_name          = "mysql"
   engine_version       = "8.0"
-  instance_type        = "cloud-dbaas-gp1.small"
+  instance_type        = "DP2-8-40"
   volume_size          = 50
   backup_retention_days = 10
   backup_start_at      = "16:00:00"

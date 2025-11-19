@@ -29,7 +29,7 @@ resource "mgc_dbaas_replicas" "dbaas_replica" {
 
 ### Optional
 
-- `instance_type` (String) Instance type
+- `instance_type` (String) Compute and memory capacity of the replica determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
 ### Read-Only
