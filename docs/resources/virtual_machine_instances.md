@@ -96,7 +96,7 @@ This attribute can only be used when "network_interface_id" is not set.
 			 If "snapshot_id" is provided, the snapshot will be used instead of an image.
 - `snapshot_id` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
-- `user_data` (String) User data for instance initialization.
+- `user_data` (String) User data for instance initialization (encoded in base64).
 - `vpc_id` (String) The VPC ID where the primary network interface will be created.
 
 ### Read-Only

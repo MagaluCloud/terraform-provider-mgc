@@ -39,6 +39,7 @@ var imageExpands []computeSdk.InstanceExpand = []computeSdk.InstanceExpand{compu
 var errorStatus = []InstanceStatus{
 	StatusCreatingError,
 	StatusCreatingNetworkError,
+	StatusCreatingErrorCapacity,
 	StatusCreatingErrorQuota,
 	StatusCreatingErrorQuotaRam,
 	StatusCreatingErrorQuotaVcpu,
@@ -61,6 +62,7 @@ const (
 	StatusProvisioning                 InstanceStatus = "provisioning"
 	StatusCreating                     InstanceStatus = "creating"
 	StatusCreatingError                InstanceStatus = "creating_error"
+	StatusCreatingErrorCapacity        InstanceStatus = "creating_error_capacity"
 	StatusCreatingNetworkError         InstanceStatus = "creating_network_error"
 	StatusCreatingErrorQuota           InstanceStatus = "creating_error_quota"
 	StatusCreatingErrorQuotaRam        InstanceStatus = "creating_error_quota_ram"
@@ -219,8 +221,14 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"user_data": schema.StringAttribute{
-				Description: "User data for instance initialization.",
+				Description: "User data for instance initialization (encoded in base64).",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[A-Za-z0-9+/]*={0,2}$`),
+						"The user data must be encoded in base64. You can use Terraform's builtin base64encode() for that.",
+					),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
