@@ -39,7 +39,7 @@ func (r *DataSourceLbaasNetworkListener) Configure(_ context.Context, req dataso
 
 func (r *DataSourceLbaasNetworkListener) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get a specific Network Load Balancer Listener by Load Balancer ID and Listener ID.",
+		Description: experimentalWarning + "Get a specific Network Load Balancer Listener by Load Balancer ID and Listener ID.",
 		Attributes: map[string]schema.Attribute{
 			"lb_id": schema.StringAttribute{
 				Required:    true,
