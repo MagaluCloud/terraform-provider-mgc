@@ -72,6 +72,7 @@ type DBaaSInstanceModel struct {
 	EngineVersion       types.String `tfsdk:"engine_version"`
 	InstanceType        types.String `tfsdk:"instance_type"`
 	VolumeSize          types.Int64  `tfsdk:"volume_size"`
+	VolumeType          types.String `tfsdk:"volume_type"`
 	BackupRetentionDays types.Int64  `tfsdk:"backup_retention_days"`
 	BackupStartAt       types.String `tfsdk:"backup_start_at"`
 	AvailabilityZone    types.String `tfsdk:"availability_zone"`
@@ -210,6 +211,15 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 					int64validator.Between(10, 50000),
 				},
 			},
+			"volume_type": schema.StringAttribute{
+				Description: "Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"backup_retention_days": schema.Int64Attribute{
 				Description: "Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.",
 				Optional:    true,
@@ -321,6 +331,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 			BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
 			Volume: &dbSDK.InstanceVolumeRequest{
 				Size: *utils.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
+				Type: data.VolumeType.ValueString(),
 			},
 		}
 		createdInstance, err := r.dbaasInstances.RestoreSnapshot(ctx, data.SnapshotSourceID.ValueString(), data.SnapshotID.ValueString(), req)
@@ -367,6 +378,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		InstanceTypeID: &instanceTypeID,
 		Volume: dbSDK.InstanceVolumeRequest{
 			Size: *utils.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
+			Type: data.VolumeType.ValueString(),
 		},
 		BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(data.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
@@ -426,6 +438,7 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	data.EngineVersion = types.StringValue(engineVersion)
 	data.InstanceType = types.StringValue(instanceTypeName)
 	data.VolumeSize = types.Int64Value(int64(instance.Volume.Size))
+	data.VolumeType = types.StringValue(instance.Volume.Type)
 	data.BackupRetentionDays = types.Int64Value(int64(instance.BackupRetentionDays))
 	data.BackupStartAt = types.StringValue(instance.BackupStartAt)
 	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
