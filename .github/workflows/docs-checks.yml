@@ -67,12 +67,25 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
+      - name: Spell Check
+        id: cspell
+        continue-on-error: true
+        run: |
+          make spell-check-docs 2>&1 | tee cspell_errors.txt
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "cspell_errors<<EOF" >> $GITHUB_OUTPUT
+            cat cspell_errors.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+  
       - name: Post PR comment with errors
         if: always()
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #v7.0.1
         env:
           EXAMPLE_ERRORS: ${{ steps.example.outputs.example_errors }}
           EMPTY_ERRORS: ${{ steps.empty.outputs.empty_errors }}
+          CSPELL_ERRORS: ${{ steps.cspell.outputs.cspell_errors }}
           DOCS_CHANGES: ${{ steps.gendocs.outputs.changes }}
           DOCS_CHANGED: ${{ steps.gendocs.outputs.docs_changed }}
         with:
@@ -86,6 +99,10 @@ jobs:
 
             if (process.env.EMPTY_ERRORS) {
               commentBody += `### ❌ Empty Subcategories Found\n\n\`\`\`\n${process.env.EMPTY_ERRORS}\n\`\`\`\n\n`;
+            }
+
+            if (process.env.CSPELL_ERRORS) {
+              commentBody += `### ❌ Misspelling Errors Found\n\n\`\`\`\n${process.env.CSPELL_ERRORS}\n\`\`\`\n\n`;
             }
 
             if (process.env.DOCS_CHANGED === 'true') {
@@ -102,6 +119,6 @@ jobs:
             }
 
       - name: Fail workflow if errors exist
-        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.gendocs.outputs.docs_changed == 'true'
+        if: steps.subcategory.outcome == 'failure' || steps.example.outcome == 'failure' || steps.empty.outcome == 'failure' || steps.cspell.outcome == 'failure' || steps.gendocs.outputs.docs_changed == 'true'
         run: exit 1
 
