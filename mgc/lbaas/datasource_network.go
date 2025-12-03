@@ -38,7 +38,6 @@ func (r *DataSourceLbaasNetwork) Configure(_ context.Context, req datasource.Con
 	r.lbNetworkLB = lbaasClient.NetworkLoadBalancers()
 }
 
-
 func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "Get the details of a network load balancer.",
