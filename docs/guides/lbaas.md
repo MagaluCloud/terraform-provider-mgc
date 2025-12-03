@@ -6,6 +6,8 @@ description: "A comprehensive guide to creating and managing Load Balancers in M
 
 # Comprehensive Guide to Load Balancer as a Service (LBaaS) in Magalu Cloud
 
+~> **WARNING:** LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
+
 This guide will help you understand and implement Load Balancers in Magalu Cloud, explaining how to distribute traffic across multiple targets, configure SSL/TLS termination, implement health checks, and manage security policies.
 
 ## Core LBaaS Concepts in Magalu Cloud

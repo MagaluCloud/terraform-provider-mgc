@@ -41,7 +41,7 @@ func (r *DataSourceLbaasNetworkCertificates) Configure(_ context.Context, req da
 
 func (r *DataSourceLbaasNetworkCertificates) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "List TLS Certificates for a Network Load Balancer.",
+		Description: experimentalWarning + "List TLS Certificates for a Network Load Balancer.",
 		Attributes: map[string]schema.Attribute{
 			"lb_id": schema.StringAttribute{
 				Required:    true,
