@@ -38,7 +38,7 @@ func (r *DataSourceLbaasNetworkBackends) Configure(_ context.Context, req dataso
 
 func (r *DataSourceLbaasNetworkBackends) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "List Network Load Balancer Backends. Includes targets for each backend.",
+		Description: experimentalWarning + "List Network Load Balancer Backends. Includes targets for each backend.",
 		Attributes: map[string]schema.Attribute{
 			"lb_id": schema.StringAttribute{
 				Required:    true,
