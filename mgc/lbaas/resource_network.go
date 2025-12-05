@@ -72,7 +72,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 
 func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages network load balancers in Magalu Cloud.",
+		Description: experimentalWarning + "Manages network load balancers in Magalu Cloud.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the load balancer.",

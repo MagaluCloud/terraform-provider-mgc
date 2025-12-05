@@ -40,7 +40,7 @@ func (r *DataSourceLbaasNetwork) Configure(_ context.Context, req datasource.Con
 
 func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get the details of a network load balancer.",
+		Description: experimentalWarning + "Get the details of a network load balancer.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Required:    true,

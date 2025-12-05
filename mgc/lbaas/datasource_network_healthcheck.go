@@ -41,7 +41,7 @@ func (r *DataSourceLbaasNetworkHealthCheck) Configure(_ context.Context, req dat
 
 func (r *DataSourceLbaasNetworkHealthCheck) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get a specific Network Load Balancer Health Check by Load Balancer ID and Health Check ID.",
+		Description: experimentalWarning + "Get a specific Network Load Balancer Health Check by Load Balancer ID and Health Check ID.",
 		Attributes: map[string]schema.Attribute{
 			"lb_id": schema.StringAttribute{
 				Required:    true,
