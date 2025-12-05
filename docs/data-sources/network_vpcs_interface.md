@@ -31,6 +31,7 @@ output "datasource_vpcs_interface" {
 
 ### Read-Only
 
+- `anti_spoofing` (Boolean) Indicates whether IP Spoofing protection is enabled
 - `availability_zone` (String) Availability zone of the VPC interface
 - `created_at` (String) Creation timestamp of the VPC interface
 - `description` (String) Description of the VPC interface

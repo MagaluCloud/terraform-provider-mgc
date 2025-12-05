@@ -24,6 +24,7 @@ type NetworkVPCInterfaceDataSourceModel struct {
 	Updated               types.String                        `tfsdk:"updated"`
 	VpcId                 types.String                        `tfsdk:"vpc_id"`
 	AvailabilityZone      types.String                        `tfsdk:"availability_zone"`
+	AntiSpoofing          types.Bool                          `tfsdk:"anti_spoofing"`
 }
 
 type NetworkVPCInterfaceIpAddressModel struct {
@@ -84,6 +85,10 @@ func (r *NetworkVPCInterfaceDatasource) Schema(_ context.Context, req datasource
 						},
 					},
 				},
+			},
+			"anti_spoofing": schema.BoolAttribute{
+				Description: "Indicates whether IP Spoofing protection is enabled",
+				Computed:    true,
 			},
 			"is_admin_state_up": schema.BoolAttribute{
 				Description: "Administrative state of the VPC interface",
