@@ -248,7 +248,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringvalidator.LengthAtLeast(1),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"availability_zone": schema.StringAttribute{
@@ -260,6 +260,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"status": schema.StringAttribute{
@@ -500,13 +501,15 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if (planData.BackupRetentionDays.ValueInt64() != stateData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != stateData.BackupStartAt.ValueString()) {
+	if (planData.BackupRetentionDays.ValueInt64() != stateData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != stateData.BackupStartAt.ValueString() || planData.ParameterGroup.ValueString() != stateData.ParameterGroup.ValueString()) {
 		stateData.BackupRetentionDays = planData.BackupRetentionDays
 		stateData.BackupStartAt = planData.BackupStartAt
+		stateData.ParameterGroup = planData.ParameterGroup
 
 		_, err := r.dbaasInstances.Update(ctx, planData.ID.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
 			BackupStartAt:       planData.BackupStartAt.ValueStringPointer(),
+			ParameterGroupID:    planData.ParameterGroup.ValueStringPointer(),
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
