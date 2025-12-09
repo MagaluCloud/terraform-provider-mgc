@@ -31,6 +31,7 @@ resource "mgc_network_vpcs_interfaces" "interface_example" {
 
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
+- `anti_spoofing` (Boolean) Activates (true) or deactivates (false) the IP Spoofing protection
 - `availability_zone` (String) The availability zone of the VPC Interface
 - `subnet_ids` (List of String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The IDs of the subnets
 
