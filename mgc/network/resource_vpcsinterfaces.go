@@ -122,7 +122,7 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 
 func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var model NetworkVPCInterfaceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &model)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -149,6 +149,10 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
+	}
+
+	if model.AntiSpoofing.ValueBoolPointer() == nil {
+		model.AntiSpoofing = types.BoolValue(true)
 	}
 
 	err = r.networkPorts.Update(ctx, createdVPCInterface, netSDK.PortUpdateRequest{
