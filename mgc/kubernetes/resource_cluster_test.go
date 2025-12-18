@@ -11,7 +11,7 @@ import (
 
 func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 	t.Run("should return nil for nil input", func(t *testing.T) {
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(nil)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(nil)
 		assert.Nil(t, result)
 	})
 
@@ -22,7 +22,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Version: "1.28.0",
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("cluster-123"), result.ID)
@@ -60,7 +60,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &[]string{"192.168.1.0/24", "10.0.0.0/8"},
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 		expectedTime := types.StringValue(now.Format(time.RFC3339))
 
 		assert.NotNil(t, result)
@@ -89,7 +89,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			MachineTypesSource: &machineTypesSource,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("internal"), result.MachineTypesSource)
@@ -107,7 +107,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &emptyCIDRs,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.True(t, result.Description.IsNull())
@@ -122,7 +122,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Platform: nil,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.True(t, result.PlatformVersion.IsNull())
@@ -207,7 +207,7 @@ func TestClusterResourceValidation(t *testing.T) {
 		}
 
 		// Convert to Terraform model
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// Validate all new fields are correctly mapped
 		assert.Equal(t, types.StringValue("us-east-1"), tfModel.Region)
@@ -227,7 +227,7 @@ func TestClusterResourceValidation(t *testing.T) {
 			// All optional fields are nil
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// All new optional fields should be null
 		assert.True(t, tfModel.Region.IsNull())
@@ -267,7 +267,7 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 					MachineTypesSource: &tc.enumValue,
 				}
 
-				tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+				tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 				assert.Equal(t, types.StringValue(tc.expected), tfModel.MachineTypesSource)
 			})
 		}
@@ -285,7 +285,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &zeroTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// Should handle zero time gracefully
 		assert.False(t, tfModel.CreatedAt.IsNull())
@@ -302,7 +302,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &futureTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		expectedTime := types.StringValue(futureTime.Format(time.RFC3339))
 		assert.Equal(t, expectedTime, tfModel.CreatedAt)
