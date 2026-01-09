@@ -1,0 +1,1 @@
+terraform import mgc_container_registry_proxy_cache.my_proxy <proxy_id>
