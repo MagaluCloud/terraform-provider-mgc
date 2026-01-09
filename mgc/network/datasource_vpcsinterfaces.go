@@ -162,7 +162,7 @@ func toNetworkVPCInterfaceDataSourceModel(vpcInterface netSDK.PortResponse) Netw
 	data.Name = types.StringPointerValue(vpcInterface.Name)
 	data.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 	data.IpAddress = []NetworkVPCInterfaceIpAddressModel{}
-	if vpcInterface.IPAddress == nil {
+	if vpcInterface.IPAddress != nil {
 		for _, ipAddress := range *vpcInterface.IPAddress {
 			data.IpAddress = append(data.IpAddress, NetworkVPCInterfaceIpAddressModel{
 				Ethertype: types.StringPointerValue(ipAddress.Ethertype),
