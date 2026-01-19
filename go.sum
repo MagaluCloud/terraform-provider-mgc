@@ -1,5 +1,9 @@
 github.com/MagaluCloud/mgc-sdk-go v1.0.0 h1:Zfpzy7OxbAmHdr3v4yvolEJ0OmAGN0r6L2Rs5cxiIls=
 github.com/MagaluCloud/mgc-sdk-go v1.0.0/go.mod h1:kNVX4v1CBlkIcKxnzNcQ0jgs5Awu3Vk0Bd+vaG7GvUs=
+github.com/MagaluCloud/mgc-sdk-go v1.1.0 h1:DXWhOxpoHxoTUiYTJixDJcl55RhZbyk+cEXq0mJpEGc=
+github.com/MagaluCloud/mgc-sdk-go v1.1.0/go.mod h1:kNVX4v1CBlkIcKxnzNcQ0jgs5Awu3Vk0Bd+vaG7GvUs=
+github.com/MagaluCloud/mgc-sdk-go v1.3.0 h1:elhQ9Q+Xui4eADoGxQb4MZuxUA9gfY5FWCPbofuRt7Q=
+github.com/MagaluCloud/mgc-sdk-go v1.3.0/go.mod h1:kNVX4v1CBlkIcKxnzNcQ0jgs5Awu3Vk0Bd+vaG7GvUs=
 github.com/bufbuild/protocompile v0.4.0 h1:LbFKd2XowZvQ/kajzguUp2DC9UEIQhIq77fZZlaQsNA=
 github.com/bufbuild/protocompile v0.4.0/go.mod h1:3v93+mbWn/v3xzN+31nwkJfrEpAUwp+BagBSZWx+TP8=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=

@@ -8,6 +8,8 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -18,6 +20,7 @@ type NetworkVPCInterfaceModel struct {
 	Name             types.String   `tfsdk:"name"`
 	AvailabilityZone types.String   `tfsdk:"availability_zone"`
 	SubnetsIds       []types.String `tfsdk:"subnet_ids"`
+	AntiSpoofing     types.Bool     `tfsdk:"anti_spoofing"`
 }
 
 type NetworkVPCInterfaceResource struct {
@@ -83,6 +86,15 @@ func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.Schem
 					utils.ReplaceIfChangeAndNotIsNotSetOnPlan{},
 				},
 			},
+			"anti_spoofing": schema.BoolAttribute{
+				Description: "Activates (true) or deactivates (false) the IP Spoofing protection",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -103,6 +115,7 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 	model.Name = types.StringPointerValue(vpcInterface.Name)
 	model.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 	model.AvailabilityZone = types.StringPointerValue(vpcInterface.Network.AvailabilityZone)
+	model.AntiSpoofing = types.BoolPointerValue(vpcInterface.IPSpoofingGuard)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
@@ -138,6 +151,19 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
+	if model.AntiSpoofing.ValueBoolPointer() == nil {
+		model.AntiSpoofing = types.BoolValue(true)
+	}
+
+	err = r.networkPorts.Update(ctx, createdVPCInterface, netSDK.PortUpdateRequest{
+		IPSpoofingGuard: model.AntiSpoofing.ValueBoolPointer(),
+	})
+
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
 	createdVPCGet, err := r.networkPorts.Get(ctx, createdVPCInterface)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -151,7 +177,32 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 }
 
 func (r *NetworkVPCInterfaceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Update is not supported for VPC Interfaces", "")
+	var planData NetworkVPCInterfaceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &planData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var stateData NetworkVPCInterfaceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &stateData)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if planData.AntiSpoofing.ValueBool() != stateData.AntiSpoofing.ValueBool() {
+		stateData.AntiSpoofing = planData.AntiSpoofing
+
+		err := r.networkPorts.Update(ctx, stateData.Id.ValueString(), netSDK.PortUpdateRequest{
+			IPSpoofingGuard: stateData.AntiSpoofing.ValueBoolPointer(),
+		})
+
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &stateData)...)
 }
 
 func (r *NetworkVPCInterfaceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

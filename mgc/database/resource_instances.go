@@ -72,6 +72,7 @@ type DBaaSInstanceModel struct {
 	EngineVersion       types.String `tfsdk:"engine_version"`
 	InstanceType        types.String `tfsdk:"instance_type"`
 	VolumeSize          types.Int64  `tfsdk:"volume_size"`
+	VolumeType          types.String `tfsdk:"volume_type"`
 	BackupRetentionDays types.Int64  `tfsdk:"backup_retention_days"`
 	BackupStartAt       types.String `tfsdk:"backup_start_at"`
 	AvailabilityZone    types.String `tfsdk:"availability_zone"`
@@ -193,7 +194,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 			},
 			"instance_type": schema.StringAttribute{
-				Description: "Compute and memory capacity of the instance (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
+				Description: "Compute and memory capacity of the instance determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -208,6 +209,15 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.Between(10, 50000),
+				},
+			},
+			"volume_type": schema.StringAttribute{
+				Description: "Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"backup_retention_days": schema.Int64Attribute{
@@ -238,7 +248,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringvalidator.LengthAtLeast(1),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"availability_zone": schema.StringAttribute{
@@ -250,6 +260,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"status": schema.StringAttribute{
@@ -321,6 +332,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 			BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
 			Volume: &dbSDK.InstanceVolumeRequest{
 				Size: *utils.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
+				Type: data.VolumeType.ValueString(),
 			},
 		}
 		createdInstance, err := r.dbaasInstances.RestoreSnapshot(ctx, data.SnapshotSourceID.ValueString(), data.SnapshotID.ValueString(), req)
@@ -367,6 +379,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		InstanceTypeID: &instanceTypeID,
 		Volume: dbSDK.InstanceVolumeRequest{
 			Size: *utils.ConvertInt64PointerToIntPointer(data.VolumeSize.ValueInt64Pointer()),
+			Type: data.VolumeType.ValueString(),
 		},
 		BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(data.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       data.BackupStartAt.ValueStringPointer(),
@@ -426,6 +439,7 @@ func (r *DBaaSInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	data.EngineVersion = types.StringValue(engineVersion)
 	data.InstanceType = types.StringValue(instanceTypeName)
 	data.VolumeSize = types.Int64Value(int64(instance.Volume.Size))
+	data.VolumeType = types.StringValue(instance.Volume.Type)
 	data.BackupRetentionDays = types.Int64Value(int64(instance.BackupRetentionDays))
 	data.BackupStartAt = types.StringValue(instance.BackupStartAt)
 	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
@@ -487,13 +501,15 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if (planData.BackupRetentionDays.ValueInt64() != stateData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != stateData.BackupStartAt.ValueString()) {
+	if (planData.BackupRetentionDays.ValueInt64() != stateData.BackupRetentionDays.ValueInt64()) || (planData.BackupStartAt.ValueString() != stateData.BackupStartAt.ValueString() || planData.ParameterGroup.ValueString() != stateData.ParameterGroup.ValueString()) {
 		stateData.BackupRetentionDays = planData.BackupRetentionDays
 		stateData.BackupStartAt = planData.BackupStartAt
+		stateData.ParameterGroup = planData.ParameterGroup
 
 		_, err := r.dbaasInstances.Update(ctx, planData.ID.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
 			BackupStartAt:       planData.BackupStartAt.ValueStringPointer(),
+			ParameterGroupID:    planData.ParameterGroup.ValueStringPointer(),
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))

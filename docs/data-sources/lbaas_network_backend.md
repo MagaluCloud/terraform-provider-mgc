@@ -3,10 +3,13 @@
 page_title: "mgc_lbaas_network_backend Data Source - terraform-provider-mgc"
 subcategory: "Load Balancer"
 description: |-
+  ~> WARNING: LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
   Get a specific Network Load Balancer Backend by Load Balancer ID and Backend ID. Includes targets.
 ---
 
 # mgc_lbaas_network_backend (Data Source)
+
+~> **WARNING:** LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
 
 Get a specific Network Load Balancer Backend by Load Balancer ID and Backend ID. Includes targets.
 

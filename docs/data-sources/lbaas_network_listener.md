@@ -3,10 +3,13 @@
 page_title: "mgc_lbaas_network_listener Data Source - terraform-provider-mgc"
 subcategory: "Load Balancer"
 description: |-
+  ~> WARNING: LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
   Get a specific Network Load Balancer Listener by Load Balancer ID and Listener ID.
 ---
 
 # mgc_lbaas_network_listener (Data Source)
+
+~> **WARNING:** LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
 
 Get a specific Network Load Balancer Listener by Load Balancer ID and Listener ID.
 

@@ -22,6 +22,7 @@ resource "mgc_dbaas_instances" "web_db" {
   engine_version        = "8.0"
   instance_type         = "cloud-dbaas-bs1.small"
   volume_size           = 50
+  volume_type           = "CLOUD_NVME15K"
   backup_retention_days = 7
   backup_start_at       = "02:00:00"
   availability_zone     = "br-se1-a"
@@ -36,6 +37,7 @@ Key parameters:
 - `engine_name/version`: Database type and version
 - `instance_type`: Determines compute resources allocated
 - `volume_size`: Storage capacity in GB
+- `volume_type`: Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K')
 - `backup_*`: Configures automatic backups
 
 ## Creating a Database Cluster

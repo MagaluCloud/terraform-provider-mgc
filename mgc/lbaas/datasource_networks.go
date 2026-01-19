@@ -39,7 +39,7 @@ func (r *DataSourceLbaasNetworks) Configure(_ context.Context, req datasource.Co
 
 func (r *DataSourceLbaasNetworks) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "List network load balancers.",
+		Description: experimentalWarning + "List network load balancers.",
 		Attributes: map[string]schema.Attribute{
 			"load_balancers": schema.ListNestedAttribute{
 				Computed:    true,

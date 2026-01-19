@@ -14,15 +14,16 @@ Manages a DBaaS (Database-as-a-Service) instance
 
 ```terraform
 resource "mgc_dbaas_instances" "test_instance" {
-  name                 = "test-instance"
-  user                 = "dbadmin"
-  password             = "examplepassword"
-  engine_name          = "mysql"
-  engine_version       = "8.0"
-  instance_type        = "cloud-dbaas-gp1.small"
-  volume_size          = 50
+  name                  = "test-instance"
+  user                  = "dbadmin"
+  password              = "examplepassword"
+  engine_name           = "mysql"
+  engine_version        = "8.0"
+  instance_type         = "DP2-8-40"
+  volume_size           = 50
+  volume_type           = "CLOUD_NVME15K"
   backup_retention_days = 10
-  backup_start_at      = "16:00:00"
+  backup_start_at       = "16:00:00"
 }
 ```
 
@@ -31,7 +32,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 
 ### Required
 
-- `instance_type` (String) Compute and memory capacity of the instance (e.g., 'DP2-16-40'). Can be changed to scale the instance.
+- `instance_type` (String) Compute and memory capacity of the instance determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS instance. Must be unique within your account. Cannot be changed after creation.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
@@ -49,6 +50,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 - `snapshot_id` (String) ID of the snapshot to use for the instance. Not used when creating a new instance.
 - `snapshot_source_id` (String) ID of the instance to use for the snapshot. Not used when creating a new instance.
 - `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database. Must start with a letter and contain only alphanumeric characters. Required when creating a new instance.
+- `volume_type` (String) Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.
 
 ### Read-Only
 

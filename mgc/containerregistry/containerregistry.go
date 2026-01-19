@@ -11,11 +11,14 @@ func GetDataSources() []func() datasource.DataSource {
 		NewDataSourceCRImages,
 		NewDataSourceCRRegistries,
 		NewDataSourceCRRepositories,
+		NewProxyCacheDataSource,
+		NewProxyCacheListDataSource,
 	}
 }
 
 func GetResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewContainerRegistryRegistriesResource,
+		NewContainerRegistryProxyCacheResource,
 	}
 }

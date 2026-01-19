@@ -67,6 +67,10 @@ func (r *NetworkVPCInterfacesDatasource) Schema(_ context.Context, req datasourc
 								},
 							},
 						},
+						"anti_spoofing": schema.BoolAttribute{
+							Description: "Indicates whether IP Spoofing protection is enabled.",
+							Computed:    true,
+						},
 						"is_admin_state_up": schema.BoolAttribute{
 							Description: "Administrative state of the VPC interface",
 							Computed:    true,
@@ -167,6 +171,7 @@ func toNetworkVPCInterfaceDataSourceModel(vpcInterface netSDK.PortResponse) Netw
 			})
 		}
 	}
+	data.AntiSpoofing = types.BoolPointerValue(vpcInterface.IPSpoofingGuard)
 	data.IsAdminStateUp = types.BoolPointerValue(vpcInterface.IsAdminStateUp)
 	data.IsPortSecurityEnabled = types.BoolPointerValue(vpcInterface.IsPortSecurityEnabled)
 	data.PublicIp = []NetworkVPCInterfacePublicIpModel{}

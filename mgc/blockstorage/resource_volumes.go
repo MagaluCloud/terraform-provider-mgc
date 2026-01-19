@@ -249,7 +249,7 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 		}
 	}
 
-	if planData.Size.ValueInt64() > state.Size.ValueInt64() {
+	if planData.Size.ValueInt64() != state.Size.ValueInt64() {
 		err := r.bsVolumes.Extend(ctx, planData.ID.ValueString(), storageSDK.ExtendVolumeRequest{
 			Size: int(planData.Size.ValueInt64()),
 		})
