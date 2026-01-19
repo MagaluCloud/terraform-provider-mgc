@@ -176,18 +176,18 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 				"Error enabling versioning",
 				fmt.Sprintf("Could not enable versioning for bucket %s: %s", bucketName, err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 	}
 
 	if !plan.Lock.IsNull() && plan.Lock.ValueBool() {
-		if err := r.buckets.LockBucket(ctx, bucketName); err != nil {
+		if err := r.buckets.LockBucket(ctx, bucketName, 1, "days"); err != nil {
 			resp.Diagnostics.AddError(
 				"Error locking bucket",
 				fmt.Sprintf("Could not enable object lock for bucket %s: %s", bucketName, err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 	}
@@ -199,7 +199,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 				"Error parsing bucket policy",
 				fmt.Sprintf("Could not parse bucket policy JSON: %s", err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 
@@ -208,7 +208,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 				"Error setting bucket policy",
 				fmt.Sprintf("Could not set bucket policy for %s: %s", bucketName, err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 	}
@@ -221,7 +221,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 		})
 		if diags.HasError() {
 			resp.Diagnostics.Append(diags...)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 
@@ -231,7 +231,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 				"Error parsing CORS configuration",
 				fmt.Sprintf("Could not parse CORS configuration: %s", err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 
@@ -240,7 +240,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 				"Error setting CORS configuration",
 				fmt.Sprintf("Could not set CORS configuration for bucket %s: %s", bucketName, err.Error()),
 			)
-			_ = r.buckets.Delete(ctx, bucketName)
+			_ = r.buckets.Delete(ctx, bucketName, false)
 			return
 		}
 	} else if plan.CORS.IsUnknown() {
@@ -402,7 +402,7 @@ func (r *objectStorageBuckets) Update(ctx context.Context, req resource.UpdateRe
 
 	if !plan.Lock.Equal(state.Lock) {
 		if plan.Lock.ValueBool() {
-			if err := r.buckets.LockBucket(ctx, bucketName); err != nil {
+			if err := r.buckets.LockBucket(ctx, bucketName, 1, "days"); err != nil {
 				resp.Diagnostics.AddError(
 					"Error locking bucket",
 					fmt.Sprintf("Could not enable object lock for bucket %s: %s", bucketName, err.Error()),
@@ -528,7 +528,7 @@ func (r *objectStorageBuckets) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	if err := r.buckets.Delete(ctx, bucketName); err != nil {
+	if err := r.buckets.Delete(ctx, bucketName, false); err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting bucket",
 			fmt.Sprintf("Could not delete bucket %s: %s", bucketName, err.Error()),

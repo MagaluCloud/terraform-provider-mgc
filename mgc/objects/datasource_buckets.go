@@ -70,7 +70,7 @@ func (d *objectStorageBucketsDataSource) Schema(ctx context.Context, req datasou
 func (d *objectStorageBucketsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data ObjectStorageBucketsDataSourceModel
 
-	buckets, err := d.buckets.List(ctx, objSdk.BucketListOptions{})
+	buckets, err := d.buckets.List(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing buckets",
