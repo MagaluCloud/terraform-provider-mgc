@@ -11,7 +11,6 @@ import (
 )
 
 var _ datasource.DataSource = &DataSourceCRRegistries{}
-var listLimit = 50
 
 type DataSourceCRRegistries struct {
 	crRegistries crSDK.RegistriesService
@@ -29,6 +28,7 @@ type crRegistries struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	StorageUsageBytes types.Int64  `tfsdk:"storage_usage_bytes"`
+	ProxyCacheID      types.String `tfsdk:"proxy_cache_id"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
 }
@@ -72,6 +72,10 @@ func (r *DataSourceCRRegistries) Schema(_ context.Context, req datasource.Schema
 							Description: "The storage usage in bytes",
 							Computed:    true,
 						},
+						"proxy_cache_id": schema.StringAttribute{
+							Description: "The ID of the proxy cache associated with this registry",
+							Computed:    true,
+						},
 						"created_at": schema.StringAttribute{
 							Description: "The timestamp when the registry was created",
 							Computed:    true,
@@ -109,6 +113,7 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 		item.Name = types.StringValue(registry.Name)
 		item.UpdatedAt = types.StringValue(registry.UpdatedAt)
 		item.CreatedAt = types.StringValue(registry.CreatedAt)
+		item.ProxyCacheID = types.StringPointerValue(registry.ProxyCacheID)
 
 		data.Registries = append(data.Registries, item)
 	}

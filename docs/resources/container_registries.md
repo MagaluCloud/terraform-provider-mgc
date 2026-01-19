@@ -14,7 +14,8 @@ Manages a Container Registry
 
 ```terraform
 resource "mgc_container_registries" "registry" {
-  name = "my_registry"
+  name           = "my_registry"
+  proxy_cache_id = "proxy_cache_id"
 }
 ```
 
@@ -24,6 +25,10 @@ resource "mgc_container_registries" "registry" {
 ### Required
 
 - `name` (String) Name of the registry
+
+### Optional
+
+- `proxy_cache_id` (String) The ID of the proxy cache associated with this registry
 
 ### Read-Only
 
