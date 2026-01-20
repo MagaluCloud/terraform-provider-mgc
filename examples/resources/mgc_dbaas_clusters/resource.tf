@@ -10,6 +10,7 @@ resource "mgc_dbaas_clusters" "my_cluster" {
   backup_retention_days = 7
   backup_start_at       = "03:00:00"
   parameter_group_id    = mgc_dbaas_parameter_groups.cluster_pg.id
+  deletion_protected    = true
 }
 
 resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {

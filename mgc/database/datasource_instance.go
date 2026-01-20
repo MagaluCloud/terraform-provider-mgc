@@ -30,6 +30,7 @@ type dbInstanceDataSourceModel struct {
 	VolumeType          types.String      `tfsdk:"volume_type"`
 	AvailabilityZone    types.String      `tfsdk:"availability_zone"`
 	ParameterGroup      types.String      `tfsdk:"parameter_group"`
+	DeletionProtected   types.Bool        `tfsdk:"deletion_protected"`
 }
 
 func NewDataSourceDbaasInstance() datasource.DataSource {
@@ -121,6 +122,10 @@ func (r *DataSourceDbInstance) Schema(_ context.Context, _ datasource.SchemaRequ
 				Description: "Availability zone to use for the instance.",
 				Computed:    true,
 			},
+			"deletion_protected": schema.BoolAttribute{
+				Description: "Deletion protected.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -149,5 +154,6 @@ func (r *DataSourceDbInstance) Read(ctx context.Context, req datasource.ReadRequ
 	data.VolumeType = types.StringValue(string(instance.Volume.Type))
 	data.AvailabilityZone = types.StringValue(instance.AvailabilityZone)
 	data.ParameterGroup = types.StringValue(instance.ParameterGroupID)
+	data.DeletionProtected = types.BoolValue(instance.DeletionProtected)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
