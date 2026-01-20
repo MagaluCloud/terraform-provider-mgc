@@ -14,8 +14,10 @@ Network VPC Interface
 
 ```terraform
 resource "mgc_network_vpcs_interfaces" "interface_example" {
-    name = "example-interface"
-    vpc_id = mgc_network_vpcs.example.id
+  name       = "example-interface"
+  vpc_id     = mgc_network_vpcs.example.id
+  subnet_ids = ["subnet-id"]
+  ip_address = "172.18.106.110"
 }
 ```
 
@@ -33,6 +35,7 @@ resource "mgc_network_vpcs_interfaces" "interface_example" {
 
 - `anti_spoofing` (Boolean) Activates (true) or deactivates (false) the IP Spoofing protection
 - `availability_zone` (String) The availability zone of the VPC Interface
+- `ip_address` (String) IP Address
 - `subnet_ids` (List of String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The IDs of the subnets
 
 ### Read-Only

@@ -14,8 +14,9 @@ import (
 )
 
 type ContainerRegistryModel struct {
-	Id   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	Id           types.String `tfsdk:"id"`
+	Name         types.String `tfsdk:"name"`
+	ProxyCacheID types.String `tfsdk:"proxy_cache_id"`
 }
 
 type ContainerRegistryResource struct {
@@ -58,6 +59,13 @@ func (r *ContainerRegistryResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"proxy_cache_id": schema.StringAttribute{
+				Description: "The ID of the proxy cache associated with this registry",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -70,7 +78,8 @@ func (r *ContainerRegistryResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	created, err := r.registryService.Create(ctx, &crSDK.RegistryRequest{
-		Name: data.Name.ValueString(),
+		Name:         data.Name.ValueString(),
+		ProxyCacheID: data.ProxyCacheID.ValueStringPointer(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -79,6 +88,7 @@ func (r *ContainerRegistryResource) Create(ctx context.Context, req resource.Cre
 
 	data.Id = types.StringValue(created.ID)
 	data.Name = types.StringValue(created.Name)
+	data.ProxyCacheID = types.StringPointerValue(created.ProxyCacheID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -96,6 +106,7 @@ func (r *ContainerRegistryResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	data.Name = types.StringValue(registry.Name)
+	data.ProxyCacheID = types.StringPointerValue(registry.ProxyCacheID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

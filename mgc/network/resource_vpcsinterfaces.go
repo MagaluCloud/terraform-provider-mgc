@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -21,6 +22,7 @@ type NetworkVPCInterfaceModel struct {
 	AvailabilityZone types.String   `tfsdk:"availability_zone"`
 	SubnetsIds       []types.String `tfsdk:"subnet_ids"`
 	AntiSpoofing     types.Bool     `tfsdk:"anti_spoofing"`
+	IPAddress        types.String   `tfsdk:"ip_address"`
 }
 
 type NetworkVPCInterfaceResource struct {
@@ -95,6 +97,14 @@ func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.Schem
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"ip_address": schema.StringAttribute{
+				Description: "IP Address",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -116,6 +126,10 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 	model.VpcId = types.StringPointerValue(vpcInterface.VPCID)
 	model.AvailabilityZone = types.StringPointerValue(vpcInterface.Network.AvailabilityZone)
 	model.AntiSpoofing = types.BoolPointerValue(vpcInterface.IPSpoofingGuard)
+
+	if len(*vpcInterface.IPAddress) == 1 {
+		model.IPAddress = types.StringPointerValue(&(*vpcInterface.IPAddress)[0].IPAddress)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
@@ -140,6 +154,10 @@ func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.C
 			subnets = append(subnets, subnetId.ValueString())
 		}
 		createNic.Subnets = &subnets
+	}
+
+	if model.IPAddress.ValueString() != "" {
+		createNic.IPAddress = model.IPAddress.ValueStringPointer()
 	}
 
 	createdVPCInterface, err := r.networkVpcsPorts.CreatePort(ctx, model.VpcId.ValueString(), createNic,

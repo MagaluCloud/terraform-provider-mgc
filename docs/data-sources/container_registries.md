@@ -32,5 +32,6 @@ Read-Only:
 - `created_at` (String) The timestamp when the registry was created
 - `id` (String) The unique identifier of the registry
 - `name` (String) The name of the registry
+- `proxy_cache_id` (String) The ID of the proxy cache associated with this registry
 - `storage_usage_bytes` (Number) The storage usage in bytes
 - `updated_at` (String) The timestamp when the registry was last updated
