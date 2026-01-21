@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -316,7 +316,9 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "Deletion protected.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -354,7 +356,10 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		ParameterGroupID:    plan.ParameterGroup.ValueStringPointer(),
 		BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(plan.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       plan.BackupStartAt.ValueStringPointer(),
-		DeletionProtected:   plan.DeletionProtected.ValueBoolPointer(),
+	}
+
+	if plan.DeletionProtected.ValueBoolPointer() != nil {
+		createReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
 	}
 
 	clusterResp, err := r.dbaasClusters.Create(ctx, createReq)

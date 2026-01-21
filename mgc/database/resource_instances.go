@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -293,7 +293,9 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Description: "Deletion protected.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -396,6 +398,10 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		DeletionProtected:   data.DeletionProtected.ValueBoolPointer(),
 	}
 
+	if data.DeletionProtected.ValueBoolPointer() != nil {
+		params.DeletionProtected = data.DeletionProtected.ValueBoolPointer()
+	}
+
 	created, err := r.dbaasInstances.Create(ctx, params)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -413,6 +419,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	data.Status = types.StringValue(string(result.Status))
+	data.DeletionProtected = types.BoolValue(result.DeletionProtected)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -522,12 +529,17 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		stateData.ParameterGroup = planData.ParameterGroup
 		stateData.DeletionProtected = planData.DeletionProtected
 
-		_, err := r.dbaasInstances.Update(ctx, planData.ID.ValueString(), dbSDK.DatabaseInstanceUpdateRequest{
+		reqParams := dbSDK.DatabaseInstanceUpdateRequest{
 			BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(planData.BackupRetentionDays.ValueInt64Pointer()),
 			BackupStartAt:       planData.BackupStartAt.ValueStringPointer(),
 			ParameterGroupID:    planData.ParameterGroup.ValueStringPointer(),
-			DeletionProtected:   planData.DeletionProtected.ValueBoolPointer(),
-		})
+		}
+
+		if planData.DeletionProtected.ValueBoolPointer() != nil {
+			reqParams.DeletionProtected = planData.DeletionProtected.ValueBoolPointer()
+		}
+
+		_, err := r.dbaasInstances.Update(ctx, planData.ID.ValueString(), reqParams)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
