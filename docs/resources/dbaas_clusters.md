@@ -25,6 +25,7 @@ resource "mgc_dbaas_clusters" "my_cluster" {
   backup_retention_days = 7
   backup_start_at       = "03:00:00"
   parameter_group_id    = mgc_dbaas_parameter_groups.cluster_pg.id
+  deletion_protected    = true
 }
 
 resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
@@ -59,6 +60,7 @@ resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
 
 - `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Default is 7 days.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS'). Default is '04:00:00'.
+- `deletion_protected` (Boolean) Deletion protected.
 - `parameter_group` (String) ID of the parameter group to associate with the cluster.  Cannot be changed after creation.
 - `volume_type` (String) Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.
 

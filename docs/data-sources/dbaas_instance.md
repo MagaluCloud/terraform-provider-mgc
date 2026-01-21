@@ -31,6 +31,7 @@ data "mgc_dbaas_instance" "test_instance" {
 - `availability_zone` (String) Availability zone to use for the instance.
 - `backup_retention_days` (Number) Number of days to retain backups
 - `created_at` (String) Creation timestamp of the instance
+- `deletion_protected` (Boolean) Deletion protected.
 - `engine_id` (String) ID of the engine
 - `instance_type_id` (String) ID of the instance type
 - `name` (String) Name of the instance
