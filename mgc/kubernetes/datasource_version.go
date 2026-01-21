@@ -12,7 +12,8 @@ import (
 )
 
 type VersionsModel struct {
-	Versions []VersionModel `tfsdk:"versions"`
+	IncludeDeprecated types.Bool     `tfsdk:"include_deprecated"`
+	Versions          []VersionModel `tfsdk:"versions"`
 }
 
 type VersionModel struct {
@@ -50,6 +51,10 @@ func (r *DataSourceKubernetesVersion) Configure(ctx context.Context, req datasou
 func (r *DataSourceKubernetesVersion) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"include_deprecated": schema.BoolAttribute{
+				Description: "Include deprecated versions.",
+				Optional:    true,
+			},
 			"versions": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available Kubernetes versions.",
@@ -74,7 +79,15 @@ func (r *DataSourceKubernetesVersion) Schema(_ context.Context, req datasource.S
 func (r *DataSourceKubernetesVersion) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data VersionsModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	sdkOutput, err := r.sdkClient.List(ctx)
+
+	includeDeprecated := false
+	if data.IncludeDeprecated.ValueBoolPointer() != nil && *data.IncludeDeprecated.ValueBoolPointer() {
+		includeDeprecated = true
+	} else {
+		data.IncludeDeprecated = types.BoolValue(false)
+	}
+
+	sdkOutput, err := r.sdkClient.List(ctx, includeDeprecated)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
