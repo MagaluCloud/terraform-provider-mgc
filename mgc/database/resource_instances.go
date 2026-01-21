@@ -398,7 +398,7 @@ func (r *DBaaSInstanceResource) Create(ctx context.Context, req resource.CreateR
 		DeletionProtected:   data.DeletionProtected.ValueBoolPointer(),
 	}
 
-	if data.DeletionProtected.ValueBoolPointer() != nil {
+	if !data.DeletionProtected.IsNull() && !data.DeletionProtected.IsUnknown() {
 		params.DeletionProtected = data.DeletionProtected.ValueBoolPointer()
 	}
 
@@ -535,7 +535,7 @@ func (r *DBaaSInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			ParameterGroupID:    planData.ParameterGroup.ValueStringPointer(),
 		}
 
-		if planData.DeletionProtected.ValueBoolPointer() != nil {
+		if !planData.DeletionProtected.IsNull() && !planData.DeletionProtected.IsUnknown() {
 			reqParams.DeletionProtected = planData.DeletionProtected.ValueBoolPointer()
 		}
 

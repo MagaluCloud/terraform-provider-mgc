@@ -358,7 +358,7 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		BackupStartAt:       plan.BackupStartAt.ValueStringPointer(),
 	}
 
-	if plan.DeletionProtected.ValueBoolPointer() != nil {
+	if !plan.DeletionProtected.IsNull() && !plan.DeletionProtected.IsUnknown() {
 		createReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
 	}
 
