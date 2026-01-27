@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -59,6 +60,7 @@ type DBaaSClusterModel struct {
 	FinishedAt             types.String               `tfsdk:"finished_at"`
 	InstanceTypeID         types.String               `tfsdk:"instance_type_id"`
 	EngineID               types.String               `tfsdk:"engine_id"`
+	DeletionProtected      types.Bool                 `tfsdk:"deletion_protected"`
 }
 
 type DBaaSClusterResource struct {
@@ -310,6 +312,14 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"deletion_protected": schema.BoolAttribute{
+				Description: "Deletion protected.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -346,6 +356,10 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		ParameterGroupID:    plan.ParameterGroup.ValueStringPointer(),
 		BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(plan.BackupRetentionDays.ValueInt64Pointer()),
 		BackupStartAt:       plan.BackupStartAt.ValueStringPointer(),
+	}
+
+	if !plan.DeletionProtected.IsNull() && !plan.DeletionProtected.IsUnknown() {
+		createReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
 	}
 
 	clusterResp, err := r.dbaasClusters.Create(ctx, createReq)
@@ -455,6 +469,11 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 		state.BackupStartAt = plan.BackupStartAt
 		changed = true
 	}
+	if !plan.DeletionProtected.Equal(state.DeletionProtected) {
+		updateReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
+		state.DeletionProtected = plan.DeletionProtected
+		changed = true
+	}
 
 	if changed {
 		_, err := r.dbaasClusters.Update(ctx, clusterID, updateReq)
@@ -488,6 +507,7 @@ func (r *DBaaSClusterResource) Delete(ctx context.Context, req resource.DeleteRe
 		err := r.dbaasClusters.Delete(ctx, string(clusterID))
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
 		}
 	}
 
@@ -538,6 +558,7 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	model.Addresses = modelAddresses
 	model.Password = types.StringNull()
 	model.User = types.StringNull()
+	model.DeletionProtected = types.BoolValue(detail.DeletionProtected)
 }
 
 func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus) (*dbSDK.ClusterDetailResponse, error) {

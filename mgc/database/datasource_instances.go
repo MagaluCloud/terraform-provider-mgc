@@ -37,6 +37,7 @@ type dbInstance struct {
 	VolumeType          types.String      `tfsdk:"volume_type"`
 	AvailabilityZone    types.String      `tfsdk:"availability_zone"`
 	ParameterGroup      types.String      `tfsdk:"parameter_group"`
+	DeletionProtected   types.Bool        `tfsdk:"deletion_protected"`
 }
 
 type InstanceAddress struct {
@@ -139,6 +140,10 @@ func (r *DataSourceDbInstances) Schema(_ context.Context, _ datasource.SchemaReq
 							Description: "Availability zone to use for the instance.",
 							Computed:    true,
 						},
+						"deletion_protected": schema.BoolAttribute{
+							Description: "Deletion protected.",
+							Computed:    true,
+						},
 					},
 				},
 			},
@@ -188,18 +193,11 @@ func (r *DataSourceDbInstances) Read(ctx context.Context, req datasource.ReadReq
 			VolumeType:          types.StringValue(string(instance.Volume.Type)),
 			AvailabilityZone:    types.StringValue(instance.AvailabilityZone),
 			ParameterGroup:      types.StringValue(instance.ParameterGroupID),
+			DeletionProtected:   types.BoolValue(instance.DeletionProtected),
 		})
 	}
 	data.Instances = instanceModels
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func convertToStringMapInstance(params []dbSDK.InstanceParametersResponse) map[string]types.String {
-	result := make(map[string]types.String, len(params))
-	for _, value := range params {
-		result[value.Name] = types.StringValue(utils.SdkParamValueToString(value.Value))
-	}
-	return result
 }
 
 func convertToAddressModel(addresses []dbSDK.Address) []InstanceAddress {

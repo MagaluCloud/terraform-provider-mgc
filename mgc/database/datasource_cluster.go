@@ -29,6 +29,7 @@ type dbaasClusterDataModel struct {
 	UpdatedAt              types.String                   `tfsdk:"updated_at"`
 	StartedAt              types.String                   `tfsdk:"started_at"`
 	FinishedAt             types.String                   `tfsdk:"finished_at"`
+	DeletionProtected      types.Bool                     `tfsdk:"deletion_protected"`
 }
 
 type dbaasClusterAddressDataModel struct {
@@ -68,6 +69,7 @@ func convertSDKClusterToDataModel(detail dbSDK.ClusterDetailResponse) dbaasClust
 		UpdatedAt:              types.StringPointerValue(utils.ConvertTimeToRFC3339(detail.UpdatedAt)),
 		StartedAt:              types.StringPointerValue(detail.StartedAt),
 		FinishedAt:             types.StringPointerValue(detail.FinishedAt),
+		DeletionProtected:      types.BoolPointerValue(&detail.DeletionProtected),
 	}
 }
 
@@ -161,6 +163,10 @@ func dbaasClusterAttributes() map[string]schema.Attribute {
 			Description: "Timestamp of when the cluster last finished an operation.",
 			Computed:    true,
 		},
+		"deletion_protected": schema.BoolAttribute{
+			Description: "Deletion protected.",
+			Computed:    true,
+		},
 	}
 }
 
@@ -185,6 +191,7 @@ type dbaasClusterDataSourceModel struct {
 	UpdatedAt              types.String                   `tfsdk:"updated_at"`
 	StartedAt              types.String                   `tfsdk:"started_at"`
 	FinishedAt             types.String                   `tfsdk:"finished_at"`
+	DeletionProtected      types.Bool                     `tfsdk:"deletion_protected"`
 }
 
 func NewDBaaSClusterDataSource() datasource.DataSource {

@@ -9,4 +9,5 @@ resource "mgc_dbaas_instances" "test_instance" {
   volume_type           = "CLOUD_NVME15K"
   backup_retention_days = 10
   backup_start_at       = "16:00:00"
+  deletion_protected    = true
 }
