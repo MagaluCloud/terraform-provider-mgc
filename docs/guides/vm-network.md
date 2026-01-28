@@ -243,8 +243,8 @@ You can still add secondary interfaces to your VM for advanced networking:
 resource "mgc_virtual_machine_instances" "multi_interface_vm" {
   name                 = "multi-interface-vm"
   machine_type         = "BV1-1-40"
-  image               = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name        = "your-ssh-key-name"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
   allocate_public_ipv4 = true
 }
 
