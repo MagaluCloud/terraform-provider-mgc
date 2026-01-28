@@ -31,8 +31,8 @@ Every VM in Magalu Cloud automatically comes with a primary network interface. H
 resource "mgc_virtual_machine_instances" "my_vm" {
   name                 = "my-vm"
   machine_type         = "BV1-1-40"
-  image               = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name        = "your-ssh-key-name"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
   allocate_public_ipv4 = true
 }
 
@@ -113,8 +113,8 @@ The simplest way to create a VM with a public IP address is using the `allocate_
 resource "mgc_virtual_machine_instances" "simple_vm" {
   name                 = "simple-vm"
   machine_type         = "BV1-1-40"
-  image               = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name        = "your-ssh-key-name"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
   allocate_public_ipv4 = true
 }
 
@@ -171,8 +171,8 @@ resource "mgc_network_security_groups_rules" "http_rule" {
 resource "mgc_virtual_machine_instances" "web_vm" {
   name                     = "web-vm"
   machine_type             = "BV1-1-40"
-  image                   = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name            = "your-ssh-key-name"
+  image                    = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name             = "your-ssh-key-name"
   creation_security_groups = [mgc_network_security_groups.web_sg.id]
   allocate_public_ipv4     = true
 }
@@ -216,9 +216,9 @@ resource "mgc_network_vpcs_subnets" "custom_subnet" {
 resource "mgc_virtual_machine_instances" "custom_vpc_vm" {
   name                 = "custom-vpc-vm"
   machine_type         = "BV1-1-40"
-  image               = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name        = "your-ssh-key-name"
-  vpc_id              = mgc_network_vpcs.custom_vpc.id
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
+  vpc_id               = mgc_network_vpcs.custom_vpc.id
   allocate_public_ipv4 = true
 }
 
@@ -243,8 +243,8 @@ You can still add secondary interfaces to your VM for advanced networking:
 resource "mgc_virtual_machine_instances" "multi_interface_vm" {
   name                 = "multi-interface-vm"
   machine_type         = "BV1-1-40"
-  image               = "cloud-ubuntu-24.04 LTS"
-  ssh_key_name        = "your-ssh-key-name"
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = "your-ssh-key-name"
   allocate_public_ipv4 = true
 }
 

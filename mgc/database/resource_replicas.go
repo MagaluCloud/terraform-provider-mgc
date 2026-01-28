@@ -88,7 +88,7 @@ func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaReques
 			"instance_type": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Instance type",
+				Description: "Compute and memory capacity of the replica determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
 			},
 			"volume_size": schema.Int64Attribute{
 				Optional:    true,

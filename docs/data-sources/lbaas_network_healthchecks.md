@@ -3,10 +3,13 @@
 page_title: "mgc_lbaas_network_healthchecks Data Source - terraform-provider-mgc"
 subcategory: "Load Balancer"
 description: |-
+  ~> WARNING: LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
   List Health Checks for a Network Load Balancer.
 ---
 
 # mgc_lbaas_network_healthchecks (Data Source)
+
+~> **WARNING:** LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
 
 List Health Checks for a Network Load Balancer.
 

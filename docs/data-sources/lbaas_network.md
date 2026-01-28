@@ -3,10 +3,13 @@
 page_title: "mgc_lbaas_network Data Source - terraform-provider-mgc"
 subcategory: "Load Balancer"
 description: |-
+  ~> WARNING: LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
   Get the details of a network load balancer.
 ---
 
 # mgc_lbaas_network (Data Source)
+
+~> **WARNING:** LBaaS in Magalu Cloud is in experimental stage, you may experience issues during provision and usage
 
 Get the details of a network load balancer.
 

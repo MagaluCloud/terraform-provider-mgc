@@ -53,6 +53,7 @@ resource "mgc_dbaas_instances" "test_instance" {
   engine_version        = "8.0"
   instance_type         = var.instance_type_label_single
   volume_size           = 60
+  volume_type           = "CLOUD_NVME20K"
   backup_retention_days = 10
   backup_start_at       = "17:00:00"
   availability_zone     = var.availability_zone

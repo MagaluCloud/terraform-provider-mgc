@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/MagaluCloud/mgc-sdk-go/client"
+	objSDK "github.com/MagaluCloud/mgc-sdk-go/objectstorage"
 )
 
 const (
@@ -32,11 +33,10 @@ var regions = map[string]map[string]string{
 		"br-mc1":  buildQAUrl("br-mc1"),
 	},
 }
-var s3Regions = map[string]map[string]string{
+var s3Regions = map[string]map[string]objSDK.Endpoint{
 	ENV_PROD: {
-		"br-ne1":  "br-ne1.magaluobjects.com",
-		"br-mgl1": "br-se-1.magaluobjects.com",
-		"br-se1":  "br-se1.magaluobjects.com",
+		"br-ne1": objSDK.BrNe1,
+		"br-se1": objSDK.BrSe1,
 	},
 }
 
@@ -64,7 +64,7 @@ func buildQAUrl(region string) string {
 	return URL_DEV_QA + "/" + region
 }
 
-func RegionToS3Url(region string, env string) (string, error) {
+func RegionToS3Url(region string, env string) (objSDK.Endpoint, error) {
 	if env == "pre-prod" {
 		return "", fmt.Errorf("pre-prod is not supported for S3")
 	}

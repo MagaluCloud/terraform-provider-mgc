@@ -3,6 +3,7 @@ package mgc
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"runtime"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/blockstorage"
@@ -18,6 +19,7 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/virtualmachines"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -25,7 +27,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	mgcSdk "github.com/MagaluCloud/magalu/mgc/sdk"
 	sdk "github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
@@ -37,23 +38,16 @@ const (
 
 type mgcProvider struct {
 	version string
-	sdk     *mgcSdk.Sdk
 }
+
+var rgxUUIDv4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type ProviderModel struct {
-	Region        types.String        `tfsdk:"region"`
-	Env           types.String        `tfsdk:"env"`
-	ApiKey        types.String        `tfsdk:"api_key"`
-	ObjectStorage *ObjectStorageModel `tfsdk:"object_storage"`
-}
-
-type ObjectStorageModel struct {
-	ObjectKeyPair *KeyPairModel `tfsdk:"key_pair"`
-}
-
-type KeyPairModel struct {
-	KeyID     types.String `tfsdk:"key_id"`
-	KeySecret types.String `tfsdk:"key_secret"`
+	Region        types.String `tfsdk:"region"`
+	Env           types.String `tfsdk:"env"`
+	ApiKey        types.String `tfsdk:"api_key"`
+	KeyPairID     types.String `tfsdk:"key_pair_id"`
+	KeyPairSecret types.String `tfsdk:"key_pair_secret"`
 }
 
 func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -66,14 +60,14 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 		Description: "Terraform Provider for Magalu Cloud",
 		Attributes: map[string]schema.Attribute{
 			"env": schema.StringAttribute{
-				Description: "The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.",
+				Description: "The environment to use. Options: prod / pre-prod / dev-qa. Default is " + defaultEnv,
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("prod", "pre-prod", "dev-qa"),
 				},
 			},
 			"region": schema.StringAttribute{
-				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is br-se1.",
+				Description: "The region to use for resources. Options: br-ne1 / br-se1. Default is " + defaultRegion,
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("br-ne1", "br-se1", "br-mgl1", "br-mc1"),
@@ -82,28 +76,27 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 			"api_key": schema.StringAttribute{
 				Description: "The Magalu API Key for authentication.",
 				Required:    true,
+				Sensitive:   true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud API key"),
 				},
 			},
-			"object_storage": schema.SingleNestedAttribute{
-				Description: "Configuration settings for Object Storage",
+			"key_pair_id": schema.StringAttribute{
+				Description: "Key Pair ID for Object Storage.",
 				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"key_pair": schema.SingleNestedAttribute{
-						Description: "Bucket Key Pair configuration",
-						Required:    true,
-						Attributes: map[string]schema.Attribute{
-							"key_id": schema.StringAttribute{
-								Description: "The API Key Access ID.",
-								Required:    true,
-							},
-							"key_secret": schema.StringAttribute{
-								Description: "The API Key Secret.",
-								Required:    true,
-							},
-						},
-					},
+				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud key pair id"),
+					stringvalidator.AlsoRequires(path.MatchRoot("key_pair_secret")),
+				},
+			},
+			"key_pair_secret": schema.StringAttribute{
+				Description: "Key Pair Secret for Object Storage.",
+				Optional:    true,
+				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(rgxUUIDv4, "must be a valid Magalu Cloud key pair secret"),
+					stringvalidator.AlsoRequires(path.MatchRoot("key_pair_id")),
 				},
 			},
 		},
@@ -114,7 +107,6 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 	var plan ProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
-		tflog.Error(ctx, "fail to get configs from provider")
 		return
 	}
 
@@ -124,12 +116,6 @@ func (p *mgcProvider) Configure(ctx context.Context, req provider.ConfigureReque
 
 	if plan.Region.ValueString() == "" {
 		plan.Region = types.StringValue(defaultRegion)
-	}
-
-	if plan.ObjectStorage == nil {
-		plan.ObjectStorage = &ObjectStorageModel{
-			&KeyPairModel{},
-		}
 	}
 
 	resourceOut := NewConfigData(plan, p.version)
@@ -173,25 +159,18 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 
 func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 	output := utils.DataConfig{
-		ApiKey: plan.ApiKey.ValueString(),
-		Env:    plan.Env.ValueString(),
-		Region: plan.Region.ValueString(),
-	}
-
-	if plan.ObjectStorage != nil ||
-		plan.ObjectStorage.ObjectKeyPair != nil ||
-		plan.ObjectStorage.ObjectKeyPair.KeyID.IsNull() ||
-		plan.ObjectStorage.ObjectKeyPair.KeySecret.IsNull() {
-		output.Keypair = utils.KeyPairData{
-			KeyID:     plan.ObjectStorage.ObjectKeyPair.KeyID.ValueString(),
-			KeySecret: plan.ObjectStorage.ObjectKeyPair.KeySecret.ValueString(),
-		}
+		ApiKey:        plan.ApiKey.ValueString(),
+		Env:           plan.Env.ValueString(),
+		Region:        plan.Region.ValueString(),
+		KeyPairID:     plan.KeyPairID.ValueString(),
+		KeyPairSecret: plan.KeyPairSecret.ValueString(),
 	}
 
 	sdkUrl := sdk.MgcUrl(utils.RegionToUrl(output.Region, output.Env))
 	tflog.Info(context.Background(), "Using MGC URL: "+sdkUrl.String())
 
-	output.CoreConfig = *sdk.NewMgcClient(output.ApiKey,
+	output.CoreConfig = *sdk.NewMgcClient(
+		sdk.WithAPIKey(output.ApiKey),
 		sdk.WithBaseURL(sdkUrl),
 		sdk.WithUserAgent(fmt.Sprintf("MgcTF/%s (%s; %s)", tfVersion, runtime.GOOS, runtime.GOARCH)),
 	)
@@ -200,12 +179,8 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 }
 
 func New(version string) func() provider.Provider {
-	sdk := mgcSdk.NewSdk()
-	mgcSdk.SetUserAgent("MgcTF/" + version)
-
 	return func() provider.Provider {
 		return &mgcProvider{
-			sdk:     sdk,
 			version: version,
 		}
 	}

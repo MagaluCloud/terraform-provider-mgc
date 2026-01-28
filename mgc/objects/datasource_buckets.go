@@ -2,111 +2,86 @@ package objects
 
 import (
 	"context"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	objSdk "github.com/MagaluCloud/mgc-sdk-go/objectstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
-var _ datasource.DataSource = &DatasourceBuckets{}
+var _ datasource.DataSource = &objectStorageBucketsDataSource{}
 
-type DatasourceBuckets struct {
-	s3Client *minio.Client
+type objectStorageBucketsDataSource struct {
+	buckets objSdk.BucketService
 }
 
-type BucketModel struct {
-	Name         types.String `tfsdk:"name"`
-	CreationDate types.String `tfsdk:"creation_date"`
+type ObjectStorageBucketsDataSourceModel struct {
+	Buckets []types.String `tfsdk:"buckets"`
 }
 
-type BucketsModel struct {
-	Buckets []BucketModel `tfsdk:"buckets"`
+func NewObjectStorageBucketsDataSource() datasource.DataSource {
+	return &objectStorageBucketsDataSource{}
 }
 
-func NewDatasourceBuckets() datasource.DataSource {
-	return &DatasourceBuckets{}
-}
-
-func (r *DatasourceBuckets) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (d *objectStorageBucketsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_object_storage_buckets"
 }
 
-func (r *DatasourceBuckets) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *objectStorageBucketsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	providerConfig := req.ProviderData.(utils.DataConfig)
-
-	s3Url, err := utils.RegionToS3Url(providerConfig.Region, providerConfig.Env)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to create s3 client", err.Error())
+	dataConfig, ok := req.ProviderData.(utils.DataConfig)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to configure provider", "Invalid provider data")
 		return
 	}
 
-	minioClient, err := minio.New(
-		s3Url,
-		&minio.Options{
-			Creds: credentials.NewStaticV4(
-				providerConfig.Keypair.KeyID,
-				providerConfig.Keypair.KeySecret,
-				""),
-			Secure: true,
-		})
+	endpoint, err := utils.RegionToS3Url(dataConfig.Region, dataConfig.Env)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create s3 client", err.Error())
+		resp.Diagnostics.AddError("Invalid region/env for object storage", endpoint.String())
 		return
 	}
 
-	r.s3Client = minioClient
-
+	a, err := objSdk.New(&dataConfig.CoreConfig, dataConfig.KeyPairID, dataConfig.KeyPairSecret, objSdk.WithEndpoint(endpoint))
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to configure object storage", "Invalid credentials data")
+		return
+	}
+	d.buckets = a.Buckets()
 }
 
-func (r *DatasourceBuckets) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *objectStorageBucketsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Description: "Retrieves a list of all object storage bucket names.",
 		Attributes: map[string]schema.Attribute{
-			"buckets": schema.ListNestedAttribute{
+			"buckets": schema.ListAttribute{
+				ElementType: types.StringType,
 				Computed:    true,
-				Description: "List of ssh-keys.",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Computed:    true,
-							Description: "Bucket name",
-						},
-						"creation_date": schema.StringAttribute{
-							Computed:    true,
-							Description: "Bucket creation date",
-						},
-					},
-				},
+				Description: "List of bucket names.",
 			},
 		},
 	}
-	resp.Schema.Description = "Get all buckets."
 }
 
-func (r *DatasourceBuckets) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data BucketsModel
+func (d *objectStorageBucketsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data ObjectStorageBucketsDataSourceModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
-	buckets, err := r.s3Client.ListBuckets(ctx)
+	buckets, err := d.buckets.List(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get buckets", err.Error())
+		resp.Diagnostics.AddError(
+			"Error listing buckets",
+			"Could not list buckets: "+err.Error(),
+		)
 		return
 	}
 
-	for _, bucket := range buckets {
-		data.Buckets = append(data.Buckets, BucketModel{
-			Name:         types.StringValue(bucket.Name),
-			CreationDate: types.StringValue(bucket.CreationDate.Format(time.RFC3339)),
-		})
+	data.Buckets = make([]types.String, len(buckets))
+	for i, bucket := range buckets {
+		data.Buckets[i] = types.StringValue(bucket.Name)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	clusterStatusTimeout  = 90 * time.Minute
-	clusterInstanceFamily = "CLUSTER"
+	clusterStatusTimeout      = 90 * time.Minute
+	dbaasClusterProductFamily = "CLUSTER"
 )
 
 type DBaaSClusterAddressModel struct {
@@ -181,11 +181,8 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 			},
 			"instance_type": schema.StringAttribute{
-				Description: "Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.",
+				Description: "Compute and memory capacity of the cluster determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -195,11 +192,8 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 			},
 			"volume_size": schema.Int64Attribute{
-				Description: "Size of the storage volume in GB. Cannot be changed after creation.",
+				Description: "Size of the storage volume in GB. Can be increased but not decreased after creation.",
 				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 				Validators: []validator.Int64{
 					int64validator.Between(10, 50000),
 				},
@@ -333,7 +327,7 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), engineID, clusterInstanceFamily)
+	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), engineID, dbaasClusterProductFamily)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Instance Type", fmt.Sprintf("Failed to validate instance type '%s': %s", plan.InstanceType.ValueString(), err.Error()))
 		return
@@ -393,6 +387,7 @@ func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadReques
 
 func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan DBaaSClusterModel
+	hasResizeUpdate := false
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -405,6 +400,43 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	clusterID := state.ID.ValueString()
+
+	var clusterResizeRequest dbSDK.ClusterResizeRequest
+
+	if plan.InstanceType.ValueString() != "" && plan.InstanceType.ValueString() != state.InstanceType.ValueString() {
+		instanceTypeID, err := ValidateAndGetInstanceTypeID(
+			ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), state.EngineID.ValueString(), dbaasClusterProductFamily,
+		)
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+		state.InstanceType = plan.InstanceType
+		clusterResizeRequest.InstanceTypeID = &instanceTypeID
+		hasResizeUpdate = true
+	}
+
+	if plan.VolumeSize.ValueInt64() != 0 && plan.VolumeSize.ValueInt64() != state.VolumeSize.ValueInt64() {
+		clusterResizeRequest.Volume = &dbSDK.ClusterVolumeResizeRequest{
+			Size: *utils.ConvertInt64PointerToIntPointer(plan.VolumeSize.ValueInt64Pointer()),
+		}
+		state.VolumeSize = plan.VolumeSize
+		hasResizeUpdate = true
+	}
+
+	if hasResizeUpdate {
+		_, err := r.dbaasClusters.Resize(ctx, clusterID, clusterResizeRequest)
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+
+		if _, err := r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive); err != nil {
+			resp.Diagnostics.AddError("Error waiting for cluster to be active", err.Error())
+			return
+		}
+	}
+
 	updateReq := dbSDK.ClusterUpdateRequest{}
 	changed := false
 
@@ -534,7 +566,7 @@ func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context
 }
 
 func (r *DBaaSClusterResource) waitUntilClusterIsDeleted(ctx context.Context, clusterID string) (*dbSDK.ClusterDetailResponse, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, instanceStatusTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, clusterStatusTimeout)
 	defer cancel()
 	for {
 		select {

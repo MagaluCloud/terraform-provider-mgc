@@ -49,11 +49,11 @@ resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
 
 - `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.
 - `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.
-- `instance_type` (String) Compute and memory capacity of the cluster nodes (e.g., 'BV1-4-10'). Cannot be changed after creation.
+- `instance_type` (String) Compute and memory capacity of the cluster determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS cluster. Must be unique. Cannot be changed after creation.
 - `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database cluster. Must be at least 8 characters long.  Cannot be changed after creation.
 - `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.  Cannot be changed after creation.
-- `volume_size` (Number) Size of the storage volume in GB. Cannot be changed after creation.
+- `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
 ### Optional
 

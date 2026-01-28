@@ -33,11 +33,13 @@ const (
 
 type InstanceStatus string
 
-var imageExpands []computeSdk.InstanceExpand = []computeSdk.InstanceExpand{computeSdk.InstanceImageExpand, computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
+var imageExpands []computeSdk.InstanceExpand = []computeSdk.InstanceExpand{computeSdk.InstanceImageExpand,
+	computeSdk.InstanceMachineTypeExpand, computeSdk.InstanceNetworkExpand}
 
 var errorStatus = []InstanceStatus{
 	StatusCreatingError,
 	StatusCreatingNetworkError,
+	StatusCreatingErrorCapacity,
 	StatusCreatingErrorQuota,
 	StatusCreatingErrorQuotaRam,
 	StatusCreatingErrorQuotaVcpu,
@@ -60,6 +62,7 @@ const (
 	StatusProvisioning                 InstanceStatus = "provisioning"
 	StatusCreating                     InstanceStatus = "creating"
 	StatusCreatingError                InstanceStatus = "creating_error"
+	StatusCreatingErrorCapacity        InstanceStatus = "creating_error_capacity"
 	StatusCreatingNetworkError         InstanceStatus = "creating_network_error"
 	StatusCreatingErrorQuota           InstanceStatus = "creating_error_quota"
 	StatusCreatingErrorQuotaRam        InstanceStatus = "creating_error_quota_ram"
@@ -105,6 +108,7 @@ func NewVirtualMachineInstancesResource() resource.Resource {
 
 type vmInstances struct {
 	vmInstances computeSdk.InstanceService
+	vmSnapshots computeSdk.SnapshotService
 }
 
 func (r *vmInstances) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -123,6 +127,7 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 	}
 
 	r.vmInstances = computeSdk.New(&dataConfig.CoreConfig).Instances()
+	r.vmSnapshots = computeSdk.New(&dataConfig.CoreConfig).Snapshots()
 }
 
 type vmInstancesResourceModel struct {
@@ -142,6 +147,7 @@ type vmInstancesResourceModel struct {
 	LocalIPv4              types.String `tfsdk:"local_ipv4"`
 	IPv6                   types.String `tfsdk:"ipv6"`
 	IPv4                   types.String `tfsdk:"ipv4"`
+	SnapshotID             types.String `tfsdk:"snapshot_id"`
 }
 
 type VmInstancesNetworkInterfaceModel struct {
@@ -205,15 +211,24 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Required:    true,
 			},
 			"image": schema.StringAttribute{
-				Description: "The image name used for the virtual machine instance.",
-				Required:    true,
+				Description: `The image name used for the virtual machine instance.
+			 This attribute is required when not creating the instance from a snapshot (i.e., when "snapshot_id" is not set).
+			 If "snapshot_id" is provided, the snapshot will be used instead of an image.`,
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"user_data": schema.StringAttribute{
-				Description: "User data for instance initialization.",
+				Description: "User data for instance initialization (encoded in base64).",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[A-Za-z0-9+/]*={0,2}$`),
+						"The user data must be encoded in base64. You can use Terraform's builtin base64encode() for that.",
+					),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -290,6 +305,15 @@ This attribute can only be used when "network_interface_id" is not set.`,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"snapshot_id": schema.StringAttribute{
+				Description:   "The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.",
+				Optional:      true,
+				WriteOnly:     true,
+				PlanModifiers: []planmodifier.String{},
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("image")),
+				},
+			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Description: "The network interfaces attached to the virtual machine instance.",
 				Computed:    true,
@@ -352,7 +376,7 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	if state.AllocatePublicIpv4.String() == "" {
+	if state.AllocatePublicIpv4.ValueBoolPointer() == nil {
 		state.AllocatePublicIpv4 = types.BoolValue(false)
 	}
 
@@ -372,40 +396,69 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		sg = &items
 	}
 
-	createParams := computeSdk.CreateRequest{
-		Name: state.Name.ValueString(),
-		MachineType: computeSdk.IDOrName{
-			Name: state.MachineType.ValueStringPointer(),
-		},
-		Image: computeSdk.IDOrName{
-			Name: state.Image.ValueStringPointer(),
-		},
-		UserData:         state.UserData.ValueStringPointer(),
-		AvailabilityZone: state.AvailabilityZone.ValueStringPointer(),
-		SshKeyName:       state.SshKeyName.ValueStringPointer(),
-		Network: &computeSdk.CreateParametersNetwork{
-			AssociatePublicIp: state.AllocatePublicIpv4.ValueBoolPointer(),
-			Interface: &computeSdk.CreateParametersNetworkInterface{
-				ID: state.NetworkInterfaceId.ValueStringPointer(),
-			},
+	createNetwork := computeSdk.CreateParametersNetwork{
+		AssociatePublicIp: state.AllocatePublicIpv4.ValueBoolPointer(),
+		Interface: &computeSdk.CreateParametersNetworkInterface{
+			ID: state.NetworkInterfaceId.ValueStringPointer(),
 		},
 	}
 
 	if sg != nil {
-		createParams.Network.Interface.SecurityGroups = sg
+		createNetwork.Interface.SecurityGroups = sg
 	}
 	if state.VpcID.ValueString() != "" {
-		createParams.Network.Vpc = &computeSdk.IDOrName{
+		createNetwork.Vpc = &computeSdk.IDOrName{
 			ID: state.VpcID.ValueStringPointer(),
 		}
 	}
-	createdId, err := r.vmInstances.Create(ctx, createParams)
-	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		return
+
+	var createdID string
+	var err error
+
+	if state.SnapshotID.ValueString() != "" {
+		createdID, err = r.vmSnapshots.Restore(ctx, state.SnapshotID.ValueString(), computeSdk.RestoreSnapshotRequest{
+			Name: state.Name.ValueString(),
+			MachineType: computeSdk.IDOrName{
+				Name: state.MachineType.ValueStringPointer(),
+			},
+			SSHKeyName:       state.SshKeyName.ValueStringPointer(),
+			UserData:         state.UserData.ValueStringPointer(),
+			AvailabilityZone: state.AvailabilityZone.ValueStringPointer(),
+			Network:          &createNetwork,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+	} else {
+		if state.Image.ValueString() == "" {
+			resp.Diagnostics.AddAttributeError(path.Root("image"),
+				"The image attribute must be specified when not restoring from a snapshot.",
+				"Either set the 'image' attribute to the name of an image to use for creating the instance,"+
+					"or set 'snapshot_id' to restore the instance from a snapshot. Leaving both empty is not supported.")
+		}
+		createParams := computeSdk.CreateRequest{
+			Name: state.Name.ValueString(),
+			MachineType: computeSdk.IDOrName{
+				Name: state.MachineType.ValueStringPointer(),
+			},
+			Image: computeSdk.IDOrName{
+				Name: state.Image.ValueStringPointer(),
+			},
+			UserData:         state.UserData.ValueStringPointer(),
+			AvailabilityZone: state.AvailabilityZone.ValueStringPointer(),
+			SshKeyName:       state.SshKeyName.ValueStringPointer(),
+			Network:          &createNetwork,
+		}
+
+		createdID, err = r.vmInstances.Create(ctx, createParams)
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
 	}
 
-	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdId, StatusCompleted)
+	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdID, StatusCompleted)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -484,8 +537,23 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	model := vmInstancesResourceModel{
-		ID:                types.StringValue(req.ID),
-		NetworkInterfaces: r.toTerraformNetworkInterfacesList(ctx, []VmInstancesNetworkInterfaceModel{}),
+		ID:                     types.StringValue(req.ID),
+		Name:                   types.StringUnknown(),
+		CreatedAt:              types.StringUnknown(),
+		SshKeyName:             types.StringUnknown(),
+		VpcID:                  types.StringUnknown(),
+		MachineType:            types.StringUnknown(),
+		Image:                  types.StringUnknown(),
+		UserData:               types.StringUnknown(),
+		AvailabilityZone:       types.StringUnknown(),
+		NetworkInterfaces:      r.toTerraformNetworkInterfacesList(ctx, []VmInstancesNetworkInterfaceModel{}),
+		NetworkInterfaceId:     types.StringUnknown(),
+		AllocatePublicIpv4:     types.BoolNull(),
+		CreationSecurityGroups: types.ListNull(types.StringType),
+		LocalIPv4:              types.StringUnknown(),
+		IPv6:                   types.StringUnknown(),
+		IPv4:                   types.StringUnknown(),
+		SnapshotID:             types.StringUnknown(),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
@@ -537,6 +605,7 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 
 	data.AllocatePublicIpv4 = types.BoolNull()
 	data.CreationSecurityGroups = types.ListNull(types.StringType)
+	data.SnapshotID = types.StringNull()
 
 	return &data
 }
