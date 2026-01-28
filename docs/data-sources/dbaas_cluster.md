@@ -32,6 +32,7 @@ data "mgc_dbaas_cluster" "specific_test_cluster_pg" {
 - `backup_retention_days` (Number) Number of days to retain automated backups.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS').
 - `created_at` (String) Timestamp of when the cluster was created.
+- `deletion_protected` (Boolean) Deletion protected.
 - `engine_id` (String) ID of the database engine used by the cluster.
 - `finished_at` (String) Timestamp of when the cluster last finished an operation.
 - `instance_type_id` (String) ID of the instance type for the cluster nodes.
