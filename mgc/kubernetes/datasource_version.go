@@ -81,7 +81,7 @@ func (r *DataSourceKubernetesVersion) Read(ctx context.Context, req datasource.R
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
 	includeDeprecated := false
-	if data.IncludeDeprecated.ValueBoolPointer() != nil && *data.IncludeDeprecated.ValueBoolPointer() {
+	if !data.IncludeDeprecated.IsNull() && !data.IncludeDeprecated.IsUnknown() && *data.IncludeDeprecated.ValueBoolPointer() {
 		includeDeprecated = true
 	} else {
 		data.IncludeDeprecated = types.BoolValue(false)
