@@ -87,7 +87,9 @@ func (r *DataSourceKubernetesVersion) Read(ctx context.Context, req datasource.R
 		data.IncludeDeprecated = types.BoolValue(false)
 	}
 
-	sdkOutput, err := r.sdkClient.List(ctx, includeDeprecated)
+	sdkOutput, err := r.sdkClient.List(ctx, &sdkK8s.VersionListOptions{
+		IncludeDeprecated: includeDeprecated,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
