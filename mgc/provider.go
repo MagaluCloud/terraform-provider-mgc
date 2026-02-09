@@ -9,6 +9,7 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/containerregistry"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/database"
+	internalhttp "github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/http"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/lbaas"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/network"
@@ -174,6 +175,9 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 		sdk.WithBaseURL(sdkUrl),
 		sdk.WithUserAgent(fmt.Sprintf("MgcTF/%s (%s; %s)", tfVersion, runtime.GOOS, runtime.GOARCH)),
 	)
+
+	httpClient := output.CoreConfig.GetConfig().HTTPClient
+	httpClient.Transport = internalhttp.NewRequestIDRoundTripper(httpClient.Transport)
 
 	return output
 }
