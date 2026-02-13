@@ -3,11 +3,15 @@ package kubernetes
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -161,5 +165,48 @@ func TestConvertTaintsNP(t *testing.T) {
 		}
 		result := convertTaintsNP(input)
 		assert.Equal(t, expected, result)
+	})
+}
+
+func TestNodePoolSchemaMaxPodsPerNodePlanModifiers(t *testing.T) {
+	r := &NewNodePoolResource{}
+	resp := &resource.SchemaResponse{}
+
+	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	t.Run("should include max_pods_per_node in schema", func(t *testing.T) {
+		_, ok := resp.Schema.Attributes["max_pods_per_node"]
+		assert.True(t, ok)
+	})
+
+	t.Run("should define max_pods_per_node as int64 attribute", func(t *testing.T) {
+		attrRaw, ok := resp.Schema.Attributes["max_pods_per_node"]
+		assert.True(t, ok)
+
+		_, ok = attrRaw.(schema.Int64Attribute)
+		assert.True(t, ok)
+	})
+
+	t.Run("should keep requires replace and add use state for unknown plan modifiers", func(t *testing.T) {
+		attrRaw, ok := resp.Schema.Attributes["max_pods_per_node"]
+		assert.True(t, ok)
+
+		attr, ok := attrRaw.(schema.Int64Attribute)
+		assert.True(t, ok)
+
+		hasRequiresReplace := false
+		hasUseStateForUnknown := false
+
+		for _, modifier := range attr.PlanModifiers {
+			if reflect.TypeOf(modifier) == reflect.TypeOf(int64planmodifier.RequiresReplace()) {
+				hasRequiresReplace = true
+			}
+			if reflect.TypeOf(modifier) == reflect.TypeOf(int64planmodifier.UseStateForUnknown()) {
+				hasUseStateForUnknown = true
+			}
+		}
+
+		assert.True(t, hasRequiresReplace)
+		assert.True(t, hasUseStateForUnknown)
 	})
 }
