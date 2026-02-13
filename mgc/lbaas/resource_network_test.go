@@ -223,7 +223,7 @@ func Test_updateHealthChecks_nil_noop(t *testing.T) {
 	assert.Equal(t, 0, updateCalls)
 }
 
-func Test_updateHealthChecks_equal_stillWaits_and_errors(t *testing.T) {
+func Test_updateHealthChecks_equal_notCallUpdate(t *testing.T) {
 	updateCalls := 0
 	r := &LoadBalancerResource{
 		lbNetworkHealthCheck: &mockHealthCheckService{
