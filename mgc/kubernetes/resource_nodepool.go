@@ -151,6 +151,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Computed:    true,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
+					int64planmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
