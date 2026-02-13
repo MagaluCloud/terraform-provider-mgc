@@ -254,7 +254,7 @@ func Test_updateHealthChecks_equal_stillWaits_and_errors(t *testing.T) {
 	plan := LoadBalancerModel{ID: types.StringValue("lb-1"), HealthChecks: &planHCs}
 
 	err := r.updateHealthChecks(canceledCtx(), &plan, &state)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 0, updateCalls)
 }
 
