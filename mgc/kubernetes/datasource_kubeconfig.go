@@ -51,13 +51,13 @@ func (d *DataSourceKubernetesClusterKubeConfig) Read(ctx context.Context, req da
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOuput, err := d.sdkClient.GetKubeConfig(ctx, data.ClusterID.ValueString())
+	sdkOutput, err := d.sdkClient.GetKubeConfig(ctx, data.ClusterID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	rawConfig, err := yaml.Marshal(sdkOuput)
+	rawConfig, err := yaml.Marshal(sdkOutput)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

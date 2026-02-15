@@ -132,7 +132,7 @@ func (r *bsSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Optional: true,
 			},
 			"snapshot_source_id": schema.StringAttribute{
-				Description: "The ID of the snapshot source, for creating a snapshot object from a snaphot instant. Is required when volume ID is not set and both volume ID and snapshot source ID cannot be set at the same time.",
+				Description: "The ID of the snapshot source, for creating a snapshot object from a snapshot instant. Is required when volume ID is not set and both volume ID and snapshot source ID cannot be set at the same time.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
