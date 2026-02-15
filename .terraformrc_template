@@ -1,0 +1,5 @@
+provider_installation {
+  dev_overrides {
+    "magalucloud/mgc" = "BINARY_PATH"
+  }
+}
