@@ -395,6 +395,21 @@ func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	engineInfo, err := r.dbaasEngines.Get(ctx, detailedCluster.EngineID)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+	state.EngineName = types.StringValue(engineInfo.Name)
+	state.EngineVersion = types.StringValue(engineInfo.Version)
+
+	instanceInfo, err := r.dbaasInstanceTypes.Get(ctx, detailedCluster.InstanceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+	state.InstanceType = types.StringValue(instanceInfo.Label)
+
 	r.populateModelFromDetailResponse(detailedCluster, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
