@@ -653,10 +653,11 @@ func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, sta
 			if err != nil {
 				return err
 			}
-		}
-		_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
-		if err != nil {
-			return err
+
+			_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -682,10 +683,10 @@ func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, s
 		if err != nil {
 			return err
 		}
-	}
-	_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
-	if err != nil {
-		return err
+		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -737,12 +738,12 @@ func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, 
 		if err != nil {
 			return err
 		}
+		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err := r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

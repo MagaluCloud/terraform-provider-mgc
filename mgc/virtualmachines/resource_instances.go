@@ -510,6 +510,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data vmInstancesResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
