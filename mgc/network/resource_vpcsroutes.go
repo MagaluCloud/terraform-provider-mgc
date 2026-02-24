@@ -64,7 +64,7 @@ func (r *NetworkVpcsRouteResource) Configure(ctx context.Context, req resource.C
 
 func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network Route",
+		Description: "Network VPC Route",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the route.",

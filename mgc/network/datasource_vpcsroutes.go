@@ -52,7 +52,7 @@ func (r *NetworkVpcsRoutesDatasource) Configure(ctx context.Context, req datasou
 
 func (r *NetworkVpcsRoutesDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network Routes",
+		Description: "Network VPC Routes",
 		Attributes: map[string]schema.Attribute{
 			"vpc_id": schema.StringAttribute{
 				Description: "ID of the VPC where the routes is associated.",
