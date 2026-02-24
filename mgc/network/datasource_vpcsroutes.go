@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type NetworkListRouteModel struct {
+type NetworkListVpcsRouteModel struct {
 	ID              types.String `tfsdk:"id"`
 	PortID          types.String `tfsdk:"port_id"`
 	CIDRDestination types.String `tfsdk:"cidr_destination"`
@@ -20,24 +20,24 @@ type NetworkListRouteModel struct {
 	Status          types.String `tfsdk:"status"`
 }
 
-type NetworkRoutesDataSourceModel struct {
-	VpcID  types.String            `tfsdk:"vpc_id"`
-	Routes []NetworkListRouteModel `tfsdk:"routes"`
+type NetworkVpcsRoutesDataSourceModel struct {
+	VpcID  types.String                `tfsdk:"vpc_id"`
+	Routes []NetworkListVpcsRouteModel `tfsdk:"routes"`
 }
 
-type NetworkRoutesDatasource struct {
-	networkRoute netSDK.RouteService
+type NetworkVpcsRoutesDatasource struct {
+	networkRoute netSDK.VpcsRoutesService
 }
 
-func NewDataSourceNetworkRoutes() datasource.DataSource {
-	return &NetworkRoutesDatasource{}
+func NewDataSourceNetworkVpcsRoutes() datasource.DataSource {
+	return &NetworkVpcsRoutesDatasource{}
 }
 
-func (r *NetworkRoutesDatasource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_network_routes"
+func (r *NetworkVpcsRoutesDatasource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_network_vpcs_routes"
 }
 
-func (r *NetworkRoutesDatasource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *NetworkVpcsRoutesDatasource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -47,10 +47,10 @@ func (r *NetworkRoutesDatasource) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).Routes()
+	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).VpcsRoutes()
 }
 
-func (r *NetworkRoutesDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *NetworkVpcsRoutesDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Network Routes",
 		Attributes: map[string]schema.Attribute{
@@ -97,29 +97,29 @@ func (r *NetworkRoutesDatasource) Schema(_ context.Context, _ datasource.SchemaR
 	}
 }
 
-func (r *NetworkRoutesDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	data := &NetworkRoutesDataSourceModel{}
+func (r *NetworkVpcsRoutesDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	data := &NetworkVpcsRoutesDataSourceModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	routes, err := r.networkRoute.ListAll(ctx, data.VpcID.ValueString(), &netSDK.ListAllRoutesOptions{})
+	routes, err := r.networkRoute.ListAll(ctx, data.VpcID.ValueString(), &netSDK.ListAllVpcsRoutesOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
 	for _, route := range routes {
-		data.Routes = append(data.Routes, *convertSDKListRouteResultToTerraformNetworkListRouteModel(&route))
+		data.Routes = append(data.Routes, *convertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(&route))
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func convertSDKListRouteResultToTerraformNetworkListRouteModel(sdkResult *netSDK.RouteDetail) *NetworkListRouteModel {
+func convertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(sdkResult *netSDK.VpcsRouteDetail) *NetworkListVpcsRouteModel {
 	if sdkResult == nil {
 		return nil
 	}
 
-	tfModel := &NetworkListRouteModel{
+	tfModel := &NetworkListVpcsRouteModel{
 		ID:              types.StringValue(sdkResult.ID),
 		PortID:          types.StringValue(sdkResult.PortID),
 		CIDRDestination: types.StringValue(sdkResult.CIDRDestination),

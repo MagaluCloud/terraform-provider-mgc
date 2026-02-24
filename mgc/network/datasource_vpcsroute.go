@@ -9,23 +9,23 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 )
 
-type NetworkRouteDataSourceModel struct {
-	NetworkRouteModel
+type NetworkVpcsRouteDataSourceModel struct {
+	NetworkVpcsRouteModel
 }
 
-type NetworkRouteDatasource struct {
-	networkRoute netSDK.RouteService
+type NetworkVpcsRouteDatasource struct {
+	networkRoute netSDK.VpcsRoutesService
 }
 
-func NewDataSourceNetworkRoute() datasource.DataSource {
-	return &NetworkRouteDatasource{}
+func NewDataSourceNetworkVpcsRoute() datasource.DataSource {
+	return &NetworkVpcsRouteDatasource{}
 }
 
-func (r *NetworkRouteDatasource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_network_route"
+func (r *NetworkVpcsRouteDatasource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_network_vpcs_route"
 }
 
-func (r *NetworkRouteDatasource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (r *NetworkVpcsRouteDatasource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -35,10 +35,10 @@ func (r *NetworkRouteDatasource) Configure(ctx context.Context, req datasource.C
 		return
 	}
 
-	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).Routes()
+	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).VpcsRoutes()
 }
 
-func (r *NetworkRouteDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *NetworkVpcsRouteDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Network Route",
 		Attributes: map[string]schema.Attribute{
@@ -78,8 +78,8 @@ func (r *NetworkRouteDatasource) Schema(_ context.Context, _ datasource.SchemaRe
 	}
 }
 
-func (r *NetworkRouteDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	data := &NetworkRouteDataSourceModel{}
+func (r *NetworkVpcsRouteDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	data := &NetworkVpcsRouteDataSourceModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
 	route, err := r.networkRoute.Get(ctx, data.VpcID.ValueString(), data.ID.ValueString())
@@ -88,6 +88,6 @@ func (r *NetworkRouteDatasource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	tfResult := convertSDKRouteResultToTerraformNetworkRouteModel(route)
+	tfResult := convertSDKRouteResultToTerraformNetworkVpcsRouteModel(route)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &tfResult)...)
 }

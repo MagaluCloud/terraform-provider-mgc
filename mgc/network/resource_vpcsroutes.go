@@ -26,7 +26,7 @@ const (
 	RoutePoolingTimeout = 100 * time.Minute
 )
 
-type NetworkRouteModel struct {
+type NetworkVpcsRouteModel struct {
 	ID              types.String `tfsdk:"id"`
 	VpcID           types.String `tfsdk:"vpc_id"`
 	PortID          types.String `tfsdk:"port_id"`
@@ -37,19 +37,19 @@ type NetworkRouteModel struct {
 	Status          types.String `tfsdk:"status"`
 }
 
-type NetworkRouteResource struct {
-	networkRoute netSDK.RouteService
+type NetworkVpcsRouteResource struct {
+	networkRoute netSDK.VpcsRoutesService
 }
 
-func NewNetworkRouteResource() resource.Resource {
-	return &NetworkRouteResource{}
+func NewNetworkVpcsRouteResource() resource.Resource {
+	return &NetworkVpcsRouteResource{}
 }
 
-func (r *NetworkRouteResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_network_route"
+func (r *NetworkVpcsRouteResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_network_vpcs_route"
 }
 
-func (r *NetworkRouteResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *NetworkVpcsRouteResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -59,10 +59,10 @@ func (r *NetworkRouteResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).Routes()
+	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).VpcsRoutes()
 }
 
-func (r *NetworkRouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Network Route",
 		Attributes: map[string]schema.Attribute{
@@ -126,8 +126,8 @@ func (r *NetworkRouteResource) Schema(_ context.Context, _ resource.SchemaReques
 	}
 }
 
-func (r *NetworkRouteResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data NetworkRouteModel
+func (r *NetworkVpcsRouteResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data NetworkVpcsRouteModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -135,7 +135,7 @@ func (r *NetworkRouteResource) Create(ctx context.Context, req resource.CreateRe
 
 	vpcID := data.VpcID.ValueString()
 
-	createdRoute, err := r.networkRoute.Create(ctx, vpcID, netSDK.CreateRequest{
+	createdRoute, err := r.networkRoute.Create(ctx, vpcID, netSDK.VpcsRoutesCreateRequest{
 		PortID:          data.PortID.ValueString(),
 		CIDRDestination: data.CIDRDestination.ValueString(),
 		Description:     data.Description.ValueStringPointer(),
@@ -153,12 +153,12 @@ func (r *NetworkRouteResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	tfResult := convertSDKRouteResultToTerraformNetworkRouteModel(route)
+	tfResult := convertSDKRouteResultToTerraformNetworkVpcsRouteModel(route)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &tfResult)...)
 }
 
-func (r *NetworkRouteResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data NetworkRouteModel
+func (r *NetworkVpcsRouteResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data NetworkVpcsRouteModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -170,12 +170,12 @@ func (r *NetworkRouteResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	tfResult := convertSDKRouteResultToTerraformNetworkRouteModel(route)
+	tfResult := convertSDKRouteResultToTerraformNetworkVpcsRouteModel(route)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &tfResult)...)
 }
 
-func (r *NetworkRouteResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data NetworkRouteModel
+func (r *NetworkVpcsRouteResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data NetworkVpcsRouteModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -201,11 +201,11 @@ func (r *NetworkRouteResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 }
 
-func (r *NetworkRouteResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *NetworkVpcsRouteResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError("Update is not supported for route", "")
 }
 
-func (r *NetworkRouteResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *NetworkVpcsRouteResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, ",")
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError("Invalid import format", "Use `<vpc_id>,<route_id>`")
@@ -220,8 +220,8 @@ func (r *NetworkRouteResource) ImportState(ctx context.Context, req resource.Imp
 	)
 }
 
-func (r *NetworkRouteResource) WaitUntilRouteSatusMatches(ctx context.Context, vpcID, routeID string, expectedStatus ...string) (*netSDK.Route, error) {
-	var result *netSDK.Route
+func (r *NetworkVpcsRouteResource) WaitUntilRouteSatusMatches(ctx context.Context, vpcID, routeID string, expectedStatus ...string) (*netSDK.VpcsRoute, error) {
+	var result *netSDK.VpcsRoute
 	var err error
 
 	for startTime := time.Now(); time.Since(startTime) < RoutePoolingTimeout; {
@@ -247,12 +247,12 @@ func (r *NetworkRouteResource) WaitUntilRouteSatusMatches(ctx context.Context, v
 	return result, errors.New("timeout waiting for route to provision")
 }
 
-func convertSDKRouteResultToTerraformNetworkRouteModel(sdkResult *netSDK.Route) *NetworkRouteModel {
+func convertSDKRouteResultToTerraformNetworkVpcsRouteModel(sdkResult *netSDK.VpcsRoute) *NetworkVpcsRouteModel {
 	if sdkResult == nil {
 		return nil
 	}
 
-	tfModel := &NetworkRouteModel{
+	tfModel := &NetworkVpcsRouteModel{
 		ID:              types.StringValue(sdkResult.ID),
 		VpcID:           types.StringValue(sdkResult.VpcID),
 		PortID:          types.StringValue(sdkResult.PortID),
