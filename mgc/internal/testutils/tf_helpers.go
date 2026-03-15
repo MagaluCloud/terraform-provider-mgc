@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GetResourceTestSchema is a generic helper to retrieve the schema of a Resource for unit testing.
@@ -17,7 +17,7 @@ func GetResourceTestSchema(t *testing.T, r resource.Resource) resource.SchemaRes
 
 	r.Schema(ctx, schemaReq, schemaResp)
 
-	assert.False(t, schemaResp.Diagnostics.HasError(), "Resource schema generation returned errors: %v", schemaResp.Diagnostics)
+	require.False(t, schemaResp.Diagnostics.HasError(), "Resource schema generation returned errors: %v", schemaResp.Diagnostics)
 
 	return *schemaResp
 }
@@ -30,7 +30,7 @@ func GetDataSourceTestSchema(t *testing.T, d datasource.DataSource) datasource.S
 
 	d.Schema(ctx, schemaReq, schemaResp)
 
-	assert.False(t, schemaResp.Diagnostics.HasError(), "DataSource schema generation returned errors: %v", schemaResp.Diagnostics)
+	require.False(t, schemaResp.Diagnostics.HasError(), "DataSource schema generation returned errors: %v", schemaResp.Diagnostics)
 
 	return *schemaResp
 }
