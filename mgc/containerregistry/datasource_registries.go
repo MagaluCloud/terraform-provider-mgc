@@ -111,6 +111,7 @@ func (r *DataSourceCRRegistries) Read(ctx context.Context, req datasource.ReadRe
 
 		item.ID = types.StringValue(registry.ID)
 		item.Name = types.StringValue(registry.Name)
+		item.StorageUsageBytes = types.Int64Value(int64(registry.Storage))
 		item.UpdatedAt = types.StringValue(registry.UpdatedAt)
 		item.CreatedAt = types.StringValue(registry.CreatedAt)
 		item.ProxyCacheID = types.StringPointerValue(registry.ProxyCacheID)
