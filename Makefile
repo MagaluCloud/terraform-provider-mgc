@@ -3,6 +3,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 SKIP_TF_STEP ?= true
+CSPELL_VERSION = "latest"
 
 # Go commands
 GO              := go
@@ -11,8 +12,10 @@ GOVET           := go vet
 GOTEST          := go test
 
 # Directories
+DOCS_DIR_PATH   := docs
+MGC_DIR_PATH    := mgc
 SCRIPT_DIR      := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-DOCS_DIR        := $(SCRIPT_DIR)/docs
+DOCS_DIR        := $(SCRIPT_DIR)/$(DOCS_DIR_PATH)
 RESOURCES_DIR   := $(DOCS_DIR)/resources
 DATA_SOURCES_DIR := $(DOCS_DIR)/data-sources
 DOCS_EXTRA_DIR  := $(SCRIPT_DIR)/docs-extra
@@ -33,6 +36,11 @@ NC     := \033[0m # No Color
 # Declare all targets as phony
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
         tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all
+
+install:
+	@export GOBIN=${PWD}/bin
+	@export PATH=${GOBIN}:${PATH}
+	@go install $(TF_PLUGIN_DOCS)
 
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
@@ -126,7 +134,7 @@ build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
 
-before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
+before-commit: go-test go-fmt spell-check-docs generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
 	@echo -e "$(GREEN)All pre-commit checks passed!$(NC)"
 
 debug: ## Run the provider in debug mode
@@ -141,3 +149,14 @@ clean: ## Clean build artifacts
 
 all: clean go-fmt go-vet go-test generate-docs build ## Run all main tasks
 	@echo -e "$(GREEN)All tasks completed successfully!$(NC)"
+
+spell-check-docs: ## Spell check documentation
+	@echo -e "$(GREEN)*** Checking docs for miss spellings... ***$(NC)"
+	@grep . cspell.txt | sort > .cspell.txt && mv .cspell.txt cspell.txt
+	@docker run --quiet -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique $(DOCS_DIR_PATH)
+	@echo -e "$(GREEN)*** MGC Terraform Provider is correctly written! ***$(NC)"
+
+spell-check-code: ## Spell check codebase
+	@echo -e "$(GREEN)*** Checking code base for miss spellings... ***$(NC)"
+	@docker run -v ${PWD}:/workdir ghcr.io/streetsidesoftware/cspell:$(CSPELL_VERSION) lint -c cspell.json --no-progress --unique $(MGC_DIR_PATH)
+	@echo -e "$(GREEN)*** MGC Terraform Provider is correctly written! ***$(NC)"
