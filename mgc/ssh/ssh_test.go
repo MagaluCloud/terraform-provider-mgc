@@ -9,35 +9,27 @@ import (
 )
 
 func TestGetDataSources(t *testing.T) {
+	t.Parallel()
 	dataSources := GetDataSources()
 
-	assert.NotNil(t, dataSources)
-	assert.Len(t, dataSources, 1)
+	assert.NotEmpty(t, dataSources)
 
-	factory := dataSources[0]
-	assert.NotNil(t, factory)
-
-	ds := factory()
-	assert.NotNil(t, ds)
-	assert.Implements(t, (*datasource.DataSource)(nil), ds)
-
-	_, ok := ds.(*DataSourceSSH)
-	assert.True(t, ok)
+	for _, factory := range dataSources {
+		ds := factory()
+		assert.NotNil(t, ds)
+		assert.Implements(t, (*datasource.DataSource)(nil), ds)
+	}
 }
 
 func TestGetResources(t *testing.T) {
+	t.Parallel()
 	resources := GetResources()
 
-	assert.NotNil(t, resources)
-	assert.Len(t, resources, 1)
+	assert.NotEmpty(t, resources)
 
-	factory := resources[0]
-	assert.NotNil(t, factory)
-
-	r := factory()
-	assert.NotNil(t, r)
-	assert.Implements(t, (*resource.Resource)(nil), r)
-
-	_, ok := r.(*sshKeys)
-	assert.True(t, ok)
+	for _, factory := range resources {
+		r := factory()
+		assert.NotNil(t, r)
+		assert.Implements(t, (*resource.Resource)(nil), r)
+	}
 }

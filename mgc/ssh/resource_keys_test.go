@@ -12,9 +12,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSshKeysResource_Metadata(t *testing.T) {
+	t.Parallel()
 	r := NewSshKeysResource()
 	req := resource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +29,7 @@ func TestSshKeysResource_Metadata(t *testing.T) {
 }
 
 func TestSshKeysResource_Schema(t *testing.T) {
+	t.Parallel()
 	r := NewSshKeysResource()
 	req := resource.SchemaRequest{}
 	resp := &resource.SchemaResponse{}
@@ -41,6 +44,7 @@ func TestSshKeysResource_Schema(t *testing.T) {
 }
 
 func TestSshKeysResource_Create(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -66,7 +70,7 @@ func TestSshKeysResource_Create(t *testing.T) {
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
 	diags := plan.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -89,6 +93,7 @@ func TestSshKeysResource_Create(t *testing.T) {
 }
 
 func TestSshKeysResource_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -111,7 +116,7 @@ func TestSshKeysResource_Read(t *testing.T) {
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -134,6 +139,7 @@ func TestSshKeysResource_Read(t *testing.T) {
 }
 
 func TestSshKeysResource_Delete(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -152,7 +158,7 @@ func TestSshKeysResource_Delete(t *testing.T) {
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,
@@ -169,6 +175,7 @@ func TestSshKeysResource_Delete(t *testing.T) {
 }
 
 func TestSshKeysResource_Create_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -189,7 +196,8 @@ func TestSshKeysResource_Create_APIError(t *testing.T) {
 		Name: types.StringValue("my-error-key"),
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
-	_ = plan.Set(ctx, &inputData)
+	diags := plan.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -206,6 +214,7 @@ func TestSshKeysResource_Create_APIError(t *testing.T) {
 }
 
 func TestSshKeysResource_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -223,7 +232,8 @@ func TestSshKeysResource_Read_APIError(t *testing.T) {
 		Name: types.StringValue("my-read-key"),
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -240,6 +250,7 @@ func TestSshKeysResource_Read_APIError(t *testing.T) {
 }
 
 func TestSshKeysResource_Update_NotSupported(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	r := &sshKeys{}
 
@@ -252,17 +263,19 @@ func TestSshKeysResource_Update_NotSupported(t *testing.T) {
 }
 
 func TestSshKeysResource_ImportState(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	r := &sshKeys{}
 
 	schemaResp := testutils.GetResourceTestSchema(t, r)
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
-	_ = state.Set(ctx, &sshKeyModel{
+	diags := state.Set(ctx, &sshKeyModel{
 		ID:   types.StringUnknown(),
 		Name: types.StringUnknown(),
 		Key:  types.StringUnknown(),
 	})
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ImportStateRequest{
 		ID: "import-id-123",
@@ -281,6 +294,7 @@ func TestSshKeysResource_ImportState(t *testing.T) {
 }
 
 func TestSshKeysResource_Delete_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -298,7 +312,8 @@ func TestSshKeysResource_Delete_APIError(t *testing.T) {
 		Name: types.StringValue("my-del-key"),
 		Key:  types.StringValue("ssh-rsa AAAAB3Nza..."),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,

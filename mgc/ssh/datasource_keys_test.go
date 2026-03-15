@@ -15,6 +15,7 @@ import (
 )
 
 func TestDataSourceSSH_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceSSH()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +28,7 @@ func TestDataSourceSSH_Metadata(t *testing.T) {
 }
 
 func TestDataSourceSSH_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceSSH()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -39,6 +41,7 @@ func TestDataSourceSSH_Schema(t *testing.T) {
 }
 
 func TestDataSourceSSH_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -112,6 +115,7 @@ func TestDataSourceSSH_Read(t *testing.T) {
 }
 
 func TestDataSourceSSH_Read_EmptyList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)
@@ -166,6 +170,7 @@ func TestDataSourceSSH_Read_EmptyList(t *testing.T) {
 }
 
 func TestDataSourceSSH_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.KeyService)

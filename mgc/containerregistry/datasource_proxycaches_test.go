@@ -15,6 +15,7 @@ import (
 )
 
 func TestProxyCacheListDataSource_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewProxyCacheListDataSource()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +28,7 @@ func TestProxyCacheListDataSource_Metadata(t *testing.T) {
 }
 
 func TestProxyCacheListDataSource_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewProxyCacheListDataSource()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -39,6 +41,7 @@ func TestProxyCacheListDataSource_Schema(t *testing.T) {
 }
 
 func TestProxyCacheListDataSource_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -126,6 +129,7 @@ func TestProxyCacheListDataSource_Read(t *testing.T) {
 }
 
 func TestProxyCacheListDataSource_Read_EmptyList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -185,6 +189,7 @@ func TestProxyCacheListDataSource_Read_EmptyList(t *testing.T) {
 }
 
 func TestProxyCacheListDataSource_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)

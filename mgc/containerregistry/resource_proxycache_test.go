@@ -12,9 +12,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProxyCacheResource_Metadata(t *testing.T) {
+	t.Parallel()
 	r := NewContainerRegistryProxyCacheResource()
 	req := resource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +29,7 @@ func TestProxyCacheResource_Metadata(t *testing.T) {
 }
 
 func TestProxyCacheResource_Schema(t *testing.T) {
+	t.Parallel()
 	r := NewContainerRegistryProxyCacheResource()
 	req := resource.SchemaRequest{}
 	resp := &resource.SchemaResponse{}
@@ -53,6 +56,7 @@ func TestProxyCacheResource_Schema(t *testing.T) {
 }
 
 func TestProxyCacheResource_Configure_NilProviderData(t *testing.T) {
+	t.Parallel()
 	r := &ProxyCacheResource{}
 
 	req := resource.ConfigureRequest{
@@ -67,6 +71,7 @@ func TestProxyCacheResource_Configure_NilProviderData(t *testing.T) {
 }
 
 func TestProxyCacheResource_Configure_InvalidProviderData(t *testing.T) {
+	t.Parallel()
 	r := &ProxyCacheResource{}
 
 	req := resource.ConfigureRequest{
@@ -81,6 +86,7 @@ func TestProxyCacheResource_Configure_InvalidProviderData(t *testing.T) {
 }
 
 func TestProxyCacheResource_Create(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -125,7 +131,7 @@ func TestProxyCacheResource_Create(t *testing.T) {
 		AccessSecret: types.StringValue("secret-456"),
 	}
 	diags := plan.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -151,6 +157,7 @@ func TestProxyCacheResource_Create(t *testing.T) {
 }
 
 func TestProxyCacheResource_Create_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -173,7 +180,8 @@ func TestProxyCacheResource_Create_APIError(t *testing.T) {
 		ProviderName: types.StringValue("dockerhub"),
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
-	_ = plan.Set(ctx, &inputData)
+	diags := plan.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -190,6 +198,7 @@ func TestProxyCacheResource_Create_APIError(t *testing.T) {
 }
 
 func TestProxyCacheResource_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -222,7 +231,7 @@ func TestProxyCacheResource_Read(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -250,6 +259,7 @@ func TestProxyCacheResource_Read(t *testing.T) {
 }
 
 func TestProxyCacheResource_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -268,7 +278,8 @@ func TestProxyCacheResource_Read_APIError(t *testing.T) {
 		ProviderName: types.StringValue("dockerhub"),
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -285,6 +296,7 @@ func TestProxyCacheResource_Read_APIError(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -318,7 +330,7 @@ func TestProxyCacheResource_Update(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := plan.Set(ctx, &planData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -331,7 +343,7 @@ func TestProxyCacheResource_Update(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags = state.Set(ctx, &stateData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -358,6 +370,7 @@ func TestProxyCacheResource_Update(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update_OnlyName(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -389,7 +402,7 @@ func TestProxyCacheResource_Update_OnlyName(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := plan.Set(ctx, &planData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -402,7 +415,7 @@ func TestProxyCacheResource_Update_OnlyName(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags = state.Set(ctx, &stateData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -428,6 +441,7 @@ func TestProxyCacheResource_Update_OnlyName(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update_OnlyDescription(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -459,7 +473,7 @@ func TestProxyCacheResource_Update_OnlyDescription(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := plan.Set(ctx, &planData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -472,7 +486,7 @@ func TestProxyCacheResource_Update_OnlyDescription(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags = state.Set(ctx, &stateData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -497,6 +511,7 @@ func TestProxyCacheResource_Update_OnlyDescription(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update_OnlyURL(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -528,7 +543,7 @@ func TestProxyCacheResource_Update_OnlyURL(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := plan.Set(ctx, &planData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -541,7 +556,7 @@ func TestProxyCacheResource_Update_OnlyURL(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags = state.Set(ctx, &stateData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -566,6 +581,7 @@ func TestProxyCacheResource_Update_OnlyURL(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update_NoChanges(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -588,7 +604,7 @@ func TestProxyCacheResource_Update_NoChanges(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags := plan.Set(ctx, &planData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -601,7 +617,7 @@ func TestProxyCacheResource_Update_NoChanges(t *testing.T) {
 		UpdatedAt:    types.StringValue("2024-01-02T00:00:00Z"),
 	}
 	diags = state.Set(ctx, &stateData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -624,6 +640,7 @@ func TestProxyCacheResource_Update_NoChanges(t *testing.T) {
 }
 
 func TestProxyCacheResource_Update_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -644,7 +661,8 @@ func TestProxyCacheResource_Update_APIError(t *testing.T) {
 		ProviderName: types.StringValue("dockerhub"),
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
-	_ = plan.Set(ctx, &planData)
+	diags := plan.Set(ctx, &planData)
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
 	stateData := ProxyCacheModel{
@@ -653,7 +671,8 @@ func TestProxyCacheResource_Update_APIError(t *testing.T) {
 		ProviderName: types.StringValue("dockerhub"),
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
-	_ = state.Set(ctx, &stateData)
+	diags = state.Set(ctx, &stateData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.UpdateRequest{
 		Plan:  plan,
@@ -671,6 +690,7 @@ func TestProxyCacheResource_Update_APIError(t *testing.T) {
 }
 
 func TestProxyCacheResource_Delete(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -690,7 +710,7 @@ func TestProxyCacheResource_Delete(t *testing.T) {
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,
@@ -707,6 +727,7 @@ func TestProxyCacheResource_Delete(t *testing.T) {
 }
 
 func TestProxyCacheResource_Delete_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ProxyCachesService)
@@ -725,7 +746,8 @@ func TestProxyCacheResource_Delete_APIError(t *testing.T) {
 		ProviderName: types.StringValue("dockerhub"),
 		URL:          types.StringValue("https://registry-1.docker.io"),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,
@@ -742,15 +764,17 @@ func TestProxyCacheResource_Delete_APIError(t *testing.T) {
 }
 
 func TestProxyCacheResource_ImportState(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	r := &ProxyCacheResource{}
 
 	schemaResp := testutils.GetResourceTestSchema(t, r)
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
-	_ = state.Set(ctx, &ProxyCacheModel{
+	diags := state.Set(ctx, &ProxyCacheModel{
 		ID: types.StringUnknown(),
 	})
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ImportStateRequest{
 		ID: "import-proxy-123",

@@ -16,6 +16,7 @@ import (
 )
 
 func TestDataSourceCRImages_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRImages()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -28,6 +29,7 @@ func TestDataSourceCRImages_Metadata(t *testing.T) {
 }
 
 func TestDataSourceCRImages_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRImages()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -42,6 +44,7 @@ func TestDataSourceCRImages_Schema(t *testing.T) {
 }
 
 func TestDataSourceCRImages_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ImagesService)
@@ -132,6 +135,7 @@ func TestDataSourceCRImages_Read(t *testing.T) {
 }
 
 func TestDataSourceCRImages_Read_EmptyList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ImagesService)
@@ -196,6 +200,7 @@ func TestDataSourceCRImages_Read_EmptyList(t *testing.T) {
 }
 
 func TestDataSourceCRImages_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.ImagesService)
@@ -253,6 +258,7 @@ func TestDataSourceCRImages_Read_APIError(t *testing.T) {
 }
 
 func TestDataSourceCRImages_Model(t *testing.T) {
+	t.Parallel()
 	image := crImage{
 		Digest:    types.StringValue("sha256:test"),
 		SizeBytes: types.Int64Value(1024),

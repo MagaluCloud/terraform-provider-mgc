@@ -15,6 +15,7 @@ import (
 )
 
 func TestDataSourceCRRepositories_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRRepositories()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +28,7 @@ func TestDataSourceCRRepositories_Metadata(t *testing.T) {
 }
 
 func TestDataSourceCRRepositories_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRRepositories()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -40,6 +42,7 @@ func TestDataSourceCRRepositories_Schema(t *testing.T) {
 }
 
 func TestDataSourceCRRepositories_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RepositoriesService)
@@ -125,6 +128,7 @@ func TestDataSourceCRRepositories_Read(t *testing.T) {
 }
 
 func TestDataSourceCRRepositories_Read_EmptyList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RepositoriesService)
@@ -186,6 +190,7 @@ func TestDataSourceCRRepositories_Read_EmptyList(t *testing.T) {
 }
 
 func TestDataSourceCRRepositories_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RepositoriesService)

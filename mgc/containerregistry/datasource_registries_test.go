@@ -15,6 +15,7 @@ import (
 )
 
 func TestDataSourceCRRegistries_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRRegistries()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +28,7 @@ func TestDataSourceCRRegistries_Metadata(t *testing.T) {
 }
 
 func TestDataSourceCRRegistries_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRRegistries()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -39,6 +41,7 @@ func TestDataSourceCRRegistries_Schema(t *testing.T) {
 }
 
 func TestDataSourceCRRegistries_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -127,6 +130,7 @@ func TestDataSourceCRRegistries_Read(t *testing.T) {
 }
 
 func TestDataSourceCRRegistries_Read_EmptyList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -183,7 +187,12 @@ func TestDataSourceCRRegistries_Read_EmptyList(t *testing.T) {
 	mockSvc.AssertExpectations(t)
 }
 
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestDataSourceCRRegistries_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -233,8 +242,4 @@ func TestDataSourceCRRegistries_Read_APIError(t *testing.T) {
 
 	assert.True(t, resp.Diagnostics.HasError(), "Read operation should return diagnostics errors on API failure")
 	mockSvc.AssertExpectations(t)
-}
-
-func strPtr(s string) *string {
-	return &s
 }

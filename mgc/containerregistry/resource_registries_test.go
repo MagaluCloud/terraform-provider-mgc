@@ -12,9 +12,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainerRegistryResource_Metadata(t *testing.T) {
+	t.Parallel()
 	r := NewContainerRegistryRegistriesResource()
 	req := resource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +29,7 @@ func TestContainerRegistryResource_Metadata(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Schema(t *testing.T) {
+	t.Parallel()
 	r := NewContainerRegistryRegistriesResource()
 	req := resource.SchemaRequest{}
 	resp := &resource.SchemaResponse{}
@@ -41,6 +44,7 @@ func TestContainerRegistryResource_Schema(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Create(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -66,7 +70,7 @@ func TestContainerRegistryResource_Create(t *testing.T) {
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
 	diags := plan.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -90,6 +94,7 @@ func TestContainerRegistryResource_Create(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Create_WithoutProxyCache(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -115,7 +120,7 @@ func TestContainerRegistryResource_Create_WithoutProxyCache(t *testing.T) {
 		ProxyCacheID: types.StringNull(),
 	}
 	diags := plan.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -139,6 +144,7 @@ func TestContainerRegistryResource_Create_WithoutProxyCache(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Create_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -159,7 +165,8 @@ func TestContainerRegistryResource_Create_APIError(t *testing.T) {
 		Name:         types.StringValue("my-registry"),
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
-	_ = plan.Set(ctx, &inputData)
+	diags := plan.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set plan")
 
 	req := resource.CreateRequest{
 		Plan: plan,
@@ -176,6 +183,7 @@ func TestContainerRegistryResource_Create_APIError(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -198,7 +206,7 @@ func TestContainerRegistryResource_Read(t *testing.T) {
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -222,6 +230,7 @@ func TestContainerRegistryResource_Read(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -239,7 +248,8 @@ func TestContainerRegistryResource_Read_APIError(t *testing.T) {
 		Name:         types.StringValue("my-registry"),
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ReadRequest{
 		State: state,
@@ -256,6 +266,7 @@ func TestContainerRegistryResource_Read_APIError(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Update(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	r := &ContainerRegistryResource{}
 
@@ -269,6 +280,7 @@ func TestContainerRegistryResource_Update(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Delete(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -287,7 +299,7 @@ func TestContainerRegistryResource_Delete(t *testing.T) {
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
 	diags := state.Set(ctx, &inputData)
-	assert.False(t, diags.HasError())
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,
@@ -304,6 +316,7 @@ func TestContainerRegistryResource_Delete(t *testing.T) {
 }
 
 func TestContainerRegistryResource_Delete_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.RegistriesService)
@@ -321,7 +334,8 @@ func TestContainerRegistryResource_Delete_APIError(t *testing.T) {
 		Name:         types.StringValue("my-registry"),
 		ProxyCacheID: types.StringValue("proxy-123"),
 	}
-	_ = state.Set(ctx, &inputData)
+	diags := state.Set(ctx, &inputData)
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.DeleteRequest{
 		State: state,
@@ -338,17 +352,19 @@ func TestContainerRegistryResource_Delete_APIError(t *testing.T) {
 }
 
 func TestContainerRegistryResource_ImportState(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	r := &ContainerRegistryResource{}
 
 	schemaResp := testutils.GetResourceTestSchema(t, r)
 
 	state := tfsdk.State{Schema: schemaResp.Schema}
-	_ = state.Set(ctx, &ContainerRegistryModel{
+	diags := state.Set(ctx, &ContainerRegistryModel{
 		Id:           types.StringUnknown(),
 		Name:         types.StringUnknown(),
 		ProxyCacheID: types.StringUnknown(),
 	})
+	require.False(t, diags.HasError(), "failed to set state")
 
 	req := resource.ImportStateRequest{
 		ID: "import-reg-123",

@@ -15,6 +15,7 @@ import (
 )
 
 func TestDataSourceCRCredentials_Metadata(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRCredentials()
 	req := datasource.MetadataRequest{
 		ProviderTypeName: "mgc",
@@ -27,6 +28,7 @@ func TestDataSourceCRCredentials_Metadata(t *testing.T) {
 }
 
 func TestDataSourceCRCredentials_Schema(t *testing.T) {
+	t.Parallel()
 	d := NewDataSourceCRCredentials()
 	req := datasource.SchemaRequest{}
 	resp := &datasource.SchemaResponse{}
@@ -44,6 +46,7 @@ func TestDataSourceCRCredentials_Schema(t *testing.T) {
 }
 
 func TestDataSourceCRCredentials_Configure_NilProviderData(t *testing.T) {
+	t.Parallel()
 	d := &DataSourceCRCredentials{}
 
 	req := datasource.ConfigureRequest{
@@ -58,6 +61,7 @@ func TestDataSourceCRCredentials_Configure_NilProviderData(t *testing.T) {
 }
 
 func TestDataSourceCRCredentials_Configure_InvalidProviderData(t *testing.T) {
+	t.Parallel()
 	d := &DataSourceCRCredentials{}
 
 	req := datasource.ConfigureRequest{
@@ -72,6 +76,7 @@ func TestDataSourceCRCredentials_Configure_InvalidProviderData(t *testing.T) {
 }
 
 func TestDataSourceCRCredentials_Read(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.CredentialsService)
@@ -130,6 +135,7 @@ func TestDataSourceCRCredentials_Read(t *testing.T) {
 }
 
 func TestDataSourceCRCredentials_Read_APIError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	mockSvc := new(mocks.CredentialsService)
