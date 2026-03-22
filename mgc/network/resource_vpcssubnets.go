@@ -3,7 +3,9 @@ package network
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -17,15 +19,15 @@ import (
 )
 
 type mgcNetworkVpcsSubnetsModel struct {
-	ID               types.String   `tfsdk:"id"`
-	CidrBlock        types.String   `tfsdk:"cidr_block"`
-	Description      types.String   `tfsdk:"description"`
-	DnsNameservers   []types.String `tfsdk:"dns_nameservers"`
-	IpVersion        types.String   `tfsdk:"ip_version"`
-	Name             types.String   `tfsdk:"name"`
-	SubnetpoolId     types.String   `tfsdk:"subnetpool_id"`
-	VpcId            types.String   `tfsdk:"vpc_id"`
-	AvailabilityZone types.String   `tfsdk:"availability_zone"`
+	ID               types.String `tfsdk:"id"`
+	CidrBlock        types.String `tfsdk:"cidr_block"`
+	Description      types.String `tfsdk:"description"`
+	DnsNameservers   types.List   `tfsdk:"dns_nameservers"`
+	IpVersion        types.String `tfsdk:"ip_version"`
+	Name             types.String `tfsdk:"name"`
+	SubnetpoolId     types.String `tfsdk:"subnetpool_id"`
+	VpcId            types.String `tfsdk:"vpc_id"`
+	AvailabilityZone types.String `tfsdk:"availability_zone"`
 }
 
 type mgcNetworkVpcsSubnetsResource struct {
@@ -76,6 +78,9 @@ func (r *mgcNetworkVpcsSubnetsResource) Schema(_ context.Context, _ resource.Sch
 				ElementType: types.StringType,
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 			"ip_version": schema.StringAttribute{
 				Description: "Network protocol version. Allowed values: 'IPv4' or 'IPv6'. Example: 'IPv4'",
@@ -144,8 +149,8 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 	}
 
 	dnsCreateParam := []string{}
-	for _, dns := range data.DnsNameservers {
-		dnsCreateParam = append(dnsCreateParam, dns.ValueString())
+	if !data.DnsNameservers.IsNull() && !data.DnsNameservers.IsUnknown() {
+		data.DnsNameservers.ElementsAs(ctx, &dnsCreateParam, false)
 	}
 
 	createParam := netSDK.SubnetCreateRequest{
@@ -182,6 +187,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Create(ctx context.Context, req resource
 
 	data.AvailabilityZone = types.StringValue(utils.ConvertXZoneToAvailabilityZone(r.region, createdSubnet.Zone))
 	data.ID = types.StringValue(subnetID)
+	data.DnsNameservers, _ = types.ListValueFrom(ctx, types.StringType, createdSubnet.DNSNameservers)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -198,12 +204,7 @@ func (r *mgcNetworkVpcsSubnetsResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	dnsNameServers := []types.String{}
-	for _, dns := range subnet.DNSNameservers {
-		dnsNameServers = append(dnsNameServers, types.StringPointerValue(&dns))
-	}
-
-	data.DnsNameservers = dnsNameServers
+	data.DnsNameservers, _ = types.ListValueFrom(ctx, types.StringType, subnet.DNSNameservers)
 	data.CidrBlock = types.StringPointerValue(&subnet.CIDRBlock)
 	data.Description = types.StringPointerValue(subnet.Description)
 	data.IpVersion = types.StringValue(subnet.IPVersion)
@@ -222,8 +223,8 @@ func (r *mgcNetworkVpcsSubnetsResource) Update(ctx context.Context, req resource
 	}
 
 	dnsServers := []string{}
-	for _, dns := range data.DnsNameservers {
-		dnsServers = append(dnsServers, dns.ValueString())
+	if !data.DnsNameservers.IsNull() && !data.DnsNameservers.IsUnknown() {
+		data.DnsNameservers.ElementsAs(ctx, &dnsServers, false)
 	}
 	subnetUpdateParams := netSDK.SubnetPatchRequest{
 		DNSNameservers: &dnsServers,
@@ -260,7 +261,5 @@ func convertIPStringToIPVersion(ipVersion string) int {
 }
 
 func (r *mgcNetworkVpcsSubnetsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resp.Diagnostics.Append(resp.State.Set(ctx, &mgcNetworkVpcsSubnetsModel{
-		ID: types.StringValue(req.ID),
-	})...)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

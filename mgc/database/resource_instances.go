@@ -223,7 +223,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"backup_retention_days": schema.Int64Attribute{
-				Description: "Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.",
+				Description: "Number of days to retain automated backups (1-35 days). Default is 7 days.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.Int64{
