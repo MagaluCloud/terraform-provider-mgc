@@ -13,7 +13,7 @@ Manages a DBaaS parameters groups
 ## Example Usage
 
 ```terraform
-# Create a snapshot for a DBaaS instance
+# Create a custom parameter group
 resource "mgc_dbaas_parameter_groups" "example" {
   engine_name    = "mysql"
   engine_version = "8.0"
