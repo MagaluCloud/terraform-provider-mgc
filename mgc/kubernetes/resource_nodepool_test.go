@@ -9,6 +9,7 @@ import (
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -165,6 +166,76 @@ func TestConvertTaintsNP(t *testing.T) {
 		}
 		result := convertTaintsNP(input)
 		assert.Equal(t, expected, result)
+	})
+}
+
+func TestNodePoolNetworkFrom(t *testing.T) {
+	t.Run("a node pool without an explicit network inherits the subnets chosen for the cluster", func(t *testing.T) {
+		request := nodePoolNetworkFrom(nil)
+
+		assert.Nil(t, request, "no network payload should be sent so the pool inherits the cluster network")
+	})
+
+	t.Run("a node pool's network is described by the subnet IDs its nodes should run on", func(t *testing.T) {
+		network := &NodePoolNetwork{
+			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
+				types.StringValue("11111111-1111-1111-1111-111111111111"),
+				types.StringValue("22222222-2222-2222-2222-222222222222"),
+			}),
+		}
+
+		request := nodePoolNetworkFrom(network)
+
+		assert.NotNil(t, request)
+		assert.ElementsMatch(t, []string{
+			"11111111-1111-1111-1111-111111111111",
+			"22222222-2222-2222-2222-222222222222",
+		}, request.SubnetIDs)
+	})
+
+	t.Run("the subnet IDs form an unordered set where duplicates are not allowed", func(t *testing.T) {
+		network := &NodePoolNetwork{
+			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
+				types.StringValue("subnet-c"),
+				types.StringValue("subnet-a"),
+				types.StringValue("subnet-b"),
+			}),
+		}
+
+		request := nodePoolNetworkFrom(network)
+
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b", "subnet-c"}, request.SubnetIDs)
+	})
+}
+
+func TestConvertNodePoolReadsNetworkSubnetIDs(t *testing.T) {
+	t.Run("a node pool's network subnets are exposed as the set of their IDs", func(t *testing.T) {
+		sdkPool := &k8sSDK.NodePool{
+			ID:   "np-with-network",
+			Name: "with-network",
+			Network: &k8sSDK.Network{
+				VPCID: "vpc-xyz",
+				Subnets: []k8sSDK.Subnet{
+					{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
+					{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
+				},
+			},
+		}
+
+		network := nodePoolNetworkFromSDK(sdkPool.Network)
+
+		assert.NotNil(t, network, "the network block must be populated when the API returns subnets")
+		ids := []string{}
+		for _, e := range network.SubnetIDs.Elements() {
+			ids = append(ids, e.(types.String).ValueString())
+		}
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
+	})
+
+	t.Run("a node pool without network information leaves the network block unset", func(t *testing.T) {
+		network := nodePoolNetworkFromSDK(nil)
+
+		assert.Nil(t, network)
 	})
 }
 

@@ -28,9 +28,7 @@ type KubernetesCluster struct {
 	KubeAPIFixedIP             types.String   `tfsdk:"kube_api_fixed_ip"`
 	KubeAPIFloatingIP          types.String   `tfsdk:"kube_api_floating_ip"`
 	KubeAPIPort                types.Int64    `tfsdk:"kube_api_port"`
-	CIDR                       types.String   `tfsdk:"cidr"`
-	NetworkName                types.String   `tfsdk:"network_name"`
-	SubnetID                   types.String   `tfsdk:"subnet_id"`
+	Network                    *Network       `tfsdk:"network"`
 	Region                     types.String   `tfsdk:"region"`
 	Message                    types.String   `tfsdk:"message"`
 	State                      types.String   `tfsdk:"state"`
@@ -327,17 +325,35 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 				Description: "Port used by the Kubernetes API Server.",
 				Computed:    true,
 			},
-			"cidr": schema.StringAttribute{
-				Description: "Available IP addresses used for provisioning nodes in the cluster.",
+			"network": schema.SingleNestedAttribute{
 				Computed:    true,
-			},
-			"network_name": schema.StringAttribute{
-				Description: "Name of the cluster network.",
-				Computed:    true,
-			},
-			"subnet_id": schema.StringAttribute{
-				Description: "Identifier of the internal subnet where the cluster will be provisioned.",
-				Computed:    true,
+				Description: "Network configuration associated with cluster.",
+				Attributes: map[string]schema.Attribute{
+					"subnets": schema.ListNestedAttribute{
+						Description: "List of subnets associated with the network.",
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Description: "Subnet ID.",
+									Computed:    true,
+								},
+								"availability_zone": schema.StringAttribute{
+									Description: "Subnet availability zone.",
+									Computed:    true,
+								},
+								"cidr": schema.StringAttribute{
+									Description: "Subnet CIDR.",
+									Computed:    true,
+								},
+							},
+						},
+					},
+					"vpc_id": schema.StringAttribute{
+						Description: "The ID of the VPC associated with the cluster.",
+						Computed:    true,
+					},
+				},
 			},
 			"region": schema.StringAttribute{
 				Description: "Identifier of the region where the Kubernetes cluster is located.",
@@ -431,10 +447,8 @@ func convertToKubernetesCluster(getResult *sdkK8s.Cluster, region string) *Kuber
 		}
 	}
 
-	if getResult.Network != nil {
-		kubernetesCluster.CIDR = types.StringValue(getResult.Network.CIDR)
-		kubernetesCluster.NetworkName = types.StringValue(getResult.Network.Name)
-		kubernetesCluster.SubnetID = types.StringValue(getResult.Network.SubnetID)
+	if getResult.Network != nil && len(getResult.Network.Subnets) > 0 {
+		kubernetesCluster.Network = ConvertSDKNetworkToTFModel(getResult.Network)
 	}
 
 	if getResult.Status != nil {

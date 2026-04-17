@@ -4,6 +4,7 @@ import (
 	"context"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -29,6 +30,17 @@ type Taint struct {
 	Effect types.String `tfsdk:"effect"`
 	Key    types.String `tfsdk:"key"`
 	Value  types.String `tfsdk:"value"`
+}
+
+type Network struct {
+	VPCID   types.String `tfsdk:"vpc_id"`
+	Subnets []Subnet     `tfsdk:"subnets"`
+}
+
+type Subnet struct {
+	ID               types.String `tfsdk:"id"`
+	CIDR             types.String `tfsdk:"cidr"`
+	AvailabilityZone types.String `tfsdk:"availability_zone"`
 }
 
 func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
@@ -123,4 +135,22 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 	}
 
 	return nodePool
+}
+
+func ConvertSDKNetworkToTFModel(n *sdkK8s.Network) *Network {
+	if n == nil || len(n.Subnets) == 0 {
+		return nil
+	}
+	subnets := make([]Subnet, len(n.Subnets))
+	for i, s := range n.Subnets {
+		subnets[i] = Subnet{
+			ID:               types.StringValue(s.ID),
+			CIDR:             types.StringValue(s.CIDR),
+			AvailabilityZone: types.StringValue(s.AvailabilityZone),
+		}
+	}
+	return &Network{
+		VPCID:   types.StringValue(n.VPCID),
+		Subnets: subnets,
+	}
 }

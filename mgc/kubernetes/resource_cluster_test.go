@@ -5,6 +5,7 @@ import (
 	"time"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -271,6 +272,199 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 				assert.Equal(t, types.StringValue(tc.expected), tfModel.MachineTypesSource)
 			})
 		}
+	})
+}
+
+func TestBuildPatchClusterRequest(t *testing.T) {
+	t.Run("should request version upgrade when plan version differs from state version", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.29.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.True(t, versionChanged, "version change must be reported so Update can poll until running")
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.29.0", *patch.Version)
+	})
+
+	t.Run("should not include version in patch when plan version equals state version", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version, "no upgrade should be triggered when version did not change")
+	})
+
+	t.Run("should not include version in patch when plan version is unknown", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringUnknown(),
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("should not include version in patch when plan version is null", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringNull(),
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("should always carry allowed_cidrs from plan", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{
+				types.StringValue("192.168.0.0/16"),
+				types.StringValue("172.16.0.0/12"),
+			},
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Equal(t, []string{"192.168.0.0/16", "172.16.0.0/12"}, *patch.AllowedCIDRs)
+	})
+
+	t.Run("should combine version upgrade and allowed_cidrs change in the same patch", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.30.1"),
+			AllowedCidrs: []types.String{types.StringValue("192.168.0.0/16")},
+		}
+
+		patch, versionChanged := buildPatchClusterRequest(state, plan)
+
+		assert.True(t, versionChanged)
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.30.1", *patch.Version)
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Equal(t, []string{"192.168.0.0/16"}, *patch.AllowedCIDRs)
+	})
+
+	t.Run("should carry empty allowed_cidrs slice when plan clears the list", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: nil,
+		}
+
+		patch, _ := buildPatchClusterRequest(state, plan)
+
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Empty(t, *patch.AllowedCIDRs)
+	})
+}
+
+func TestClusterNetworkFrom(t *testing.T) {
+	t.Run("a cluster without an explicit network falls back to the default VPC subnets", func(t *testing.T) {
+		request := clusterNetworkFrom(nil)
+
+		assert.Nil(t, request, "no network payload should be sent so the API uses the default VPC")
+	})
+
+	t.Run("a cluster's network is described by the subnet IDs it should run on", func(t *testing.T) {
+		network := &ClusterNetwork{
+			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
+				types.StringValue("11111111-1111-1111-1111-111111111111"),
+				types.StringValue("22222222-2222-2222-2222-222222222222"),
+			}),
+		}
+
+		request := clusterNetworkFrom(network)
+
+		assert.NotNil(t, request)
+		assert.ElementsMatch(t, []string{
+			"11111111-1111-1111-1111-111111111111",
+			"22222222-2222-2222-2222-222222222222",
+		}, request.SubnetIDs)
+	})
+
+	t.Run("the subnet IDs form an unordered set where duplicates are not allowed", func(t *testing.T) {
+		network := &ClusterNetwork{
+			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
+				types.StringValue("subnet-c"),
+				types.StringValue("subnet-a"),
+				types.StringValue("subnet-b"),
+			}),
+		}
+
+		request := clusterNetworkFrom(network)
+
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b", "subnet-c"}, request.SubnetIDs)
+	})
+}
+
+func TestConvertSDKClusterReadsNetworkSubnetIDs(t *testing.T) {
+	t.Run("a cluster's network subnets are exposed as the set of their IDs", func(t *testing.T) {
+		sdkResult := &k8sSDK.Cluster{
+			ID:      "cluster-with-network",
+			Name:    "with-network",
+			Version: "1.29.0",
+			Network: &k8sSDK.Network{
+				VPCID: "vpc-xyz",
+				Subnets: []k8sSDK.Subnet{
+					{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
+					{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
+				},
+			},
+		}
+
+		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+
+		assert.NotNil(t, tfModel.Network, "the network block must be populated when the API returns subnets")
+		ids := []string{}
+		for _, e := range tfModel.Network.SubnetIDs.Elements() {
+			ids = append(ids, e.(types.String).ValueString())
+		}
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
+	})
+
+	t.Run("a cluster without network information leaves the network block unset", func(t *testing.T) {
+		sdkResult := &k8sSDK.Cluster{
+			ID:      "cluster-no-network",
+			Name:    "no-network",
+			Version: "1.29.0",
+		}
+
+		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+
+		assert.Nil(t, tfModel.Network)
 	})
 }
 

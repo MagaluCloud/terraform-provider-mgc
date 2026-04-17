@@ -14,10 +14,13 @@ import (
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -30,19 +33,24 @@ const (
 )
 
 type KubernetesClusterCreateResourceModel struct {
-	Name               types.String   `tfsdk:"name"`
-	AllowedCidrs       []types.String `tfsdk:"allowed_cidrs"`
-	Description        types.String   `tfsdk:"description"`
-	EnabledServerGroup types.Bool     `tfsdk:"enabled_server_group"`
-	Version            types.String   `tfsdk:"version"`
-	CreatedAt          types.String   `tfsdk:"created_at"`
-	UpdatedAt          types.String   `tfsdk:"updated_at"`
-	ID                 types.String   `tfsdk:"id"`
-	Region             types.String   `tfsdk:"region"`
-	ServicesIpV4CIDR   types.String   `tfsdk:"services_ipv4_cidr"`
-	ClusterIPv4CIDR    types.String   `tfsdk:"cluster_ipv4_cidr"`
-	MachineTypesSource types.String   `tfsdk:"machine_types_source"`
-	PlatformVersion    types.String   `tfsdk:"platform_version"`
+	Name               types.String    `tfsdk:"name"`
+	AllowedCidrs       []types.String  `tfsdk:"allowed_cidrs"`
+	Description        types.String    `tfsdk:"description"`
+	EnabledServerGroup types.Bool      `tfsdk:"enabled_server_group"`
+	Version            types.String    `tfsdk:"version"`
+	CreatedAt          types.String    `tfsdk:"created_at"`
+	UpdatedAt          types.String    `tfsdk:"updated_at"`
+	ID                 types.String    `tfsdk:"id"`
+	Region             types.String    `tfsdk:"region"`
+	ServicesIpV4CIDR   types.String    `tfsdk:"services_ipv4_cidr"`
+	ClusterIPv4CIDR    types.String    `tfsdk:"cluster_ipv4_cidr"`
+	MachineTypesSource types.String    `tfsdk:"machine_types_source"`
+	PlatformVersion    types.String    `tfsdk:"platform_version"`
+	Network            *ClusterNetwork `tfsdk:"network"`
+}
+
+type ClusterNetwork struct {
+	SubnetIDs types.Set `tfsdk:"subnet_ids"`
 }
 
 type k8sClusterResource struct {
@@ -98,7 +106,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "A brief description of the Kubernetes cluster.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"enabled_server_group": schema.BoolAttribute{
@@ -107,11 +115,11 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				WriteOnly:   true,
 			},
 			"version": schema.StringAttribute{
-				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format.",
+				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format. Changing this value triggers an in-place upgrade.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -166,6 +174,25 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "Platform version of the cluster.",
 				Computed:    true,
 			},
+			"network": schema.SingleNestedAttribute{
+				Description: "Network on which the cluster's control plane runs. When omitted, the subnets from the default VPC are used. This field cannot be changed after the cluster is created — altering it forces the cluster to be replaced.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplaceIfConfigured(),
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"subnet_ids": schema.SetAttribute{
+						Description: "Set of subnet IDs that host the control plane nodes. Each subnet must belong to a different availability zone. Between two and three subnets are required.",
+						Required:    true,
+						ElementType: types.StringType,
+						Validators: []validator.Set{
+							setvalidator.SizeBetween(2, 3),
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -206,6 +233,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		EnabledServerGroup: data.EnabledServerGroup.ValueBoolPointer(),
 		ClusterIPv4CIDR:    data.ClusterIPv4CIDR.ValueStringPointer(),
 		ServicesIpV4CIDR:   data.ServicesIpV4CIDR.ValueStringPointer(),
+		Network:            clusterNetworkFrom(data.Network),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -251,8 +279,8 @@ func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId st
 }
 
 func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data KubernetesClusterCreateResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	var plan KubernetesClusterCreateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -263,21 +291,26 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	state.AllowedCidrs = data.AllowedCidrs
+	patch, versionChanged := buildPatchClusterRequest(state, plan)
 
-	cidrs := []string{}
-	for _, c := range state.AllowedCidrs {
-		cidrs = append(cidrs, c.ValueString())
-	}
-
-	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), k8sSDK.PatchClusterRequest{
-		AllowedCIDRs: &cidrs,
-	})
+	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), patch)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
+	if versionChanged {
+		upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), "running")
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+		newState := convertSDKCreateResultToTerraformCreateClsuterModel(&upgraded)
+		resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
+		return
+	}
+
+	state.AllowedCidrs = plan.AllowedCidrs
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -319,6 +352,37 @@ func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.Impor
 	})...)
 }
 
+func clusterNetworkFrom(network *ClusterNetwork) *k8sSDK.ClusterNetworkRequest {
+	if network == nil {
+		return nil
+	}
+
+	elements := network.SubnetIDs.Elements()
+	subnetIDs := make([]string, 0, len(elements))
+	for _, e := range elements {
+		if s, ok := e.(types.String); ok {
+			subnetIDs = append(subnetIDs, s.ValueString())
+		}
+	}
+
+	return &k8sSDK.ClusterNetworkRequest{SubnetIDs: subnetIDs}
+}
+
+func clusterNetworkFromSDK(network *k8sSDK.Network) *ClusterNetwork {
+	if network == nil || len(network.Subnets) == 0 {
+		return nil
+	}
+
+	ids := make([]attr.Value, len(network.Subnets))
+	for i, s := range network.Subnets {
+		ids[i] = types.StringValue(s.ID)
+	}
+
+	return &ClusterNetwork{
+		SubnetIDs: types.SetValueMust(types.StringType, ids),
+	}
+}
+
 func createAllowedCidrs(data []types.String) *[]string {
 	var allowedCidrs []string
 	for _, c := range data {
@@ -329,6 +393,26 @@ func createAllowedCidrs(data []types.String) *[]string {
 	}
 
 	return &allowedCidrs
+}
+
+func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) (k8sSDK.PatchClusterRequest, bool) {
+	cidrs := make([]string, 0, len(plan.AllowedCidrs))
+	for _, c := range plan.AllowedCidrs {
+		cidrs = append(cidrs, c.ValueString())
+	}
+
+	patch := k8sSDK.PatchClusterRequest{
+		AllowedCIDRs: &cidrs,
+	}
+
+	versionChanged := false
+	if !plan.Version.IsUnknown() && !plan.Version.IsNull() &&
+		plan.Version.ValueString() != state.Version.ValueString() {
+		patch.Version = plan.Version.ValueStringPointer()
+		versionChanged = true
+	}
+
+	return patch, versionChanged
 }
 
 func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Cluster) *KubernetesClusterCreateResourceModel {
@@ -370,6 +454,8 @@ func convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult *k8sSDK.Clust
 			tfModel.AllowedCidrs = convertStringSliceToTypesStringSlice(*sdkResult.AllowedCIDRs)
 		}
 	}
+
+	tfModel.Network = clusterNetworkFromSDK(sdkResult.Network)
 
 	// Write Only Attributes
 	tfModel.EnabledServerGroup = types.BoolNull()
