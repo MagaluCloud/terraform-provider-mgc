@@ -97,10 +97,13 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 			},
 			"replicas": schema.Int64Attribute{
-				Description: "Number of replicas of the nodes in the node pool.",
+				Description: "Initial number of replicas of the nodes in the node pool. Required at creation; after creation, changes to this value are ignored because the replica count is managed by the API (e.g. via autoscaling between min_replicas and max_replicas).",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					utils.UseStateForInt64AfterCreate(),
 				},
 			},
 
@@ -292,10 +295,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	repli := int(data.Replicas.ValueInt64())
-	updateParam := k8sSDK.PatchNodePoolRequest{
-		Replicas: &repli,
-	}
+	updateParam := k8sSDK.PatchNodePoolRequest{}
 
 	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
 		updateParam.AutoScale = &k8sSDK.AutoScale{}

@@ -150,6 +150,36 @@ func (m RequireReplacePlanModifier) PlanModifyString(ctx context.Context, req pl
 	}
 }
 
+type useStateForInt64AfterCreate struct{}
+
+// UseStateForInt64AfterCreate returns a planmodifier that preserves the state
+// value for an Int64 attribute after the resource has been created. Changes to
+// the attribute in configuration will not produce a plan diff. This is useful
+// when the attribute's value is managed by the API after creation (for
+// example, a replica count that is adjusted by an autoscaler), where the
+// config value is only meaningful at creation time.
+func UseStateForInt64AfterCreate() planmodifier.Int64 {
+	return useStateForInt64AfterCreate{}
+}
+
+func (m useStateForInt64AfterCreate) Description(_ context.Context) string {
+	return "Preserves the state value after resource creation; configuration changes to this attribute are ignored because its value is managed by the API."
+}
+
+func (m useStateForInt64AfterCreate) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m useStateForInt64AfterCreate) PlanModifyInt64(ctx context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	if req.StateValue.IsNull() {
+		return
+	}
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	resp.PlanValue = req.StateValue
+}
+
 type setRequiresReplaceOnChange struct{}
 
 // SetRequiresReplaceOnChange returns a planmodifier that requires resource replacement
