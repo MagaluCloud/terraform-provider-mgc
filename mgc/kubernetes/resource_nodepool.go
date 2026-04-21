@@ -164,6 +164,14 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					int64validator.AtLeast(0),
 				},
 			},
+			"version": schema.StringAttribute{
+				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format. Changing this value triggers an in-place upgrade.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			//deprecated
 			"availability_zones": schema.SetAttribute{
 				Description: "List of availability zones where the node pool is deployed.",
@@ -322,21 +330,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	repli := int(data.Replicas.ValueInt64())
-	updateParam := k8sSDK.PatchNodePoolRequest{
-		Replicas: &repli,
-	}
-
-	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
-		updateParam.AutoScale = &k8sSDK.AutoScale{}
-	}
-
-	if !data.MaxReplicas.IsUnknown() {
-		updateParam.AutoScale.MaxReplicas = utils.ConvertInt64PointerToIntPointer(data.MaxReplicas.ValueInt64Pointer())
-	}
-	if !data.MinReplicas.IsUnknown() {
-		updateParam.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
-	}
+	updateParam, versionChanged := buildPatchNodePoolRequest(state, data)
 
 	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
 	if err != nil {
@@ -344,7 +338,6 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
-	data.Network = nodePoolNetworkFromSDK(nodepool.Network)
 
 	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
@@ -352,7 +345,38 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	if versionChanged {
+		upgraded, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+		data.NodePool = ConvertToNodePoolToTFModel(upgraded, r.region)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func buildPatchNodePoolRequest(state, plan NodePoolResourceModel) (k8sSDK.PatchNodePoolRequest, bool) {
+	patch := k8sSDK.PatchNodePoolRequest{}
+	if !plan.MaxReplicas.IsUnknown() || !plan.MinReplicas.IsUnknown() {
+		patch.AutoScale = &k8sSDK.AutoScale{}
+	}
+	if !plan.MaxReplicas.IsUnknown() {
+		patch.AutoScale.MaxReplicas = utils.ConvertInt64PointerToIntPointer(plan.MaxReplicas.ValueInt64Pointer())
+	}
+	if !plan.MinReplicas.IsUnknown() {
+		patch.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(plan.MinReplicas.ValueInt64Pointer())
+	}
+
+	versionChanged := false
+	if !plan.Version.IsUnknown() && !plan.Version.IsNull() &&
+		plan.Version.ValueString() != state.Version.ValueString() {
+		patch.Version = plan.Version.ValueStringPointer()
+		versionChanged = true
+	}
+
+	return patch, versionChanged
 }
 
 func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

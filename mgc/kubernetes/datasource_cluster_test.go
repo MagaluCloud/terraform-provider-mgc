@@ -159,16 +159,21 @@ func TestConvertToKubernetesCluster(t *testing.T) {
 				Port:                intPtr(6443),
 			},
 			Network: &sdkK8s.Network{
-				CIDR:     "10.244.0.0/16",
-				Name:     "prod-net",
-				SubnetID: "subnet-id-abc",
+				VPCID:   "vpc-id-abc",
+				Subnets: *MockedSubnets(),
 			},
 			Status: &sdkK8s.MessageState{
 				Message: "Cluster is healthy",
 				State:   "Running",
 			},
 			NodePools: &[]sdkK8s.NodePool{
-				{ID: "np-1", Name: "worker-pool-1"},
+				{ID: "np-1",
+					Name: "worker-pool-1",
+					Network: &sdkK8s.Network{
+						VPCID:   "vpc-id-abc",
+						Subnets: *MockedSubnets(),
+					},
+				},
 			},
 			ControlPlane: &sdkK8s.NodePool{
 				ID: "cp-1",
@@ -188,10 +193,45 @@ func TestConvertToKubernetesCluster(t *testing.T) {
 		assert.Equal(t, types.BoolValue(false), result.KubeAPIDisableAPIServerFIP)
 		assert.Equal(t, types.StringValue("200.1.2.3"), result.KubeAPIFloatingIP)
 		assert.Equal(t, types.Int64Value(6443), result.KubeAPIPort)
-		assert.Equal(t, types.StringValue("10.244.0.0/16"), result.CIDR)
-		assert.Equal(t, types.StringValue("subnet-id-abc"), result.SubnetID)
 		assert.Equal(t, types.StringValue("Running"), result.State)
 		assert.Equal(t, types.StringValue("np-1"), result.NodePools[0].ID)
-		assert.Equal(t, types.StringValue("cp-1"), result.Controlplane.ID)
+		AssertNetwork(t, result.Network, sdkCluster.Network)
+		for _, np := range result.NodePools {
+			AssertNetwork(t, np.Network, sdkCluster.Network)
+		}
 	})
+
+}
+
+func MockedSubnets() *[]sdkK8s.Subnet {
+	return &[]sdkK8s.Subnet{
+		{
+			ID:               "subnet-id-1",
+			CIDR:             "10.0.0.0/24",
+			AvailabilityZone: "br-se1-a",
+		},
+		{
+			ID:               "subnet-id-2",
+			CIDR:             "10.0.1.0/24",
+			AvailabilityZone: "br-se1-b",
+		},
+		{
+			ID:               "subnet-id-3",
+			CIDR:             "10.0.0.0/24",
+			AvailabilityZone: "br-se1-c",
+		},
+	}
+}
+
+func AssertNetwork(t *testing.T, network *Network, sdkNetwork *sdkK8s.Network) {
+	assert.Equal(t, network.VPCID.ValueString(), sdkNetwork.VPCID)
+	assert.Equal(t, network.Subnets[0].ID.ValueString(), sdkNetwork.Subnets[0].ID)
+	assert.Equal(t, network.Subnets[0].CIDR.ValueString(), sdkNetwork.Subnets[0].CIDR)
+	assert.Equal(t, network.Subnets[0].AvailabilityZone.ValueString(), sdkNetwork.Subnets[0].AvailabilityZone)
+	assert.Equal(t, network.Subnets[1].ID.ValueString(), sdkNetwork.Subnets[1].ID)
+	assert.Equal(t, network.Subnets[1].CIDR.ValueString(), sdkNetwork.Subnets[1].CIDR)
+	assert.Equal(t, network.Subnets[1].AvailabilityZone.ValueString(), sdkNetwork.Subnets[1].AvailabilityZone)
+	assert.Equal(t, network.Subnets[2].ID.ValueString(), sdkNetwork.Subnets[2].ID)
+	assert.Equal(t, network.Subnets[2].CIDR.ValueString(), sdkNetwork.Subnets[2].CIDR)
+	assert.Equal(t, network.Subnets[2].AvailabilityZone.ValueString(), sdkNetwork.Subnets[2].AvailabilityZone)
 }

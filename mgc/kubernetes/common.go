@@ -24,6 +24,8 @@ type NodePool struct {
 	Taints            *[]Taint     `tfsdk:"taints"`
 	MaxPodsPerNode    types.Int64  `tfsdk:"max_pods_per_node"`
 	AvailabilityZones types.Set    `tfsdk:"availability_zones"`
+	Network           *Network     `tfsdk:"network"`
+	Version           types.String `tfsdk:"version"`
 }
 
 type Taint struct {
@@ -58,6 +60,7 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 			SecurityGroups:    types.SetNull(types.StringType),
 			MaxPodsPerNode:    types.Int64Null(),
 			AvailabilityZones: types.SetNull(types.StringType),
+			Version:           types.StringNull(),
 		}
 	}
 
@@ -67,6 +70,7 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 		CreatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339(np.CreatedAt)),
 		UpdatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339(np.UpdatedAt)),
 		ID:        types.StringValue(np.ID),
+		Version:   types.StringPointerValue(np.Version),
 	}
 
 	if np.AvailabilityZones != nil {
@@ -132,6 +136,10 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 			}
 		}
 		nodePool.Taints = &taints
+	}
+
+	if np.Network != nil && len(np.Network.Subnets) > 0 {
+		nodePool.Network = ConvertSDKNetworkToTFModel(np.Network)
 	}
 
 	return nodePool

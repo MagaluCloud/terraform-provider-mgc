@@ -311,6 +311,9 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	state.AllowedCidrs = plan.AllowedCidrs
+	if !plan.Description.IsUnknown() && !plan.Description.IsNull() {
+		state.Description = plan.Description
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -397,12 +400,17 @@ func createAllowedCidrs(data []types.String) *[]string {
 
 func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) (k8sSDK.PatchClusterRequest, bool) {
 	cidrs := make([]string, 0, len(plan.AllowedCidrs))
+
 	for _, c := range plan.AllowedCidrs {
 		cidrs = append(cidrs, c.ValueString())
 	}
 
 	patch := k8sSDK.PatchClusterRequest{
 		AllowedCIDRs: &cidrs,
+	}
+
+	if !plan.Description.IsUnknown() && !plan.Description.IsNull() {
+		patch.Description = plan.Description.ValueStringPointer()
 	}
 
 	versionChanged := false

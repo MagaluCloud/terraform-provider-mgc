@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -211,8 +212,6 @@ func TestNodePoolNetworkFrom(t *testing.T) {
 func TestConvertNodePoolReadsNetworkSubnetIDs(t *testing.T) {
 	t.Run("a node pool's network subnets are exposed as the set of their IDs", func(t *testing.T) {
 		sdkPool := &k8sSDK.NodePool{
-			ID:   "np-with-network",
-			Name: "with-network",
 			Network: &k8sSDK.Network{
 				VPCID: "vpc-xyz",
 				Subnets: []k8sSDK.Subnet{
@@ -236,6 +235,194 @@ func TestConvertNodePoolReadsNetworkSubnetIDs(t *testing.T) {
 		network := nodePoolNetworkFromSDK(nil)
 
 		assert.Nil(t, network)
+	})
+}
+
+func TestBuildPatchNodePoolRequest(t *testing.T) {
+	t.Run("a node pool's Kubernetes version is upgraded in place when the plan version differs from the state version", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.29.0"),
+			Replicas: types.Int64Value(2),
+		}}
+
+		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
+
+		assert.True(t, versionChanged, "version change must be reported so Update can poll until running")
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.29.0", *patch.Version)
+	})
+
+	t.Run("a node pool keeps its current version when the plan version equals the state version", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+
+		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version, "no upgrade should be triggered when version did not change")
+	})
+
+	t.Run("a node pool keeps its current version when the plan version is unknown", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringUnknown(),
+			Replicas: types.Int64Value(2),
+		}}
+
+		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("a node pool keeps its current version when the plan version is null", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringNull(),
+			Replicas: types.Int64Value(2),
+		}}
+
+		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
+
+		assert.False(t, versionChanged)
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("a node pool's replicas are always carried from the plan into the patch", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(5),
+		}}
+
+		patch, _ := buildPatchNodePoolRequest(state, plan)
+
+		assert.NotNil(t, patch.Replicas)
+		assert.Equal(t, 5, *patch.Replicas)
+	})
+
+	t.Run("a node pool can have its version and replicas updated together in the same patch", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.30.1"),
+			Replicas: types.Int64Value(4),
+		}}
+
+		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
+
+		assert.True(t, versionChanged)
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.30.1", *patch.Version)
+		assert.NotNil(t, patch.Replicas)
+		assert.Equal(t, 4, *patch.Replicas)
+	})
+
+	t.Run("a node pool's autoscale bounds are carried in the patch when set in the plan", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Version:  types.StringValue("v1.28.0"),
+			Replicas: types.Int64Value(2),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Version:     types.StringValue("v1.28.0"),
+			Replicas:    types.Int64Value(2),
+			MaxReplicas: types.Int64Value(5),
+			MinReplicas: types.Int64Value(1),
+		}}
+
+		patch, _ := buildPatchNodePoolRequest(state, plan)
+
+		assert.NotNil(t, patch.AutoScale)
+		assert.NotNil(t, patch.AutoScale.MaxReplicas)
+		assert.Equal(t, 5, *patch.AutoScale.MaxReplicas)
+		assert.NotNil(t, patch.AutoScale.MinReplicas)
+		assert.Equal(t, 1, *patch.AutoScale.MinReplicas)
+	})
+}
+
+func TestConvertToNodePoolReadsVersion(t *testing.T) {
+	t.Run("a node pool's current Kubernetes version is exposed when the API returns it", func(t *testing.T) {
+		version := "v1.30.1"
+		sdkPool := &k8sSDK.NodePool{
+			ID:      "np-id",
+			Name:    "worker",
+			Version: &version,
+		}
+
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
+
+		assert.Equal(t, types.StringValue("v1.30.1"), converted.Version)
+	})
+
+	t.Run("a node pool without version information leaves the version field null", func(t *testing.T) {
+		sdkPool := &k8sSDK.NodePool{
+			ID:      "np-id",
+			Name:    "worker",
+			Version: nil,
+		}
+
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
+
+		assert.True(t, converted.Version.IsNull())
+	})
+}
+
+func TestNodePoolSchemaVersionPlanModifiers(t *testing.T) {
+	r := &NewNodePoolResource{}
+	resp := &resource.SchemaResponse{}
+
+	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	t.Run("the version attribute is exposed so users can declare the node pool's Kubernetes version", func(t *testing.T) {
+		_, ok := resp.Schema.Attributes["version"]
+		assert.True(t, ok, "version attribute must be present on the schema")
+	})
+
+	t.Run("the version attribute is optional and computed so the provider can echo back the server value", func(t *testing.T) {
+		attrRaw, ok := resp.Schema.Attributes["version"].(schema.StringAttribute)
+		assert.True(t, ok)
+		assert.True(t, attrRaw.Optional)
+		assert.True(t, attrRaw.Computed)
+	})
+
+	t.Run("changing the version must trigger an in-place upgrade, never a replacement of the node pool", func(t *testing.T) {
+		attrRaw, ok := resp.Schema.Attributes["version"].(schema.StringAttribute)
+		assert.True(t, ok)
+
+		hasUseStateForUnknown := false
+		hasRequiresReplace := false
+		for _, modifier := range attrRaw.PlanModifiers {
+			if reflect.TypeOf(modifier) == reflect.TypeOf(stringplanmodifier.UseStateForUnknown()) {
+				hasUseStateForUnknown = true
+			}
+			if reflect.TypeOf(modifier) == reflect.TypeOf(stringplanmodifier.RequiresReplace()) {
+				hasRequiresReplace = true
+			}
+		}
+
+		assert.True(t, hasUseStateForUnknown, "version must use state for unknown to avoid spurious diffs on read")
+		assert.False(t, hasRequiresReplace, "version change is upgraded in place, not by recreating the node pool")
 	})
 }
 

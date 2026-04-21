@@ -181,7 +181,7 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 			},
 			"network": schema.SingleNestedAttribute{
 				Computed:    true,
-				Description: "Network configuration associated with cluster.",
+				Description: "Network configuration associated with nodepool.",
 				Attributes: map[string]schema.Attribute{
 					"subnets": schema.ListNestedAttribute{
 						Description: "List of subnets associated with the network.",
