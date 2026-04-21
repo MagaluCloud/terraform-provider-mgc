@@ -31,7 +31,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 - `cluster_id` (String) UUID of the Kubernetes cluster.
 - `flavor_name` (String) Definition of the CPU, RAM, and storage capacity of the nodes.
 - `name` (String) Name of the node pool.
-- `replicas` (Number) Number of replicas of the nodes in the node pool.
+- `replicas` (Number) Initial number of replicas of the nodes in the node pool. Required at creation; after creation, changes to this value are ignored because the replica count is managed by the API (e.g. via autoscaling between min_replicas and max_replicas).
 
 ### Optional
 
