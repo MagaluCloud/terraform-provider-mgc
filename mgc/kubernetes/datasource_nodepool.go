@@ -36,7 +36,7 @@ type FlattenedGetResult struct {
 	Taints                     []Taint        `tfsdk:"taints"`
 	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
 	AvailabilityZones          types.Set      `tfsdk:"availability_zones"`
-	Network                    *Network       `tfsdk:"network"`
+	SubnetIDs                  types.Set      `tfsdk:"subnet_ids"`
 }
 
 type DataSourceKubernetesNodepool struct {
@@ -179,36 +179,7 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 					},
 				},
 			},
-			"network": schema.SingleNestedAttribute{
-				Computed:    true,
-				Description: "Network configuration associated with nodepool.",
-				Attributes: map[string]schema.Attribute{
-					"subnets": schema.ListNestedAttribute{
-						Description: "List of subnets associated with the network.",
-						Computed:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Description: "Subnet ID.",
-									Computed:    true,
-								},
-								"availability_zone": schema.StringAttribute{
-									Description: "Subnet availability zone.",
-									Computed:    true,
-								},
-								"cidr": schema.StringAttribute{
-									Description: "Subnet CIDR.",
-									Computed:    true,
-								},
-							},
-						},
-					},
-					"vpc_id": schema.StringAttribute{
-						Description: "The ID of the VPC associated with the cluster.",
-						Computed:    true,
-					},
-				},
-			},
+			"subnet_ids": DatasourceSubnetIDsAttribute(),
 			"availability_zones": schema.SetAttribute{
 				Description: "List of availability zones.",
 				ElementType: types.StringType,
@@ -321,7 +292,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	}
 
 	if original.Network != nil && len(original.Network.Subnets) > 0 {
-		flattened.Network = ConvertSDKNetworkToTFModel(original.Network)
+		flattened.SubnetIDs = GetSubnetIDs(original.Network)
 	}
 
 	return *flattened, nil

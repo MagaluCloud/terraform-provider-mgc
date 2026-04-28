@@ -9,12 +9,14 @@ import (
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -170,48 +172,44 @@ func TestConvertTaintsNP(t *testing.T) {
 	})
 }
 
-func TestNodePoolNetworkFrom(t *testing.T) {
-	t.Run("a node pool without an explicit network inherits the subnets chosen for the cluster", func(t *testing.T) {
-		request := nodePoolNetworkFrom(nil)
-
-		assert.Nil(t, request, "no network payload should be sent so the pool inherits the cluster network")
-	})
-
-	t.Run("a node pool's network is described by the subnet IDs its nodes should run on", func(t *testing.T) {
-		network := &NodePoolNetwork{
-			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
-				types.StringValue("11111111-1111-1111-1111-111111111111"),
-				types.StringValue("22222222-2222-2222-2222-222222222222"),
-			}),
+func TestGetSubnetIDs(t *testing.T) {
+	t.Run("a network's subnets are exposed as the set of their IDs", func(t *testing.T) {
+		network := &k8sSDK.Network{
+			VPCID: "vpc-xyz",
+			Subnets: []k8sSDK.Subnet{
+				{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
+				{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
+			},
 		}
 
-		request := nodePoolNetworkFrom(network)
+		result := GetSubnetIDs(network)
 
-		assert.NotNil(t, request)
-		assert.ElementsMatch(t, []string{
-			"11111111-1111-1111-1111-111111111111",
-			"22222222-2222-2222-2222-222222222222",
-		}, request.SubnetIDs)
+		assert.False(t, result.IsNull(), "subnet_ids must be populated when the API returns subnets")
+		ids := []string{}
+		for _, e := range result.Elements() {
+			ids = append(ids, e.(types.String).ValueString())
+		}
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
 	})
 
-	t.Run("the subnet IDs form an unordered set where duplicates are not allowed", func(t *testing.T) {
-		network := &NodePoolNetwork{
-			SubnetIDs: types.SetValueMust(types.StringType, []attr.Value{
-				types.StringValue("subnet-c"),
-				types.StringValue("subnet-a"),
-				types.StringValue("subnet-b"),
-			}),
-		}
+	t.Run("a nil network returns a null set so the schema reports the attribute as absent", func(t *testing.T) {
+		result := GetSubnetIDs(nil)
 
-		request := nodePoolNetworkFrom(network)
+		assert.True(t, result.IsNull())
+	})
 
-		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b", "subnet-c"}, request.SubnetIDs)
+	t.Run("a network with no subnets returns a null set", func(t *testing.T) {
+		result := GetSubnetIDs(&k8sSDK.Network{VPCID: "vpc-xyz"})
+
+		assert.True(t, result.IsNull())
 	})
 }
 
-func TestConvertNodePoolReadsNetworkSubnetIDs(t *testing.T) {
+func TestConvertNodePoolReadsSubnetIDs(t *testing.T) {
 	t.Run("a node pool's network subnets are exposed as the set of their IDs", func(t *testing.T) {
 		sdkPool := &k8sSDK.NodePool{
+			ID:   "np-id",
+			Name: "worker",
 			Network: &k8sSDK.Network{
 				VPCID: "vpc-xyz",
 				Subnets: []k8sSDK.Subnet{
@@ -221,20 +219,26 @@ func TestConvertNodePoolReadsNetworkSubnetIDs(t *testing.T) {
 			},
 		}
 
-		network := nodePoolNetworkFromSDK(sdkPool.Network)
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
 
-		assert.NotNil(t, network, "the network block must be populated when the API returns subnets")
+		assert.False(t, converted.SubnetsIDs.IsNull())
 		ids := []string{}
-		for _, e := range network.SubnetIDs.Elements() {
+		for _, e := range converted.SubnetsIDs.Elements() {
 			ids = append(ids, e.(types.String).ValueString())
 		}
 		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
 	})
 
-	t.Run("a node pool without network information leaves the network block unset", func(t *testing.T) {
-		network := nodePoolNetworkFromSDK(nil)
+	t.Run("a node pool without network information leaves subnet_ids null", func(t *testing.T) {
+		sdkPool := &k8sSDK.NodePool{
+			ID:      "np-id",
+			Name:    "worker",
+			Network: nil,
+		}
 
-		assert.Nil(t, network)
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
+
+		assert.True(t, converted.SubnetsIDs.IsNull())
 	})
 }
 
@@ -304,7 +308,7 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 		assert.Nil(t, patch.Version)
 	})
 
-	t.Run("a node pool's replicas are always carried from the plan into the patch", func(t *testing.T) {
+	t.Run("a node pool's replicas are not sent in patch because they are managed by autoscaling", func(t *testing.T) {
 		state := NodePoolResourceModel{NodePool: NodePool{
 			Version:  types.StringValue("v1.28.0"),
 			Replicas: types.Int64Value(2),
@@ -316,18 +320,19 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 
 		patch, _ := buildPatchNodePoolRequest(state, plan)
 
-		assert.NotNil(t, patch.Replicas)
-		assert.Equal(t, 5, *patch.Replicas)
+		assert.Nil(t, patch.Replicas)
 	})
 
-	t.Run("a node pool can have its version and replicas updated together in the same patch", func(t *testing.T) {
+	t.Run("a node pool can have its version updated along with autoscale bounds in the same patch", func(t *testing.T) {
 		state := NodePoolResourceModel{NodePool: NodePool{
 			Version:  types.StringValue("v1.28.0"),
 			Replicas: types.Int64Value(2),
 		}}
 		plan := NodePoolResourceModel{NodePool: NodePool{
-			Version:  types.StringValue("v1.30.1"),
-			Replicas: types.Int64Value(4),
+			Version:     types.StringValue("v1.30.1"),
+			Replicas:    types.Int64Value(4),
+			MaxReplicas: types.Int64Value(10),
+			MinReplicas: types.Int64Value(2),
 		}}
 
 		patch, versionChanged := buildPatchNodePoolRequest(state, plan)
@@ -335,8 +340,10 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 		assert.True(t, versionChanged)
 		assert.NotNil(t, patch.Version)
 		assert.Equal(t, "v1.30.1", *patch.Version)
-		assert.NotNil(t, patch.Replicas)
-		assert.Equal(t, 4, *patch.Replicas)
+		assert.Nil(t, patch.Replicas)
+		assert.NotNil(t, patch.AutoScale)
+		assert.Equal(t, 10, *patch.AutoScale.MaxReplicas)
+		assert.Equal(t, 2, *patch.AutoScale.MinReplicas)
 	})
 
 	t.Run("a node pool's autoscale bounds are carried in the patch when set in the plan", func(t *testing.T) {
@@ -423,6 +430,63 @@ func TestNodePoolSchemaVersionPlanModifiers(t *testing.T) {
 
 		assert.True(t, hasUseStateForUnknown, "version must use state for unknown to avoid spurious diffs on read")
 		assert.False(t, hasRequiresReplace, "version change is upgraded in place, not by recreating the node pool")
+	})
+}
+
+func TestNodePoolImportState(t *testing.T) {
+	ctx := context.Background()
+	r := &NewNodePoolResource{}
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	npSchema := schemaResp.Schema
+
+	newImportResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State: tfsdk.State{
+				Schema: npSchema,
+				Raw:    tftypes.NewValue(npSchema.Type().TerraformType(ctx), nil),
+			},
+		}
+	}
+
+	t.Run("a node pool import id missing the comma separator is rejected with an explanatory error", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "single-id-no-comma"}, resp)
+
+		assert.True(t, resp.Diagnostics.HasError(), "import id without comma must be rejected")
+		assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "cluster_id,node_pool_id",
+			"the error must teach the user the expected import id format")
+	})
+
+	t.Run("a valid 'cluster_id,node_pool_id' import id puts both values into state", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "cluster-uuid,np-uuid"}, resp)
+
+		assert.False(t, resp.Diagnostics.HasError(), "valid import must not error: %v", resp.Diagnostics)
+
+		var clusterID types.String
+		resp.State.GetAttribute(ctx, path.Root("cluster_id"), &clusterID)
+		assert.Equal(t, types.StringValue("cluster-uuid"), clusterID)
+
+		var npID types.String
+		resp.State.GetAttribute(ctx, path.Root("id"), &npID)
+		assert.Equal(t, types.StringValue("np-uuid"), npID)
+	})
+}
+
+func TestNodePoolConfigValidators(t *testing.T) {
+	r := &NewNodePoolResource{}
+	validators := r.ConfigValidators(context.Background())
+
+	t.Run("a nodepool declares config validators so subnet_ids and availability_zones cannot be set together", func(t *testing.T) {
+		assert.Len(t, validators, 1, "expected exactly one config validator")
+	})
+
+	t.Run("the validator description names both conflicting attributes so the user knows what to remove", func(t *testing.T) {
+		desc := validators[0].Description(context.Background())
+		assert.Contains(t, desc, "subnet_ids")
+		assert.Contains(t, desc, "availability_zones")
 	})
 }
 

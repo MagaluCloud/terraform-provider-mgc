@@ -4,10 +4,15 @@ import (
 	"context"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
-	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type NodePool struct {
@@ -24,7 +29,7 @@ type NodePool struct {
 	Taints            *[]Taint     `tfsdk:"taints"`
 	MaxPodsPerNode    types.Int64  `tfsdk:"max_pods_per_node"`
 	AvailabilityZones types.Set    `tfsdk:"availability_zones"`
-	Network           *Network     `tfsdk:"network"`
+	SubnetsIDs        types.Set    `tfsdk:"subnet_ids"`
 	Version           types.String `tfsdk:"version"`
 }
 
@@ -32,17 +37,6 @@ type Taint struct {
 	Effect types.String `tfsdk:"effect"`
 	Key    types.String `tfsdk:"key"`
 	Value  types.String `tfsdk:"value"`
-}
-
-type Network struct {
-	VPCID   types.String `tfsdk:"vpc_id"`
-	Subnets []Subnet     `tfsdk:"subnets"`
-}
-
-type Subnet struct {
-	ID               types.String `tfsdk:"id"`
-	CIDR             types.String `tfsdk:"cidr"`
-	AvailabilityZone types.String `tfsdk:"availability_zone"`
 }
 
 func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
@@ -138,27 +132,56 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 		nodePool.Taints = &taints
 	}
 
-	if np.Network != nil && len(np.Network.Subnets) > 0 {
-		nodePool.Network = ConvertSDKNetworkToTFModel(np.Network)
-	}
+	nodePool.SubnetsIDs = GetSubnetIDs(np.Network)
 
 	return nodePool
 }
 
-func ConvertSDKNetworkToTFModel(n *sdkK8s.Network) *Network {
-	if n == nil || len(n.Subnets) == 0 {
+func GetSubnetIDs(network *k8sSDK.Network) basetypes.SetValue {
+	if network == nil || len(network.Subnets) == 0 {
+		return basetypes.NewSetNull(types.StringType)
+	}
+
+	subnets := make([]attr.Value, len(network.Subnets))
+	for i := range network.Subnets {
+		subnets[i] = types.StringValue(network.Subnets[i].ID)
+	}
+
+	return types.SetValueMust(types.StringType, subnets)
+}
+
+func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkRequest {
+	subnetIDs := utils.ConvertTypeSetToStringArray(set)
+	if subnetIDs == nil || len(*subnetIDs) < 1 {
 		return nil
 	}
-	subnets := make([]Subnet, len(n.Subnets))
-	for i, s := range n.Subnets {
-		subnets[i] = Subnet{
-			ID:               types.StringValue(s.ID),
-			CIDR:             types.StringValue(s.CIDR),
-			AvailabilityZone: types.StringValue(s.AvailabilityZone),
-		}
+
+	return &k8sSDK.KubernetesNetworkRequest{SubnetIDs: *subnetIDs}
+}
+
+func ResourceSubnetIDsAttribute() schema.SetAttribute {
+	return schema.SetAttribute{
+		Description: `List of subnet ids. When omitted, the subnets chosen are inherited.
+							Only one subnet per availability zone is allowed.
+							This field cannot be changed after the node pool is created`,
+		Optional:    true,
+		Computed:    true,
+		ElementType: types.StringType,
+		PlanModifiers: []planmodifier.Set{
+			setplanmodifier.RequiresReplaceIfConfigured(),
+			setplanmodifier.UseStateForUnknown(),
+		},
+		Validators: []validator.Set{
+			setvalidator.SizeAtLeast(2),
+		},
 	}
-	return &Network{
-		VPCID:   types.StringValue(n.VPCID),
-		Subnets: subnets,
+}
+
+func DatasourceSubnetIDsAttribute() schema.SetAttribute {
+	return schema.SetAttribute{
+		Description: `List of subnet ids.`,
+		Optional:    true,
+		Computed:    true,
+		ElementType: types.StringType,
 	}
 }

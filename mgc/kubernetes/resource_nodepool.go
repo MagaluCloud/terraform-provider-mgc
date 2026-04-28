@@ -13,16 +13,17 @@ import (
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,13 +41,8 @@ var (
 )
 
 type NodePoolResourceModel struct {
-	ClusterID types.String     `tfsdk:"cluster_id"`
-	Network   *NodePoolNetwork `tfsdk:"network"`
+	ClusterID types.String `tfsdk:"cluster_id"`
 	NodePool
-}
-
-type NodePoolNetwork struct {
-	SubnetIDs types.Set `tfsdk:"subnet_ids"`
 }
 
 type NewNodePoolResource struct {
@@ -74,6 +70,15 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 
 	r.region = dataConfig.Region
 	r.sdkNodepool = k8sSDK.New(&dataConfig.CoreConfig).Nodepools()
+}
+
+func (r *NewNodePoolResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.Conflicting(
+			path.MatchRoot("subnet_ids"),
+			path.MatchRoot("availability_zones"),
+		),
+	}
 }
 
 func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -118,11 +123,17 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Description: "Map of labels for the node pool.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"security_groups": schema.SetAttribute{
 				Description: "List of security groups for the node pool.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"max_replicas": schema.Int64Attribute{
 				Description: "Maximum number of replicas for autoscaling.",
@@ -143,10 +154,16 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"created_at": schema.StringAttribute{
 				Description: "Date of creation of the Kubernetes Node.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "Date of the last change to the Kubernetes Node.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"id": schema.StringAttribute{
 				Description: "Node pool's UUID.",
@@ -177,9 +194,10 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			},
 			//deprecated
 			"availability_zones": schema.SetAttribute{
-				Description: "List of availability zones where the node pool is deployed.",
-				Optional:    true,
-				Computed:    true,
+				Description:        "List of availability zones where the node pool is deployed.",
+				Optional:           true,
+				Computed:           true,
+				DeprecationMessage: "use subnet_ids instead",
 				PlanModifiers: []planmodifier.Set{
 					utils.SetRequiresReplaceOnChange(),
 				},
@@ -188,25 +206,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 				ElementType: types.StringType,
 			},
-			"network": schema.SingleNestedAttribute{
-				Description: "Network on which the node pool's nodes run. When omitted, the subnets chosen during cluster creation are inherited. Only one subnet per availability zone is allowed. This field cannot be changed after the node pool is created — altering it forces the node pool to be replaced.",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplaceIfConfigured(),
-					objectplanmodifier.UseStateForUnknown(),
-				},
-				Attributes: map[string]schema.Attribute{
-					"subnet_ids": schema.SetAttribute{
-						Description: "Set of subnet IDs that host the node pool's nodes.",
-						Required:    true,
-						ElementType: types.StringType,
-						Validators: []validator.Set{
-							setvalidator.SizeAtLeast(1),
-						},
-					},
-				},
-			},
+			"subnet_ids": ResourceSubnetIDsAttribute(),
 			"taints": schema.ListNestedAttribute{
 				Description: "Property associating a set of nodes.",
 				Optional:    true,
@@ -248,7 +248,6 @@ func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
-	data.Network = nodePoolNetworkFromSDK(nodepool.Network)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
@@ -265,7 +264,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		Replicas:       int(data.Replicas.ValueInt64()),
 		Taints:         convertTaintsNP(data.Taints),
 		MaxPodsPerNode: utils.ConvertInt64PointerToIntPointer(data.MaxPodsPerNode.ValueInt64Pointer()),
-		Network:        nodePoolNetworkFrom(data.Network),
+		Network:        CreateKubernetesSDKNetworkRequest(data.SubnetsIDs),
 	}
 
 	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
@@ -307,7 +306,6 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
-	data.Network = nodePoolNetworkFromSDK(nodepool.Network)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -422,37 +420,6 @@ func (r *NewNodePoolResource) ImportState(ctx context.Context, req resource.Impo
 	resp.Diagnostics.Append(
 		resp.State.SetAttribute(ctx, path.Root("id"), ids[1])...,
 	)
-}
-
-func nodePoolNetworkFrom(network *NodePoolNetwork) *k8sSDK.NodePoolNetworkRequest {
-	if network == nil {
-		return nil
-	}
-
-	elements := network.SubnetIDs.Elements()
-	subnetIDs := make([]string, 0, len(elements))
-	for _, e := range elements {
-		if s, ok := e.(types.String); ok {
-			subnetIDs = append(subnetIDs, s.ValueString())
-		}
-	}
-
-	return &k8sSDK.NodePoolNetworkRequest{SubnetIDs: subnetIDs}
-}
-
-func nodePoolNetworkFromSDK(network *k8sSDK.Network) *NodePoolNetwork {
-	if network == nil || len(network.Subnets) == 0 {
-		return nil
-	}
-
-	ids := make([]attr.Value, len(network.Subnets))
-	for i, s := range network.Subnets {
-		ids[i] = types.StringValue(s.ID)
-	}
-
-	return &NodePoolNetwork{
-		SubnetIDs: types.SetValueMust(types.StringType, ids),
-	}
 }
 
 func convertTaintsNP(taints *[]Taint) *[]k8sSDK.Taint {
