@@ -5,12 +5,10 @@ import (
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
-	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -159,20 +157,15 @@ func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkR
 	return &k8sSDK.KubernetesNetworkRequest{SubnetIDs: *subnetIDs}
 }
 
-func ResourceSubnetIDsAttribute() schema.SetAttribute {
+func ResourceSubnetIDsAttribute(desc string) schema.SetAttribute {
 	return schema.SetAttribute{
-		Description: `List of subnet ids. When omitted, the subnets chosen are inherited.
-							Only one subnet per availability zone is allowed.
-							This field cannot be changed after the node pool is created`,
+		Description: desc,
 		Optional:    true,
 		Computed:    true,
 		ElementType: types.StringType,
 		PlanModifiers: []planmodifier.Set{
 			setplanmodifier.RequiresReplaceIfConfigured(),
 			setplanmodifier.UseStateForUnknown(),
-		},
-		Validators: []validator.Set{
-			setvalidator.SizeAtLeast(2),
 		},
 	}
 }

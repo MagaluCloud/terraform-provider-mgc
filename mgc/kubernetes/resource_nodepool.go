@@ -206,7 +206,10 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 				ElementType: types.StringType,
 			},
-			"subnet_ids": ResourceSubnetIDsAttribute(),
+			"subnet_ids": ResourceSubnetIDsAttribute(`List of subnet ids. When omitted, the cluster’s default subnets will be used.
+							Only one subnet per availability zone is allowed.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created`),
 			"taints": schema.ListNestedAttribute{
 				Description: "Property associating a set of nodes.",
 				Optional:    true,
@@ -331,30 +334,28 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	updateParam, versionChanged := buildPatchNodePoolRequest(state, data)
+	updateParam, _ := buildPatchNodePoolRequest(state, data)
 
 	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 
+	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	if versionChanged {
-		upgraded, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-		data.NodePool = ConvertToNodePoolToTFModel(upgraded, r.region)
+	upgraded, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
 	}
 
+	data.NodePool = ConvertToNodePoolToTFModel(upgraded, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

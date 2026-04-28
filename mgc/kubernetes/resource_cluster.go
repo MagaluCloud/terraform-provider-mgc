@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -92,9 +91,6 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Description: "List of allowed CIDR blocks for API server access.",
 				Optional:    true,
 				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Description: "A brief description of the Kubernetes cluster.",
@@ -174,7 +170,10 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"subnet_ids": ResourceSubnetIDsAttribute(),
+			"subnet_ids": ResourceSubnetIDsAttribute(`List of subnet ids. When omitted, the subnets chosen are inherited.
+							You must specify exactly one subnet per availability zone.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created`),
 		},
 	}
 }
@@ -281,6 +280,9 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	state.AllowedCidrs = plan.AllowedCidrs
+	state.Description = plan.Description
+
 	if versionChanged {
 		upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), "running")
 		if err != nil {
@@ -291,8 +293,6 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 		return
 	}
-
-	state.AllowedCidrs = plan.AllowedCidrs
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -347,7 +347,9 @@ func createAllowedCidrs(data []types.String) *[]string {
 func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) (k8sSDK.PatchClusterRequest, bool) {
 	patch := k8sSDK.PatchClusterRequest{}
 
-	if plan.AllowedCidrs != nil || len(state.AllowedCidrs) > 0 {
+	if len(plan.AllowedCidrs) < 1 {
+		patch.AllowedCIDRs = &[]string{}
+	} else {
 		cidrs := make([]string, 0, len(plan.AllowedCidrs))
 		for _, c := range plan.AllowedCidrs {
 			cidrs = append(cidrs, c.ValueString())
