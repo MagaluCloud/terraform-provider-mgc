@@ -291,9 +291,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		flattened.AvailabilityZones = types.SetNull(types.StringType)
 	}
 
-	if original.Network != nil && len(original.Network.Subnets) > 0 {
-		flattened.SubnetIDs = GetSubnetIDs(original.Network)
-	}
+	flattened.SubnetIDs = GetSubnetIDs(original.Network)
 
 	return *flattened, nil
 }
