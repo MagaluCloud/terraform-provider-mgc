@@ -175,3 +175,29 @@ func StringSliceToTypesList(slice []string) types.List {
 	listValue, _ := types.ListValue(types.StringType, elements)
 	return listValue
 }
+
+func ConvertTypeSetToArray[T any](set types.Set, extract func(attr.Value) (T, bool)) *[]T {
+	elements := set.Elements()
+	if len(elements) < 1 {
+		return nil
+	}
+
+	result := make([]T, 0, len(elements))
+	for _, e := range elements {
+		if v, ok := extract(e); ok {
+			result = append(result, v)
+		}
+	}
+
+	return &result
+}
+
+func ConvertTypeSetToStringArray(set types.Set) *[]string {
+	return ConvertTypeSetToArray(set, func(v attr.Value) (string, bool) {
+		i, ok := v.(types.String)
+		if !ok {
+			return "", false
+		}
+		return i.ValueString(), true
+	})
+}

@@ -29,13 +29,16 @@ output "cluster" {
 
 - `id` (String) Cluster's UUID.
 
+### Optional
+
+- `subnet_ids` (Set of String) List of subnet ids.
+
 ### Read-Only
 
 - `addons_loadbalance` (String) Flag indicating whether the load balancer service is enabled/disabled in the cluster.
 - `addons_secrets` (String) Native Kubernetes secret to be included in the cluster during provisioning.
 - `addons_volume` (String) Flag indicating whether the storage class service is configured by default.
 - `allowed_cidrs` (List of String) List of allowed CIDR blocks for API server access.
-- `cidr` (String) Available IP addresses used for provisioning nodes in the cluster.
 - `cluster_ipv4_cidr` (String) The IP address range of the Kubernetes cluster.
 - `controlplane` (Attributes) Object of the node pool response. (see [below for nested schema](#nestedatt--controlplane))
 - `created_at` (String) Creation date of the Kubernetes cluster.
@@ -49,13 +52,11 @@ output "cluster" {
 - `machine_types_source` (String) Source of machine types for the cluster.
 - `message` (String) Detailed message about the status of the cluster or node.
 - `name` (String) Kubernetes cluster name.
-- `network_name` (String) Name of the cluster network.
 - `node_pools` (Attributes List) An array representing a set of nodes within a Kubernetes cluster. (see [below for nested schema](#nestedatt--node_pools))
 - `platform_version` (String) Platform version of the cluster.
 - `region` (String) Identifier of the region where the Kubernetes cluster is located.
 - `services_ipv4_cidr` (String) The IP address range of the Kubernetes cluster service.
 - `state` (String) Current state of the cluster or node.
-- `subnet_id` (String) Identifier of the internal subnet where the cluster will be provisioned.
 - `updated_at` (String) Date of the last modification of the Kubernetes cluster.
 - `version` (String) The native Kubernetes version of the cluster.
 
@@ -96,6 +97,10 @@ Read-Only:
 <a id="nestedatt--node_pools"></a>
 ### Nested Schema for `node_pools`
 
+Optional:
+
+- `subnet_ids` (Set of String) List of subnet ids.
+
 Read-Only:
 
 - `availability_zones` (Set of String) List of availability zones where the nodes in the node pool are distributed.
@@ -111,6 +116,7 @@ Read-Only:
 - `security_groups` (Set of String) List of security groups for the node pool.
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--node_pools--taints))
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
+- `version` (String) The native Kubernetes version of the cluster.
 
 <a id="nestedatt--node_pools--taints"></a>
 ### Nested Schema for `node_pools.taints`

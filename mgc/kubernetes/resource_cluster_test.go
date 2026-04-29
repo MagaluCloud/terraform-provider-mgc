@@ -1,17 +1,22 @@
 package kubernetes
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 	t.Run("should return nil for nil input", func(t *testing.T) {
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(nil)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(nil)
 		assert.Nil(t, result)
 	})
 
@@ -22,7 +27,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Version: "1.28.0",
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("cluster-123"), result.ID)
@@ -60,7 +65,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &[]string{"192.168.1.0/24", "10.0.0.0/8"},
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 		expectedTime := types.StringValue(now.Format(time.RFC3339))
 
 		assert.NotNil(t, result)
@@ -89,7 +94,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			MachineTypesSource: &machineTypesSource,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("internal"), result.MachineTypesSource)
@@ -107,7 +112,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &emptyCIDRs,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.True(t, result.Description.IsNull())
@@ -122,7 +127,7 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Platform: nil,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClsuterModel(sdkResult)
+		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
 
 		assert.NotNil(t, result)
 		assert.True(t, result.PlatformVersion.IsNull())
@@ -207,7 +212,7 @@ func TestClusterResourceValidation(t *testing.T) {
 		}
 
 		// Convert to Terraform model
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// Validate all new fields are correctly mapped
 		assert.Equal(t, types.StringValue("us-east-1"), tfModel.Region)
@@ -227,7 +232,7 @@ func TestClusterResourceValidation(t *testing.T) {
 			// All optional fields are nil
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// All new optional fields should be null
 		assert.True(t, tfModel.Region.IsNull())
@@ -267,10 +272,233 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 					MachineTypesSource: &tc.enumValue,
 				}
 
-				tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+				tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 				assert.Equal(t, types.StringValue(tc.expected), tfModel.MachineTypesSource)
 			})
 		}
+	})
+}
+
+func TestBuildPatchClusterRequest(t *testing.T) {
+	t.Run("should request version upgrade when plan version differs from state version", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.29.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.29.0", *patch.Version)
+	})
+
+	t.Run("should not include version in patch when plan version equals state version", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.Nil(t, patch.Version, "no upgrade should be triggered when version did not change")
+	})
+
+	t.Run("should not include version in patch when plan version is unknown", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringUnknown(),
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("should not include version in patch when plan version is null", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringNull(),
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.Nil(t, patch.Version)
+	})
+
+	t.Run("should always carry allowed_cidrs from plan", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version: types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{
+				types.StringValue("192.168.0.0/16"),
+				types.StringValue("172.16.0.0/12"),
+			},
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Equal(t, []string{"192.168.0.0/16", "172.16.0.0/12"}, *patch.AllowedCIDRs)
+	})
+
+	t.Run("should combine version upgrade and allowed_cidrs change in the same patch", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.30.1"),
+			AllowedCidrs: []types.String{types.StringValue("192.168.0.0/16")},
+		}
+
+		patch := buildPatchClusterRequest(state, plan)
+
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.30.1", *patch.Version)
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Equal(t, []string{"192.168.0.0/16"}, *patch.AllowedCIDRs)
+	})
+
+	t.Run("should carry empty allowed_cidrs slice when plan clears the list", func(t *testing.T) {
+		state := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
+		}
+		plan := KubernetesClusterCreateResourceModel{
+			Version:      types.StringValue("v1.28.0"),
+			AllowedCidrs: nil,
+		}
+
+		patch, _ := buildPatchClusterRequest(state, plan)
+
+		assert.NotNil(t, patch.AllowedCIDRs)
+		assert.Empty(t, *patch.AllowedCIDRs)
+	})
+}
+
+func TestCreateKubernetesSDKNetworkRequest(t *testing.T) {
+	t.Run("returns nil when the configured set is null so the API uses the default VPC", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetNull(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("a cluster's network is described by the subnet IDs it should run on", func(t *testing.T) {
+		set := types.SetValueMust(types.StringType, []attr.Value{
+			types.StringValue("11111111-1111-1111-1111-111111111111"),
+			types.StringValue("22222222-2222-2222-2222-222222222222"),
+		})
+
+		request := CreateKubernetesSDKNetworkRequest(set)
+
+		assert.NotNil(t, request)
+		assert.ElementsMatch(t, []string{
+			"11111111-1111-1111-1111-111111111111",
+			"22222222-2222-2222-2222-222222222222",
+		}, request.SubnetIDs)
+	})
+
+	t.Run("the subnet IDs form an unordered set where duplicates are not allowed", func(t *testing.T) {
+		set := types.SetValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-c"),
+			types.StringValue("subnet-a"),
+			types.StringValue("subnet-b"),
+		})
+
+		request := CreateKubernetesSDKNetworkRequest(set)
+
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b", "subnet-c"}, request.SubnetIDs)
+	})
+}
+
+func TestConvertSDKClusterReadsSubnetIDs(t *testing.T) {
+	t.Run("a cluster's network subnets are exposed as the set of their IDs", func(t *testing.T) {
+		sdkResult := &k8sSDK.Cluster{
+			ID:      "cluster-with-network",
+			Name:    "with-network",
+			Version: "1.29.0",
+			Network: &k8sSDK.Network{
+				VPCID: "vpc-xyz",
+				Subnets: []k8sSDK.Subnet{
+					{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
+					{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
+				},
+			},
+		}
+
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+
+		assert.False(t, tfModel.SubnetIDs.IsNull(), "subnet_ids must be populated when the API returns subnets")
+		ids := []string{}
+		for _, e := range tfModel.SubnetIDs.Elements() {
+			ids = append(ids, e.(types.String).ValueString())
+		}
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
+	})
+
+	t.Run("a cluster without network information leaves subnet_ids null", func(t *testing.T) {
+		sdkResult := &k8sSDK.Cluster{
+			ID:      "cluster-no-network",
+			Name:    "no-network",
+			Version: "1.29.0",
+		}
+
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+
+		assert.True(t, tfModel.SubnetIDs.IsNull())
+	})
+}
+
+func TestClusterImportState(t *testing.T) {
+	ctx := context.Background()
+	r := &k8sClusterResource{}
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	clusterSchema := schemaResp.Schema
+
+	newImportResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State: tfsdk.State{
+				Schema: clusterSchema,
+				Raw:    tftypes.NewValue(clusterSchema.Type().TerraformType(ctx), nil),
+			},
+		}
+	}
+
+	t.Run("an empty import id is rejected so the user is told to provide one", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: ""}, resp)
+
+		assert.True(t, resp.Diagnostics.HasError(), "an empty id must produce an error diagnostic")
+	})
+
+	t.Run("an imported cluster's id is written into state without dragging write-only attributes along", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "cluster-uuid"}, resp)
+
+		assert.False(t, resp.Diagnostics.HasError(), "valid import must not error: %v", resp.Diagnostics)
+
+		var imported KubernetesClusterCreateResourceModel
+		diags := resp.State.Get(ctx, &imported)
+		assert.False(t, diags.HasError(), "reading state back must succeed: %v", diags)
+
+		assert.Equal(t, types.StringValue("cluster-uuid"), imported.ID)
+		assert.True(t, imported.EnabledServerGroup.IsNull(),
+			"enabled_server_group is write-only and must not be persisted to state on import")
 	})
 }
 
@@ -285,7 +513,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &zeroTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		// Should handle zero time gracefully
 		assert.False(t, tfModel.CreatedAt.IsNull())
@@ -302,7 +530,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &futureTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClsuterModel(sdkCluster)
+		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
 
 		expectedTime := types.StringValue(futureTime.Format(time.RFC3339))
 		assert.Equal(t, expectedTime, tfModel.CreatedAt)
