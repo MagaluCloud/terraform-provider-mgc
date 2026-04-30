@@ -280,9 +280,6 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	state.AllowedCidrs = plan.AllowedCidrs
-	state.Description = plan.Description
-
 	upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), "running")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -290,7 +287,6 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 	newState := convertSDKCreateResultToTerraformCreateClusterModel(&upgraded)
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
-	return
 }
 
 func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
