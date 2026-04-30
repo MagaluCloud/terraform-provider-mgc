@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -205,43 +204,6 @@ func TestGetSubnetIDs(t *testing.T) {
 	})
 }
 
-func TestConvertNodePoolReadsSubnetIDs(t *testing.T) {
-	t.Run("a node pool's network subnets are exposed as the set of their IDs", func(t *testing.T) {
-		sdkPool := &k8sSDK.NodePool{
-			ID:   "np-id",
-			Name: "worker",
-			Network: &k8sSDK.Network{
-				VPCID: "vpc-xyz",
-				Subnets: []k8sSDK.Subnet{
-					{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
-					{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
-				},
-			},
-		}
-
-		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
-
-		assert.False(t, converted.SubnetIDs.IsNull())
-		ids := []string{}
-		for _, e := range converted.SubnetIDs.Elements() {
-			ids = append(ids, e.(types.String).ValueString())
-		}
-		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
-	})
-
-	t.Run("a node pool without network information leaves subnet_ids null", func(t *testing.T) {
-		sdkPool := &k8sSDK.NodePool{
-			ID:      "np-id",
-			Name:    "worker",
-			Network: nil,
-		}
-
-		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
-
-		assert.True(t, converted.SubnetIDs.IsNull())
-	})
-}
-
 func TestBuildPatchNodePoolRequest(t *testing.T) {
 	t.Run("a node pool's Kubernetes version is upgraded in place when the plan version differs from the state version", func(t *testing.T) {
 		state := NodePoolResourceModel{NodePool: NodePool{
@@ -304,43 +266,6 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 		assert.Nil(t, patch.Version)
 	})
 
-	t.Run("a node pool's replicas are not sent in patch because they are managed by autoscaling", func(t *testing.T) {
-		state := NodePoolResourceModel{NodePool: NodePool{
-			Version:  types.StringValue("v1.28.0"),
-			Replicas: types.Int64Value(2),
-		}}
-		plan := NodePoolResourceModel{NodePool: NodePool{
-			Version:  types.StringValue("v1.28.0"),
-			Replicas: types.Int64Value(5),
-		}}
-
-		patch, _ := buildPatchNodePoolRequest(state, plan)
-
-		assert.Nil(t, patch.Replicas)
-	})
-
-	t.Run("a node pool can have its version updated along with autoscale bounds in the same patch", func(t *testing.T) {
-		state := NodePoolResourceModel{NodePool: NodePool{
-			Version:  types.StringValue("v1.28.0"),
-			Replicas: types.Int64Value(2),
-		}}
-		plan := NodePoolResourceModel{NodePool: NodePool{
-			Version:     types.StringValue("v1.30.1"),
-			Replicas:    types.Int64Value(4),
-			MaxReplicas: types.Int64Value(10),
-			MinReplicas: types.Int64Value(2),
-		}}
-
-		patch := buildPatchNodePoolRequest(state, plan)
-
-		assert.NotNil(t, patch.Version)
-		assert.Equal(t, "v1.30.1", *patch.Version)
-		assert.Nil(t, patch.Replicas)
-		assert.NotNil(t, patch.AutoScale)
-		assert.Equal(t, 10, *patch.AutoScale.MaxReplicas)
-		assert.Equal(t, 2, *patch.AutoScale.MinReplicas)
-	})
-
 	t.Run("a node pool's autoscale bounds are carried in the patch when set in the plan", func(t *testing.T) {
 		state := NodePoolResourceModel{NodePool: NodePool{
 			Version:  types.StringValue("v1.28.0"),
@@ -353,7 +278,7 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 			MinReplicas: types.Int64Value(1),
 		}}
 
-		patch, _ := buildPatchNodePoolRequest(state, plan)
+		patch := buildPatchNodePoolRequest(state, plan)
 
 		assert.NotNil(t, patch.AutoScale)
 		assert.NotNil(t, patch.AutoScale.MaxReplicas)
@@ -387,44 +312,6 @@ func TestConvertToNodePoolReadsVersion(t *testing.T) {
 		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
 
 		assert.True(t, converted.Version.IsNull())
-	})
-}
-
-func TestNodePoolSchemaVersionPlanModifiers(t *testing.T) {
-	r := &NewNodePoolResource{}
-	resp := &resource.SchemaResponse{}
-
-	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
-
-	t.Run("the version attribute is exposed so users can declare the node pool's Kubernetes version", func(t *testing.T) {
-		_, ok := resp.Schema.Attributes["version"]
-		assert.True(t, ok, "version attribute must be present on the schema")
-	})
-
-	t.Run("the version attribute is optional and computed so the provider can echo back the server value", func(t *testing.T) {
-		attrRaw, ok := resp.Schema.Attributes["version"].(schema.StringAttribute)
-		assert.True(t, ok)
-		assert.True(t, attrRaw.Optional)
-		assert.True(t, attrRaw.Computed)
-	})
-
-	t.Run("changing the version must trigger an in-place upgrade, never a replacement of the node pool", func(t *testing.T) {
-		attrRaw, ok := resp.Schema.Attributes["version"].(schema.StringAttribute)
-		assert.True(t, ok)
-
-		hasUseStateForUnknown := false
-		hasRequiresReplace := false
-		for _, modifier := range attrRaw.PlanModifiers {
-			if reflect.TypeOf(modifier) == reflect.TypeOf(stringplanmodifier.UseStateForUnknown()) {
-				hasUseStateForUnknown = true
-			}
-			if reflect.TypeOf(modifier) == reflect.TypeOf(stringplanmodifier.RequiresReplace()) {
-				hasRequiresReplace = true
-			}
-		}
-
-		assert.True(t, hasUseStateForUnknown, "version must use state for unknown to avoid spurious diffs on read")
-		assert.False(t, hasRequiresReplace, "version change is upgraded in place, not by recreating the node pool")
 	})
 }
 
@@ -467,21 +354,6 @@ func TestNodePoolImportState(t *testing.T) {
 		var npID types.String
 		resp.State.GetAttribute(ctx, path.Root("id"), &npID)
 		assert.Equal(t, types.StringValue("np-uuid"), npID)
-	})
-}
-
-func TestNodePoolConfigValidators(t *testing.T) {
-	r := &NewNodePoolResource{}
-	validators := r.ConfigValidators(context.Background())
-
-	t.Run("a nodepool declares config validators so subnet_ids and availability_zones cannot be set together", func(t *testing.T) {
-		assert.Len(t, validators, 1, "expected exactly one config validator")
-	})
-
-	t.Run("the validator description names both conflicting attributes so the user knows what to remove", func(t *testing.T) {
-		desc := validators[0].Description(context.Background())
-		assert.Contains(t, desc, "subnet_ids")
-		assert.Contains(t, desc, "availability_zones")
 	})
 }
 

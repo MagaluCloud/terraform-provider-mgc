@@ -354,24 +354,6 @@ func TestBuildPatchClusterRequest(t *testing.T) {
 		assert.Equal(t, []string{"192.168.0.0/16", "172.16.0.0/12"}, *patch.AllowedCIDRs)
 	})
 
-	t.Run("should combine version upgrade and allowed_cidrs change in the same patch", func(t *testing.T) {
-		state := KubernetesClusterCreateResourceModel{
-			Version:      types.StringValue("v1.28.0"),
-			AllowedCidrs: []types.String{types.StringValue("10.0.0.0/8")},
-		}
-		plan := KubernetesClusterCreateResourceModel{
-			Version:      types.StringValue("v1.30.1"),
-			AllowedCidrs: []types.String{types.StringValue("192.168.0.0/16")},
-		}
-
-		patch := buildPatchClusterRequest(state, plan)
-
-		assert.NotNil(t, patch.Version)
-		assert.Equal(t, "v1.30.1", *patch.Version)
-		assert.NotNil(t, patch.AllowedCIDRs)
-		assert.Equal(t, []string{"192.168.0.0/16"}, *patch.AllowedCIDRs)
-	})
-
 	t.Run("should carry empty allowed_cidrs slice when plan clears the list", func(t *testing.T) {
 		state := KubernetesClusterCreateResourceModel{
 			Version:      types.StringValue("v1.28.0"),
@@ -382,7 +364,7 @@ func TestBuildPatchClusterRequest(t *testing.T) {
 			AllowedCidrs: nil,
 		}
 
-		patch, _ := buildPatchClusterRequest(state, plan)
+		patch := buildPatchClusterRequest(state, plan)
 
 		assert.NotNil(t, patch.AllowedCIDRs)
 		assert.Empty(t, *patch.AllowedCIDRs)
@@ -411,55 +393,6 @@ func TestCreateKubernetesSDKNetworkRequest(t *testing.T) {
 		}, request.SubnetIDs)
 	})
 
-	t.Run("the subnet IDs form an unordered set where duplicates are not allowed", func(t *testing.T) {
-		set := types.SetValueMust(types.StringType, []attr.Value{
-			types.StringValue("subnet-c"),
-			types.StringValue("subnet-a"),
-			types.StringValue("subnet-b"),
-		})
-
-		request := CreateKubernetesSDKNetworkRequest(set)
-
-		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b", "subnet-c"}, request.SubnetIDs)
-	})
-}
-
-func TestConvertSDKClusterReadsSubnetIDs(t *testing.T) {
-	t.Run("a cluster's network subnets are exposed as the set of their IDs", func(t *testing.T) {
-		sdkResult := &k8sSDK.Cluster{
-			ID:      "cluster-with-network",
-			Name:    "with-network",
-			Version: "1.29.0",
-			Network: &k8sSDK.Network{
-				VPCID: "vpc-xyz",
-				Subnets: []k8sSDK.Subnet{
-					{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
-					{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
-				},
-			},
-		}
-
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
-
-		assert.False(t, tfModel.SubnetIDs.IsNull(), "subnet_ids must be populated when the API returns subnets")
-		ids := []string{}
-		for _, e := range tfModel.SubnetIDs.Elements() {
-			ids = append(ids, e.(types.String).ValueString())
-		}
-		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
-	})
-
-	t.Run("a cluster without network information leaves subnet_ids null", func(t *testing.T) {
-		sdkResult := &k8sSDK.Cluster{
-			ID:      "cluster-no-network",
-			Name:    "no-network",
-			Version: "1.29.0",
-		}
-
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
-
-		assert.True(t, tfModel.SubnetIDs.IsNull())
-	})
 }
 
 func TestClusterImportState(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -324,10 +325,7 @@ func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.Impor
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &KubernetesClusterCreateResourceModel{
-		ID:                 types.StringValue(req.ID),
-		EnabledServerGroup: types.BoolValue(true),
-	})...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
 func createAllowedCidrs(data []types.String) *[]string {
