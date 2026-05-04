@@ -283,3 +283,23 @@ func (m setRequiresReplaceOnChange) PlanModifySet(ctx context.Context, req planm
 	// If we reach here, the sets have the same membership
 	resp.RequiresReplace = false
 }
+
+type stringNullIfEmptyModifier struct{}
+
+func StringNullIfEmptyModifier() planmodifier.String {
+	return stringNullIfEmptyModifier{}
+}
+
+func (stringNullIfEmptyModifier) Description(_ context.Context) string {
+	return "Treats an empty string value as null."
+}
+
+func (m stringNullIfEmptyModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (stringNullIfEmptyModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if !req.ConfigValue.IsNull() && !req.ConfigValue.IsUnknown() && req.ConfigValue.ValueString() == "" {
+		resp.PlanValue = types.StringNull()
+	}
+}

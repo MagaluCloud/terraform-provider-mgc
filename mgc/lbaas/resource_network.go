@@ -379,6 +379,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the listener.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"backend_name": schema.StringAttribute{
 							Description: "The name of the backend associated with this listener.",
@@ -428,6 +431,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(),
+								utils.StringNullIfEmptyModifier(),
 							},
 						},
 					},
