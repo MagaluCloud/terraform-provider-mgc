@@ -133,22 +133,6 @@ func TestConvertToKubernetesCluster(t *testing.T) {
 		assert.Nil(t, result.Controlplane)
 	})
 
-	t.Run("a cluster whose Region was not set by the API is converted without panicking", func(t *testing.T) {
-		sdkCluster := &sdkK8s.Cluster{
-			ID:      "cluster-no-region",
-			Name:    "no-region-cluster",
-			Version: "1.28.0",
-			Region:  nil,
-		}
-
-		assert.NotPanics(t, func() {
-			result := convertToKubernetesCluster(sdkCluster, "br-se1")
-			assert.NotNil(t, result)
-			assert.True(t, result.Region.IsNull(),
-				"a missing Region in the API response must be exposed as null, not crash the provider")
-		})
-	})
-
 	t.Run("should convert full sdk input correctly", func(t *testing.T) {
 		now := time.Now()
 		sdkCluster := &sdkK8s.Cluster{

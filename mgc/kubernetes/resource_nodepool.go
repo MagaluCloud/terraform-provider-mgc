@@ -189,7 +189,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			//deprecated
@@ -369,11 +369,6 @@ func buildPatchNodePoolRequest(state, plan NodePoolResourceModel) k8sSDK.PatchNo
 	}
 	if !plan.MinReplicas.IsUnknown() {
 		patch.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(plan.MinReplicas.ValueInt64Pointer())
-	}
-
-	if !plan.Version.IsUnknown() && !plan.Version.IsNull() &&
-		plan.Version.ValueString() != state.Version.ValueString() {
-		patch.Version = plan.Version.ValueStringPointer()
 	}
 
 	return patch

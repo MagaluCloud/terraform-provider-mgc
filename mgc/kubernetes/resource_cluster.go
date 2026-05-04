@@ -15,6 +15,7 @@ import (
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -105,7 +106,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -289,7 +290,6 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 	newState := convertSDKCreateResultToTerraformCreateClusterModel(&upgraded)
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
-	return
 }
 
 func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -324,10 +324,7 @@ func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.Impor
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &KubernetesClusterCreateResourceModel{
-		ID:                 types.StringValue(req.ID),
-		EnabledServerGroup: types.BoolValue(true),
-	})...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
 func createAllowedCidrs(data []types.String) *[]string {
@@ -358,12 +355,6 @@ func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) 
 	if plan.Description.ValueString() != state.Description.ValueString() {
 		patch.Description = plan.Description.ValueStringPointer()
 	}
-
-	if !plan.Version.IsUnknown() && !plan.Version.IsNull() &&
-		plan.Version.ValueString() != state.Version.ValueString() {
-		patch.Version = plan.Version.ValueStringPointer()
-	}
-
 	return patch
 }
 
