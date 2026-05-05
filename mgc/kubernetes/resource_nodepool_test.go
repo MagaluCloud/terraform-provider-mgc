@@ -9,10 +9,13 @@ import (
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -165,6 +168,126 @@ func TestConvertTaintsNP(t *testing.T) {
 		}
 		result := convertTaintsNP(input)
 		assert.Equal(t, expected, result)
+	})
+}
+
+func TestGetSubnetIDs(t *testing.T) {
+	t.Run("a network's subnets are exposed as the set of their IDs", func(t *testing.T) {
+		network := &k8sSDK.Network{
+			VPCID: "vpc-xyz",
+			Subnets: []k8sSDK.Subnet{
+				{ID: "subnet-a", CIDR: "172.18.0.0/20", AvailabilityZone: "a"},
+				{ID: "subnet-b", CIDR: "172.18.16.0/20", AvailabilityZone: "b"},
+			},
+		}
+
+		result := GetSubnetIDs(network)
+
+		assert.False(t, result.IsNull(), "subnet_ids must be populated when the API returns subnets")
+		ids := []string{}
+		for _, e := range result.Elements() {
+			ids = append(ids, e.(types.String).ValueString())
+		}
+		assert.ElementsMatch(t, []string{"subnet-a", "subnet-b"}, ids)
+	})
+
+	t.Run("a nil network returns a null set so the schema reports the attribute as absent", func(t *testing.T) {
+		result := GetSubnetIDs(nil)
+
+		assert.True(t, result.IsNull())
+	})
+
+	t.Run("a network with no subnets returns a null set", func(t *testing.T) {
+		result := GetSubnetIDs(&k8sSDK.Network{VPCID: "vpc-xyz"})
+
+		assert.True(t, result.IsNull())
+	})
+}
+
+func TestBuildPatchNodePoolRequest(t *testing.T) {
+	t.Run("a node pool's autoscale bounds are carried in the patch when set in the plan", func(t *testing.T) {
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Replicas:    types.Int64Value(2),
+			MaxReplicas: types.Int64Value(5),
+			MinReplicas: types.Int64Value(1),
+		}}
+
+		patch := buildPatchNodePoolRequest(plan)
+
+		assert.NotNil(t, patch.AutoScale)
+		assert.NotNil(t, patch.AutoScale.MaxReplicas)
+		assert.Equal(t, 5, *patch.AutoScale.MaxReplicas)
+		assert.NotNil(t, patch.AutoScale.MinReplicas)
+		assert.Equal(t, 1, *patch.AutoScale.MinReplicas)
+	})
+}
+
+func TestConvertToNodePoolReadsVersion(t *testing.T) {
+	t.Run("a node pool's current Kubernetes version is exposed when the API returns it", func(t *testing.T) {
+		version := "v1.30.1"
+		sdkPool := &k8sSDK.NodePool{
+			ID:      "np-id",
+			Name:    "worker",
+			Version: &version,
+		}
+
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
+
+		assert.Equal(t, types.StringValue("v1.30.1"), converted.Version)
+	})
+
+	t.Run("a node pool without version information leaves the version field null", func(t *testing.T) {
+		sdkPool := &k8sSDK.NodePool{
+			ID:      "np-id",
+			Name:    "worker",
+			Version: nil,
+		}
+
+		converted := ConvertToNodePoolToTFModel(sdkPool, "br-se1")
+
+		assert.True(t, converted.Version.IsNull())
+	})
+}
+
+func TestNodePoolImportState(t *testing.T) {
+	ctx := context.Background()
+	r := &NewNodePoolResource{}
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	npSchema := schemaResp.Schema
+
+	newImportResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State: tfsdk.State{
+				Schema: npSchema,
+				Raw:    tftypes.NewValue(npSchema.Type().TerraformType(ctx), nil),
+			},
+		}
+	}
+
+	t.Run("a node pool import id missing the comma separator is rejected with an explanatory error", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "single-id-no-comma"}, resp)
+
+		assert.True(t, resp.Diagnostics.HasError(), "import id without comma must be rejected")
+		assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "cluster_id,node_pool_id",
+			"the error must teach the user the expected import id format")
+	})
+
+	t.Run("a valid 'cluster_id,node_pool_id' import id puts both values into state", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "cluster-uuid,np-uuid"}, resp)
+
+		assert.False(t, resp.Diagnostics.HasError(), "valid import must not error: %v", resp.Diagnostics)
+
+		var clusterID types.String
+		resp.State.GetAttribute(ctx, path.Root("cluster_id"), &clusterID)
+		assert.Equal(t, types.StringValue("cluster-uuid"), clusterID)
+
+		var npID types.String
+		resp.State.GetAttribute(ctx, path.Root("id"), &npID)
+		assert.Equal(t, types.StringValue("np-uuid"), npID)
 	})
 }
 

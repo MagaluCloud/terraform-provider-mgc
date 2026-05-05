@@ -6,7 +6,11 @@ import (
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type NodePool struct {
@@ -23,6 +27,8 @@ type NodePool struct {
 	Taints            *[]Taint     `tfsdk:"taints"`
 	MaxPodsPerNode    types.Int64  `tfsdk:"max_pods_per_node"`
 	AvailabilityZones types.Set    `tfsdk:"availability_zones"`
+	SubnetIDs         types.Set    `tfsdk:"subnet_ids"`
+	Version           types.String `tfsdk:"version"`
 }
 
 type Taint struct {
@@ -46,6 +52,7 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 			SecurityGroups:    types.SetNull(types.StringType),
 			MaxPodsPerNode:    types.Int64Null(),
 			AvailabilityZones: types.SetNull(types.StringType),
+			Version:           types.StringNull(),
 		}
 	}
 
@@ -55,6 +62,7 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 		CreatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339(np.CreatedAt)),
 		UpdatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339(np.UpdatedAt)),
 		ID:        types.StringValue(np.ID),
+		Version:   types.StringPointerValue(np.Version),
 	}
 
 	if np.AvailabilityZones != nil {
@@ -122,5 +130,51 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 		nodePool.Taints = &taints
 	}
 
+	nodePool.SubnetIDs = GetSubnetIDs(np.Network)
+
 	return nodePool
+}
+
+func GetSubnetIDs(network *k8sSDK.Network) basetypes.SetValue {
+	if network == nil || len(network.Subnets) == 0 {
+		return basetypes.NewSetNull(types.StringType)
+	}
+
+	subnets := make([]attr.Value, len(network.Subnets))
+	for i := range network.Subnets {
+		subnets[i] = types.StringValue(network.Subnets[i].ID)
+	}
+
+	return types.SetValueMust(types.StringType, subnets)
+}
+
+func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkRequest {
+	subnetIDs := utils.ConvertTypeSetToStringArray(set)
+	if subnetIDs == nil || len(*subnetIDs) < 1 {
+		return nil
+	}
+
+	return &k8sSDK.KubernetesNetworkRequest{SubnetIDs: *subnetIDs}
+}
+
+func ResourceSubnetIDsAttribute(desc string) schema.SetAttribute {
+	return schema.SetAttribute{
+		Description: desc,
+		Optional:    true,
+		Computed:    true,
+		ElementType: types.StringType,
+		PlanModifiers: []planmodifier.Set{
+			setplanmodifier.RequiresReplaceIfConfigured(),
+			setplanmodifier.UseStateForUnknown(),
+		},
+	}
+}
+
+func DatasourceSubnetIDsAttribute() schema.SetAttribute {
+	return schema.SetAttribute{
+		Description: `List of subnet ids.`,
+		Optional:    true,
+		Computed:    true,
+		ElementType: types.StringType,
+	}
 }

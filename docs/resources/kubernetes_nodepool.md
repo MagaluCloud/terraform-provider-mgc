@@ -35,11 +35,16 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 ### Optional
 
-- `availability_zones` (Set of String) List of availability zones where the node pool is deployed.
+- `availability_zones` (Set of String, Deprecated) List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
+- `subnet_ids` (Set of String) List of subnet ids. When omitted, the cluster’s default subnets will be used.
+							Only one subnet per availability zone is allowed.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
+- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format.
 
 ### Read-Only
 
