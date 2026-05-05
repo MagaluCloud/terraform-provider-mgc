@@ -35,7 +35,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 ### Optional
 
-- `availability_zones` (Set of String, Deprecated) List of availability zones where the node pool is deployed.
+- `availability_zones` (Set of String, Deprecated) List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.

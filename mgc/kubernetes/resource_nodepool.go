@@ -194,7 +194,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			},
 			//deprecated
 			"availability_zones": schema.SetAttribute{
-				Description:        "List of availability zones where the node pool is deployed.",
+				Description:        "List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead. ",
 				Optional:           true,
 				Computed:           true,
 				DeprecationMessage: "use subnet_ids instead",
@@ -334,7 +334,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	updateParam := buildPatchNodePoolRequest(state, data)
+	updateParam := buildPatchNodePoolRequest(data)
 
 	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
 	if err != nil {
@@ -359,7 +359,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func buildPatchNodePoolRequest(state, plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
+func buildPatchNodePoolRequest(plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
 	patch := k8sSDK.PatchNodePoolRequest{}
 	if !plan.MaxReplicas.IsUnknown() || !plan.MinReplicas.IsUnknown() {
 		patch.AutoScale = &k8sSDK.AutoScale{}

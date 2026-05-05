@@ -206,16 +206,13 @@ func TestGetSubnetIDs(t *testing.T) {
 
 func TestBuildPatchNodePoolRequest(t *testing.T) {
 	t.Run("a node pool's autoscale bounds are carried in the patch when set in the plan", func(t *testing.T) {
-		state := NodePoolResourceModel{NodePool: NodePool{
-			Replicas: types.Int64Value(2),
-		}}
 		plan := NodePoolResourceModel{NodePool: NodePool{
 			Replicas:    types.Int64Value(2),
 			MaxReplicas: types.Int64Value(5),
 			MinReplicas: types.Int64Value(1),
 		}}
 
-		patch := buildPatchNodePoolRequest(state, plan)
+		patch := buildPatchNodePoolRequest(plan)
 
 		assert.NotNil(t, patch.AutoScale)
 		assert.NotNil(t, patch.AutoScale.MaxReplicas)
