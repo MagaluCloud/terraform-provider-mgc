@@ -44,7 +44,6 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 							The subnets must belong to the same VPC.
 							This field cannot be changed after the node pool is created
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
-- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format.
 
 ### Read-Only
 
@@ -53,6 +52,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 - `labels` (Map of String) Map of labels for the node pool.
 - `security_groups` (Set of String) List of security groups for the node pool.
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
+- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`
