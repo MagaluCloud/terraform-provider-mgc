@@ -185,7 +185,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 			},
 			"version": schema.StringAttribute{
-				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format. Changing this value triggers an in-place upgrade.",
+				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{

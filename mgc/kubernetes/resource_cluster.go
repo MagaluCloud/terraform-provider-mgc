@@ -102,7 +102,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				WriteOnly:   true,
 			},
 			"version": schema.StringAttribute{
-				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format. Changing this value triggers an in-place upgrade.",
+				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
