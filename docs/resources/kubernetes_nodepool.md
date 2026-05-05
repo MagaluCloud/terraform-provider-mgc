@@ -44,7 +44,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 							The subnets must belong to the same VPC.
 							This field cannot be changed after the node pool is created
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
-- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format. Changing this value triggers an in-place upgrade.
+- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format.
 
 ### Read-Only
 
