@@ -191,7 +191,7 @@ func TestDataSourceBsSchedule_Read_Error(t *testing.T) {
 
 type mockCoreClient struct{}
 
-func (m mockCoreClient) DoRequest(method, path string, body interface{}, headers map[string]string) ([]byte, error) {
+func (m mockCoreClient) DoRequest(method, path string, body any, headers map[string]string) ([]byte, error) {
 	return nil, nil
 }
 

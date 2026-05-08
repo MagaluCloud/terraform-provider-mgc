@@ -62,7 +62,6 @@ func TestValidateAndGetEngineID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			id, err := ValidateAndGetEngineID(ctx, tt.fn, tt.engineName, tt.engineVer)
@@ -160,7 +159,6 @@ func TestValidateAndGetInstanceTypeID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			id, err := ValidateAndGetInstanceTypeID(ctx, tt.fn, tt.instanceLabel, tt.engineID, tt.compatible)
@@ -239,7 +237,6 @@ func TestGetEngineNameAndVersionByID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			name, version, err := GetEngineNameAndVersionByID(ctx, tt.fn, tt.id)
@@ -315,7 +312,6 @@ func TestGetInstanceTypeNameByID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			label, err := GetInstanceTypeNameByID(ctx, tt.fn, tt.id)
