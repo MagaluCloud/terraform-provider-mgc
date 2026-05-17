@@ -138,8 +138,9 @@ func (r *NetworkVpcsRouteResource) Create(ctx context.Context, req resource.Crea
 	route, err := r.WaitUntilRouteStatusMatches(ctx, vpcID, createdRoute.ID, string(netSDK.RouteStatusCreated))
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		data.ID = types.StringValue(createdRoute.ID)
-		resp.State.Set(ctx, &data)
+		if fetched, getErr := r.networkRoute.Get(ctx, vpcID, createdRoute.ID); getErr == nil && fetched != nil {
+			resp.Diagnostics.Append(resp.State.Set(ctx, convertSDKRouteResultToTerraformNetworkVpcsRouteModel(fetched))...)
+		}
 		return
 	}
 
