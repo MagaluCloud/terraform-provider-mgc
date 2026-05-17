@@ -42,7 +42,7 @@ resource "mgc_dbaas_instances" "test_instance" {
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
 - `availability_zone` (String) Availability zone to use for the instance. Not used when restoring from a snapshot.
-- `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.
+- `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Default is 7 days.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS'). Default is 04:00:00.
 - `deletion_protected` (Boolean) Deletion protected.
 - `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation. Required when creating a new instance.

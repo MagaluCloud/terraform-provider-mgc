@@ -37,6 +37,10 @@ resource "mgc_kubernetes_cluster" "cluster" {
 - `description` (String) A brief description of the Kubernetes cluster.
 - `enabled_server_group` (Boolean, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.
 - `services_ipv4_cidr` (String) The IP address range of the Kubernetes cluster service.
+- `subnet_ids` (Set of String) List of subnet ids. When omitted, the subnets chosen are inherited.
+							You must specify exactly one subnet per availability zone.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created
 - `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format.
 
 ### Read-Only

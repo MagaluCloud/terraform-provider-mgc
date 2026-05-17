@@ -36,6 +36,8 @@ type FlattenedGetResult struct {
 	Taints                     []Taint        `tfsdk:"taints"`
 	MaxPodsPerNode             types.Int64    `tfsdk:"max_pods_per_node"`
 	AvailabilityZones          types.Set      `tfsdk:"availability_zones"`
+	SubnetIDs                  types.Set      `tfsdk:"subnet_ids"`
+	Version                    types.String   `tfsdk:"version"`
 }
 
 type DataSourceKubernetesNodepool struct {
@@ -178,6 +180,11 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 					},
 				},
 			},
+			"subnet_ids": DatasourceSubnetIDsAttribute(),
+			"version": schema.StringAttribute{
+				Description: "The native Kubernetes version of the nodepool.",
+				Computed:    true,
+			},
 			"availability_zones": schema.SetAttribute{
 				Description: "List of availability zones.",
 				ElementType: types.StringType,
@@ -230,6 +237,7 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 		InstanceTemplateFlavorSize: types.Int64Value(int64(original.InstanceTemplate.Flavor.Size)),
 		InstanceTemplateFlavorVcpu: types.Int64Value(int64(original.InstanceTemplate.Flavor.VCPU)),
 		StatusState:                types.StringValue(original.Status.State),
+		Version:                    types.StringPointerValue(original.Version),
 	}
 
 	if original.AutoScale != nil {
@@ -288,6 +296,8 @@ func ConvertGetResultToFlattened(ctx context.Context, original *sdkK8s.NodePool,
 	} else {
 		flattened.AvailabilityZones = types.SetNull(types.StringType)
 	}
+
+	flattened.SubnetIDs = GetSubnetIDs(original.Network)
 
 	return *flattened, nil
 }

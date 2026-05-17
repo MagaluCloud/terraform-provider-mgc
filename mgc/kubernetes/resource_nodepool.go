@@ -13,6 +13,7 @@ import (
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -20,7 +21,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -69,6 +72,15 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 	r.sdkNodepool = k8sSDK.New(&dataConfig.CoreConfig).Nodepools()
 }
 
+func (r *NewNodePoolResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.Conflicting(
+			path.MatchRoot("subnet_ids"),
+			path.MatchRoot("availability_zones"),
+		),
+	}
+}
+
 func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	azRegex := regexp.MustCompile(`^[a-z]{2}-[a-z]+[0-9]+-[a-z]$`)
 	resp.Schema = schema.Schema{
@@ -97,10 +109,13 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 			},
 			"replicas": schema.Int64Attribute{
-				Description: "Number of replicas of the nodes in the node pool.",
+				Description: "Initial number of replicas of the nodes in the node pool. Required at creation; after creation, changes to this value are ignored because the replica count is managed by the API (e.g. via autoscaling between min_replicas and max_replicas).",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					utils.UseStateForInt64AfterCreate(),
 				},
 			},
 
@@ -108,11 +123,17 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Description: "Map of labels for the node pool.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"security_groups": schema.SetAttribute{
 				Description: "List of security groups for the node pool.",
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"max_replicas": schema.Int64Attribute{
 				Description: "Maximum number of replicas for autoscaling.",
@@ -133,10 +154,16 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"created_at": schema.StringAttribute{
 				Description: "Date of creation of the Kubernetes Node.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "Date of the last change to the Kubernetes Node.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"id": schema.StringAttribute{
 				Description: "Node pool's UUID.",
@@ -157,10 +184,19 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 					int64validator.AtLeast(0),
 				},
 			},
-			"availability_zones": schema.SetAttribute{
-				Description: "List of availability zones where the node pool is deployed.",
-				Optional:    true,
+			"version": schema.StringAttribute{
+				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			//deprecated
+			"availability_zones": schema.SetAttribute{
+				Description:        "List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead. ",
+				Optional:           true,
+				Computed:           true,
+				DeprecationMessage: "use subnet_ids instead",
 				PlanModifiers: []planmodifier.Set{
 					utils.SetRequiresReplaceOnChange(),
 				},
@@ -169,6 +205,10 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 				ElementType: types.StringType,
 			},
+			"subnet_ids": ResourceSubnetIDsAttribute(`List of subnet ids. When omitted, the cluster’s default subnets will be used.
+							Only one subnet per availability zone is allowed.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created`),
 			"taints": schema.ListNestedAttribute{
 				Description: "Property associating a set of nodes.",
 				Optional:    true,
@@ -226,6 +266,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		Replicas:       int(data.Replicas.ValueInt64()),
 		Taints:         convertTaintsNP(data.Taints),
 		MaxPodsPerNode: utils.ConvertInt64PointerToIntPointer(data.MaxPodsPerNode.ValueInt64Pointer()),
+		Network:        CreateKubernetesSDKNetworkRequest(data.SubnetIDs),
 	}
 
 	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {
@@ -292,36 +333,44 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	repli := int(data.Replicas.ValueInt64())
-	updateParam := k8sSDK.PatchNodePoolRequest{
-		Replicas: &repli,
-	}
-
-	if !data.MaxReplicas.IsUnknown() || !data.MinReplicas.IsUnknown() {
-		updateParam.AutoScale = &k8sSDK.AutoScale{}
-	}
-
-	if !data.MaxReplicas.IsUnknown() {
-		updateParam.AutoScale.MaxReplicas = utils.ConvertInt64PointerToIntPointer(data.MaxReplicas.ValueInt64Pointer())
-	}
-	if !data.MinReplicas.IsUnknown() {
-		updateParam.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(data.MinReplicas.ValueInt64Pointer())
-	}
+	updateParam := buildPatchNodePoolRequest(data)
 
 	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 
+	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
+	upgraded, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	data.NodePool = ConvertToNodePoolToTFModel(upgraded, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func buildPatchNodePoolRequest(plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
+	patch := k8sSDK.PatchNodePoolRequest{}
+	if !plan.MaxReplicas.IsUnknown() || !plan.MinReplicas.IsUnknown() {
+		patch.AutoScale = &k8sSDK.AutoScale{}
+	}
+	if !plan.MaxReplicas.IsUnknown() {
+		patch.AutoScale.MaxReplicas = utils.ConvertInt64PointerToIntPointer(plan.MaxReplicas.ValueInt64Pointer())
+	}
+	if !plan.MinReplicas.IsUnknown() {
+		patch.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(plan.MinReplicas.ValueInt64Pointer())
+	}
+
+	return patch
 }
 
 func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
