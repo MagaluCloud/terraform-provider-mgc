@@ -69,9 +69,6 @@ func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRe
 			"id": schema.StringAttribute{
 				Description: "The ID of the route.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"vpc_id": schema.StringAttribute{
 				Description: "ID of the VPC where this route is associated.",
@@ -97,30 +94,23 @@ func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRe
 			"description": schema.StringAttribute{
 				Description: "The description to help identify the route.",
 				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"next_hop": schema.StringAttribute{
 				Description: "Resolved next hop for the route, derived from the associated port.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"type": schema.StringAttribute{
 				Description: "Type of the route, as defined by the networking service.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"status": schema.StringAttribute{
 				Description: "Current status of the route.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 		},
 	}
@@ -145,11 +135,12 @@ func (r *NetworkVpcsRouteResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	route, err := r.WaitUntilRouteSatusMatches(ctx, vpcID, createdRoute.ID, string(netSDK.RouteStatusCreated))
+	route, err := r.WaitUntilRouteStatusMatches(ctx, vpcID, createdRoute.ID, string(netSDK.RouteStatusCreated))
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		data.ID = types.StringValue(createdRoute.ID)
-		resp.State.Set(ctx, &data)
+		if fetched, getErr := r.networkRoute.Get(ctx, vpcID, createdRoute.ID); getErr == nil && fetched != nil {
+			resp.Diagnostics.Append(resp.State.Set(ctx, convertSDKRouteResultToTerraformNetworkVpcsRouteModel(fetched))...)
+		}
 		return
 	}
 
@@ -166,6 +157,10 @@ func (r *NetworkVpcsRouteResource) Read(ctx context.Context, req resource.ReadRe
 
 	route, err := r.networkRoute.Get(ctx, data.VpcID.ValueString(), data.ID.ValueString())
 	if err != nil {
+		if httpErr, ok := err.(*clientSDK.HTTPError); ok && httpErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
@@ -187,11 +182,14 @@ func (r *NetworkVpcsRouteResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	_, err = r.WaitUntilRouteSatusMatches(ctx, data.ID.ValueString(), string(netSDK.RouteStatusDeleted))
+	_, err = r.WaitUntilRouteStatusMatches(ctx, data.VpcID.ValueString(), data.ID.ValueString(), string(netSDK.RouteStatusDeleted))
 	if err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
+				return
+			} else {
+				resp.Diagnostics.AddError(utils.ParseSDKError(err))
 				return
 			}
 		default:
@@ -220,13 +218,12 @@ func (r *NetworkVpcsRouteResource) ImportState(ctx context.Context, req resource
 	)
 }
 
-func (r *NetworkVpcsRouteResource) WaitUntilRouteSatusMatches(ctx context.Context, vpcID, routeID string, expectedStatus ...string) (*netSDK.VpcsRoute, error) {
+func (r *NetworkVpcsRouteResource) WaitUntilRouteStatusMatches(ctx context.Context, vpcID, routeID string, expectedStatus ...string) (*netSDK.VpcsRoute, error) {
 	var result *netSDK.VpcsRoute
 	var err error
 
+	time.Sleep(5 * time.Second)
 	for startTime := time.Now(); time.Since(startTime) < RoutePoolingTimeout; {
-		time.Sleep(1 * time.Minute)
-
 		result, err = r.networkRoute.Get(ctx, vpcID, routeID)
 		if err != nil {
 			return nil, err
@@ -242,6 +239,7 @@ func (r *NetworkVpcsRouteResource) WaitUntilRouteSatusMatches(ctx context.Contex
 		}
 
 		tflog.Debug(ctx, fmt.Sprintf("current route status: [%s]", status))
+		time.Sleep(30 * time.Second)
 	}
 
 	return result, errors.New("timeout waiting for route to provision")
@@ -261,12 +259,7 @@ func convertSDKRouteResultToTerraformNetworkVpcsRouteModel(sdkResult *netSDK.Vpc
 		Type:            types.StringValue(sdkResult.Type),
 		Status:          types.StringValue(string(sdkResult.Status)),
 	}
-
-	var description *string
-	if sdkResult.Description != "" {
-		description = &sdkResult.Description
-	}
-	tfModel.Description = types.StringPointerValue(description)
+	tfModel.Description = types.StringValue(sdkResult.Description)
 
 	return tfModel
 }

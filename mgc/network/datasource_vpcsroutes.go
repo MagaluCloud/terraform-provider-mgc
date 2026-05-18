@@ -128,11 +128,7 @@ func convertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(sdkResult *ne
 		Status:          types.StringValue(string(sdkResult.Status)),
 	}
 
-	var description *string
-	if sdkResult.Description != "" {
-		description = &sdkResult.Description
-	}
-	tfModel.Description = types.StringPointerValue(description)
+	tfModel.Description = types.StringValue(sdkResult.Description)
 
 	return tfModel
 }
