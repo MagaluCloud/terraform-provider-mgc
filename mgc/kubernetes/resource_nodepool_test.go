@@ -210,6 +210,7 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 			Replicas:    types.Int64Value(2),
 			MaxReplicas: types.Int64Value(5),
 			MinReplicas: types.Int64Value(1),
+			Flavor:      types.StringValue("BV2-4-40"),
 		}}
 
 		patch := buildPatchNodePoolRequest(plan)
@@ -219,6 +220,7 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 		assert.Equal(t, 5, *patch.AutoScale.MaxReplicas)
 		assert.NotNil(t, patch.AutoScale.MinReplicas)
 		assert.Equal(t, 1, *patch.AutoScale.MinReplicas)
+		assert.Equal(t, "BV2-4-40", *patch.Flavor)
 	})
 }
 
