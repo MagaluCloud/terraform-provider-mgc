@@ -11,8 +11,15 @@ func GetDataSources() []func() datasource.DataSource {
 		NewDataSourceCRImages,
 		NewDataSourceCRRegistries,
 		NewDataSourceCRRepositories,
+		NewDataSourceCRRepository,
 		NewProxyCacheDataSource,
 		NewProxyCacheListDataSource,
+		NewDataSourceCRUser,
+		NewDataSourceCRMember,
+		NewDataSourceCRMembers,
+		NewDataSourceCRScans,
+		NewDataSourceCRScanStatus,
+		NewDataSourceCRScanVulnerabilities,
 	}
 }
 
@@ -20,5 +27,8 @@ func GetResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewContainerRegistryRegistriesResource,
 		NewContainerRegistryProxyCacheResource,
+		NewContainerRegistryUserResource,
+		NewContainerRegistryMemberResource,
+		NewContainerRegistryScanResource,
 	}
 }
