@@ -15,5 +15,6 @@ func GetDataSources() []func() datasource.DataSource {
 func GetResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewObjectStorageBucketsResource,
+		NewObjectStorageObjectsResource,
 	}
 }

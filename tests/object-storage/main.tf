@@ -82,3 +82,16 @@ data "mgc_object_storage_bucket" "cors_details" {
 data "mgc_object_storage_bucket" "policy_details" {
   bucket = mgc_object_storage_buckets.policy_example.bucket
 }
+
+resource "mgc_object_storage_objects" "hello" {
+  bucket  = mgc_object_storage_buckets.basic.bucket
+  key     = "hello.txt"
+  content = "Hello, World!"
+}
+
+resource "mgc_object_storage_objects" "config" {
+  bucket       = mgc_object_storage_buckets.cors_example.bucket
+  key          = "config/settings.json"
+  content      = jsonencode({ environment = "test", version = 1 })
+  content_type = "application/json"
+}
