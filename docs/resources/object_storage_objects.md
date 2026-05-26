@@ -38,6 +38,7 @@ resource "mgc_object_storage_objects" "inline" {
 
 - `content` (String, Sensitive) Literal content to upload as the object.
 - `content_type` (String) Content type of the object (MIME type).
+- `object_lock_retain_until_date` (String) The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z).
 - `source` (String) Path to a file to upload as the object content.
 
 ### Read-Only
@@ -45,3 +46,13 @@ resource "mgc_object_storage_objects" "inline" {
 - `etag` (String) ETag of the uploaded object.
 - `last_modified` (String) Last modified date of the object.
 - `size` (Number) Size of the object in bytes.
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import mgc_object_storage_objects.object bucket_name/object_key
+```
