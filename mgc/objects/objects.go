@@ -9,6 +9,8 @@ func GetDataSources() []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewObjectStorageBucketDataSource,
 		NewObjectStorageBucketsDataSource,
+		NewObjectStorageObjectDataSource,
+		NewObjectStorageObjectsDataSource,
 	}
 }
 
