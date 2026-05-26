@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ${{ vars.RUNNER_RUNS_ON }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
