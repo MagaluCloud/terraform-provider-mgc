@@ -22,14 +22,15 @@ import (
 )
 
 type ObjectStorageObject struct {
-	Bucket       types.String `tfsdk:"bucket"`
-	Key          types.String `tfsdk:"key"`
-	ContentType  types.String `tfsdk:"content_type"`
-	Source       types.String `tfsdk:"source"`
-	Content      types.String `tfsdk:"content"`
-	ETag         types.String `tfsdk:"etag"`
-	Size         types.Int64  `tfsdk:"size"`
-	LastModified types.String `tfsdk:"last_modified"`
+	Bucket                    types.String `tfsdk:"bucket"`
+	Key                       types.String `tfsdk:"key"`
+	ContentType               types.String `tfsdk:"content_type"`
+	Source                    types.String `tfsdk:"source"`
+	Content                   types.String `tfsdk:"content"`
+	ETag                      types.String `tfsdk:"etag"`
+	Size                      types.Int64  `tfsdk:"size"`
+	LastModified              types.String `tfsdk:"last_modified"`
+	ObjectLockRetainUntilDate types.String `tfsdk:"object_lock_retain_until_date"`
 }
 
 func NewObjectStorageObjectsResource() resource.Resource {
@@ -117,6 +118,11 @@ func (r *objectStorageObjects) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:    true,
 				Description: "Last modified date of the object.",
 			},
+			"object_lock_retain_until_date": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z).",
+			},
 		},
 	}
 }
@@ -175,6 +181,20 @@ func (r *objectStorageObjects) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	if !plan.ObjectLockRetainUntilDate.IsNull() && plan.ObjectLockRetainUntilDate.ValueString() != "" {
+		retainUntil, err := time.Parse(time.RFC3339, plan.ObjectLockRetainUntilDate.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid object_lock_retain_until_date",
+				fmt.Sprintf("Could not parse retain until date: %s", err.Error()))
+			return
+		}
+		if err := r.objects.LockObject(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), retainUntil); err != nil {
+			resp.Diagnostics.AddError("Error locking object",
+				fmt.Sprintf("Could not lock object %s: %s", plan.Key.ValueString(), err.Error()))
+			return
+		}
+	}
+
 	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading object metadata",
@@ -217,12 +237,29 @@ func (r *objectStorageObjects) Read(ctx context.Context, req resource.ReadReques
 	state.LastModified = types.StringValue(objMeta.LastModified.Format(time.RFC3339))
 	state.ContentType = types.StringValue(objMeta.ContentType)
 
+	lockStatus, err := r.objects.GetObjectLockStatus(ctx, bucketName, objectKey)
+	if err != nil {
+		state.ObjectLockRetainUntilDate = types.StringNull()
+	} else if lockStatus {
+		if state.ObjectLockRetainUntilDate.IsNull() || state.ObjectLockRetainUntilDate.IsUnknown() {
+			state.ObjectLockRetainUntilDate = types.StringValue("locked")
+		}
+	} else {
+		state.ObjectLockRetainUntilDate = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan ObjectStorageObject
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var state ObjectStorageObject
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -241,6 +278,28 @@ func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError("Error uploading object",
 			fmt.Sprintf("Could not upload object %s to bucket %s: %s", plan.Key.ValueString(), plan.Bucket.ValueString(), err.Error()))
 		return
+	}
+
+	if !plan.ObjectLockRetainUntilDate.Equal(state.ObjectLockRetainUntilDate) {
+		if plan.ObjectLockRetainUntilDate.IsNull() || plan.ObjectLockRetainUntilDate.ValueString() == "" {
+			if err := r.objects.UnlockObject(ctx, plan.Bucket.ValueString(), plan.Key.ValueString()); err != nil {
+				resp.Diagnostics.AddError("Error unlocking object",
+					fmt.Sprintf("Could not unlock object %s: %s", plan.Key.ValueString(), err.Error()))
+				return
+			}
+		} else {
+			retainUntil, err := time.Parse(time.RFC3339, plan.ObjectLockRetainUntilDate.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid object_lock_retain_until_date",
+					fmt.Sprintf("Could not parse retain until date: %s", err.Error()))
+				return
+			}
+			if err := r.objects.LockObject(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), retainUntil); err != nil {
+				resp.Diagnostics.AddError("Error locking object",
+					fmt.Sprintf("Could not lock object %s: %s", plan.Key.ValueString(), err.Error()))
+				return
+			}
+		}
 	}
 
 	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
@@ -265,9 +324,20 @@ func (r *objectStorageObjects) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	if err := r.objects.Delete(ctx, state.Bucket.ValueString(), state.Key.ValueString(), nil); err != nil {
+	bucketName := state.Bucket.ValueString()
+	objectKey := state.Key.ValueString()
+
+	if !state.ObjectLockRetainUntilDate.IsNull() && state.ObjectLockRetainUntilDate.ValueString() != "" {
+		if err := r.objects.UnlockObject(ctx, bucketName, objectKey); err != nil {
+			resp.Diagnostics.AddError("Error unlocking object",
+				fmt.Sprintf("Could not unlock object %s: %s", objectKey, err.Error()))
+			return
+		}
+	}
+
+	if err := r.objects.Delete(ctx, bucketName, objectKey, nil); err != nil {
 		resp.Diagnostics.AddError("Error deleting object",
-			fmt.Sprintf("Could not delete object %s from bucket %s: %s", state.Key.ValueString(), state.Bucket.ValueString(), err.Error()))
+			fmt.Sprintf("Could not delete object %s from bucket %s: %s", objectKey, bucketName, err.Error()))
 	}
 }
 
