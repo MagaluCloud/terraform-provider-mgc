@@ -4,11 +4,14 @@ page_title: "mgc_container_registry_scan Resource - terraform-provider-mgc"
 subcategory: "Container Registry"
 description: |-
   Schedules a vulnerability scan for an image stored in a Container Registry.
+  Creating this resource schedules the scan and waits until it finishes before returning. Scans are immutable: changing any input (registry_id, repository_id or digest_or_tag) forces a new scan, and destroying the resource only removes it from Terraform state — the scan is preserved as history in the registry.
 ---
 
 # mgc_container_registry_scan (Resource)
 
 Schedules a vulnerability scan for an image stored in a Container Registry.
+
+Creating this resource schedules the scan and waits until it finishes before returning. Scans are immutable: changing any input (`registry_id`, `repository_id` or `digest_or_tag`) forces a new scan, and destroying the resource only removes it from Terraform state — the scan is preserved as history in the registry.
 
 ## Example Usage
 

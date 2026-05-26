@@ -58,7 +58,10 @@ func (r *ContainerRegistryScanResource) Configure(ctx context.Context, req resou
 
 func (r *ContainerRegistryScanResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Schedules a vulnerability scan for an image stored in a Container Registry.",
+		Description: "Schedules a vulnerability scan for an image stored in a Container Registry.\n\n" +
+			"Creating this resource schedules the scan and waits until it finishes before returning. " +
+			"Scans are immutable: changing any input (`registry_id`, `repository_id` or `digest_or_tag`) forces a new scan, " +
+			"and destroying the resource only removes it from Terraform state — the scan is preserved as history in the registry.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Unique identifier of the scan",
