@@ -46,7 +46,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.NoError(t, err)
 	})
 
@@ -67,7 +67,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.NoError(t, err)
 	})
 
@@ -81,9 +81,52 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "timeout waiting for node pool creation")
+		assert.Contains(t, err.Error(), "timeout waiting for node pool")
+	})
+
+	t.Run("should wait for the expected version before returning on upgrade", func(t *testing.T) {
+		oldVersion := "v1.30.0"
+		newVersion := "v1.31.0"
+		callCount := 0
+		mockSvc := &mockNodePoolService{
+			GetFunc: func(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error) {
+				callCount++
+				// Running but still on the old version: must not be accepted yet.
+				if callCount < 3 {
+					return &k8sSDK.NodePool{
+						Status:  k8sSDK.Status{State: NodepoolRunningState},
+						Version: &oldVersion,
+					}, nil
+				}
+				return &k8sSDK.NodePool{
+					Status:  k8sSDK.Status{State: NodepoolRunningState},
+					Version: &newVersion,
+				}, nil
+			},
+		}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, newVersion, testTimeout, testInterval)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, callCount, 3)
+	})
+
+	t.Run("should timeout if the expected version is never reached", func(t *testing.T) {
+		oldVersion := "v1.30.0"
+		mockSvc := &mockNodePoolService{
+			GetFunc: func(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error) {
+				return &k8sSDK.NodePool{
+					Status:  k8sSDK.Status{State: NodepoolRunningState},
+					Version: &oldVersion,
+				}, nil
+			},
+		}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "v1.31.0", testTimeout, testInterval)
+		assert.Error(t, err)
 	})
 
 	t.Run("should return error from the SDK get call", func(t *testing.T) {
@@ -95,7 +138,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.Error(t, err)
 		assert.Equal(t, expectedErr, err)
 	})
@@ -213,7 +256,9 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 			Flavor:      types.StringValue("BV2-4-40"),
 		}}
 
-		patch := buildPatchNodePoolRequest(plan)
+		state := NodePoolResourceModel{NodePool: NodePool{Flavor: types.StringValue("BV2-4-40")}}
+
+		patch := buildPatchNodePoolRequest(state, plan)
 
 		assert.NotNil(t, patch.AutoScale)
 		assert.NotNil(t, patch.AutoScale.MaxReplicas)
@@ -221,6 +266,37 @@ func TestBuildPatchNodePoolRequest(t *testing.T) {
 		assert.NotNil(t, patch.AutoScale.MinReplicas)
 		assert.Equal(t, 1, *patch.AutoScale.MinReplicas)
 		assert.Equal(t, "BV2-4-40", *patch.Flavor)
+	})
+
+	t.Run("version is sent in the patch only when it changes", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Flavor:  types.StringValue("BV2-4-40"),
+			Version: types.StringValue("v1.30.0"),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Flavor:  types.StringValue("BV2-4-40"),
+			Version: types.StringValue("v1.31.0"),
+		}}
+
+		patch := buildPatchNodePoolRequest(state, plan)
+
+		assert.NotNil(t, patch.Version)
+		assert.Equal(t, "v1.31.0", *patch.Version)
+	})
+
+	t.Run("version is omitted from the patch when unchanged", func(t *testing.T) {
+		state := NodePoolResourceModel{NodePool: NodePool{
+			Flavor:  types.StringValue("BV2-4-40"),
+			Version: types.StringValue("v1.30.0"),
+		}}
+		plan := NodePoolResourceModel{NodePool: NodePool{
+			Flavor:  types.StringValue("BV2-4-40"),
+			Version: types.StringValue("v1.30.0"),
+		}}
+
+		patch := buildPatchNodePoolRequest(state, plan)
+
+		assert.Nil(t, patch.Version)
 	})
 }
 
