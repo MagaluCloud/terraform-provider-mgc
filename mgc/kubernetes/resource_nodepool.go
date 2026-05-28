@@ -89,9 +89,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"flavor_name": schema.StringAttribute{
 				Description: "Definition of the CPU, RAM, and storage capacity of the nodes.",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"cluster_id": schema.StringAttribute{
 				Description: "UUID of the Kubernetes cluster.",
@@ -359,7 +356,11 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 }
 
 func buildPatchNodePoolRequest(plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
-	patch := k8sSDK.PatchNodePoolRequest{}
+	flavor := plan.Flavor.ValueString()
+
+	patch := k8sSDK.PatchNodePoolRequest{
+		Flavor: &flavor,
+	}
 	if !plan.MaxReplicas.IsUnknown() || !plan.MinReplicas.IsUnknown() {
 		patch.AutoScale = &k8sSDK.AutoScale{}
 	}
