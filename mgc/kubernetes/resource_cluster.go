@@ -285,6 +285,9 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	state.AllowedCidrs = plan.AllowedCidrs
+	state.Description = plan.Description
+
 	expectedVersion := ""
 	if !plan.Version.IsUnknown() && !plan.Version.IsNull() {
 		expectedVersion = plan.Version.ValueString()
