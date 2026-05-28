@@ -237,13 +237,11 @@ func (r *objectStorageObjects) Read(ctx context.Context, req resource.ReadReques
 	state.LastModified = types.StringValue(objMeta.LastModified.Format(time.RFC3339))
 	state.ContentType = types.StringValue(objMeta.ContentType)
 
-	lockStatus, err := r.objects.GetObjectLockStatus(ctx, bucketName, objectKey)
+	lockInfo, err := r.objects.GetObjectLockInfo(ctx, bucketName, objectKey)
 	if err != nil {
 		state.ObjectLockRetainUntilDate = types.StringNull()
-	} else if lockStatus {
-		if state.ObjectLockRetainUntilDate.IsNull() || state.ObjectLockRetainUntilDate.IsUnknown() {
-			state.ObjectLockRetainUntilDate = types.StringValue("locked")
-		}
+	} else if lockInfo.Locked && lockInfo.RetainUntilDate != nil {
+		state.ObjectLockRetainUntilDate = types.StringValue(lockInfo.RetainUntilDate.Format(time.RFC3339))
 	} else {
 		state.ObjectLockRetainUntilDate = types.StringNull()
 	}

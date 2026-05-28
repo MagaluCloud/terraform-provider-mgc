@@ -135,11 +135,11 @@ func (d *ObjectStorageObjectDataSource) Read(ctx context.Context, req datasource
 	data.LastModified = types.StringValue(objMeta.LastModified.Format(time.RFC3339))
 	data.ContentType = types.StringValue(objMeta.ContentType)
 
-	lockStatus, err := d.objects.GetObjectLockStatus(ctx, bucketName, objectKey)
+	lockInfo, err := d.objects.GetObjectLockInfo(ctx, bucketName, objectKey)
 	if err != nil {
 		data.LockStatus = types.BoolValue(false)
 	} else {
-		data.LockStatus = types.BoolValue(lockStatus)
+		data.LockStatus = types.BoolValue(lockInfo.Locked)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
