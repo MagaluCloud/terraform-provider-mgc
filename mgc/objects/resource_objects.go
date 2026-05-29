@@ -119,9 +119,11 @@ func (r *objectStorageObjects) Schema(ctx context.Context, req resource.SchemaRe
 				Description: "Last modified date of the object.",
 			},
 			"object_lock_retain_until_date": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z).",
+				Optional: true,
+				Computed: true,
+				Description: "The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z). " +
+					"Object locks created through terraform and mgccli are applied in COMPLIANCE mode. " +
+					"Therefore, once configured, they cannot be removed or reverted.",
 			},
 		},
 	}
@@ -249,6 +251,40 @@ func (r *objectStorageObjects) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
+func (r *objectStorageObjects) contentChanged(ctx context.Context, plan, state *ObjectStorageObject) (bool, error) {
+	sourceOrContentSet := (!plan.Source.IsNull() && plan.Source.ValueString() != "") ||
+		(!plan.Content.IsNull() && plan.Content.ValueString() != "")
+	contentTypeChanged := !plan.ContentType.Equal(state.ContentType)
+
+	if !sourceOrContentSet && !contentTypeChanged {
+		return false, nil
+	}
+
+	if !sourceOrContentSet {
+		return false, fmt.Errorf("content_type changed but no source or content specified to upload")
+	}
+
+	data, contentType, err := r.getContent(plan)
+	if err != nil {
+		return false, err
+	}
+
+	meta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
+	if err != nil {
+		return true, nil
+	}
+
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	if contentType == meta.ContentType && int64(len(data)) == meta.Size {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan ObjectStorageObject
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -262,20 +298,26 @@ func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	data, contentType, err := r.getContent(&plan)
+	changed, err := r.contentChanged(ctx, &plan, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Error preparing object content", err.Error())
 		return
 	}
 
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	if err := r.objects.UploadStream(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), bytes.NewReader(data), int64(len(data)), contentType); err != nil {
-		resp.Diagnostics.AddError("Error uploading object",
-			fmt.Sprintf("Could not upload object %s to bucket %s: %s", plan.Key.ValueString(), plan.Bucket.ValueString(), err.Error()))
-		return
+	if changed {
+		data, contentType, err := r.getContent(&plan)
+		if err != nil {
+			resp.Diagnostics.AddError("Error preparing object content", err.Error())
+			return
+		}
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		if err := r.objects.UploadStream(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), bytes.NewReader(data), int64(len(data)), contentType); err != nil {
+			resp.Diagnostics.AddError("Error uploading object",
+				fmt.Sprintf("Could not upload object %s to bucket %s: %s", plan.Key.ValueString(), plan.Bucket.ValueString(), err.Error()))
+			return
+		}
 	}
 
 	if !plan.ObjectLockRetainUntilDate.Equal(state.ObjectLockRetainUntilDate) {
