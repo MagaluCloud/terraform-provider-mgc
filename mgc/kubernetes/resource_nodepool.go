@@ -182,10 +182,16 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				},
 			},
 			"version": schema.StringAttribute{
-				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format.",
-				Computed:    true,
+				Description: "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format. " +
+					"Changing this value upgrades the node pool in place (no replacement); Terraform holds the apply until the node pool returns to a running state on the new version. " +
+					"The node pool version must not exceed the cluster's control plane version, and the cluster must be in running state to perform the upgrade. ",
+				Computed: true,
+				Optional: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^v\d+\.\d+\.\d+$`), "must follow the standard \"vX.Y.Z\" format, e.g. v1.31.0"),
 				},
 			},
 			//deprecated
@@ -310,7 +316,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
+	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, "", NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -330,16 +336,19 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	updateParam := buildPatchNodePoolRequest(data)
+	updateParam := buildPatchNodePoolRequest(state, data)
 
-	nodepool, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam)
-	if err != nil {
+	if _, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam); err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
-	err = r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, NodepoolTimeout, NodepoolInterval)
+	expectedVersion := ""
+	if !data.Version.IsUnknown() && !data.Version.IsNull() {
+		expectedVersion = data.Version.ValueString()
+	}
+
+	err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, expectedVersion, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -355,7 +364,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func buildPatchNodePoolRequest(plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
+func buildPatchNodePoolRequest(state, plan NodePoolResourceModel) k8sSDK.PatchNodePoolRequest {
 	flavor := plan.Flavor.ValueString()
 
 	patch := k8sSDK.PatchNodePoolRequest{
@@ -369,6 +378,10 @@ func buildPatchNodePoolRequest(plan NodePoolResourceModel) k8sSDK.PatchNodePoolR
 	}
 	if !plan.MinReplicas.IsUnknown() {
 		patch.AutoScale.MinReplicas = utils.ConvertInt64PointerToIntPointer(plan.MinReplicas.ValueInt64Pointer())
+	}
+	if !plan.Version.IsUnknown() && !plan.Version.IsNull() && plan.Version.ValueString() != state.Version.ValueString() {
+		version := plan.Version.ValueStringPointer()
+		patch.Version = version
 	}
 
 	return patch
@@ -387,7 +400,7 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, NodepoolTimeout, NodepoolInterval); err != nil {
+	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, "", NodepoolTimeout, NodepoolInterval); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -464,7 +477,7 @@ func convertStringSetTFToSliceString(ctx context.Context, set types.Set) (*[]str
 	return &result, nil
 }
 
-func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state string, timeout, interval time.Duration) error {
+func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state, expectedVersion string, timeout, interval time.Duration) error {
 	for startTime := time.Now(); time.Since(startTime) < timeout; {
 		time.Sleep(interval)
 
@@ -472,11 +485,12 @@ func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid,
 		if err != nil {
 			return err
 		}
-		if nodepool.Status.State == state {
+		versionMatches := expectedVersion == "" || (nodepool.Version != nil && *nodepool.Version == expectedVersion)
+		if strings.EqualFold(nodepool.Status.State, state) && versionMatches {
 			return nil
 		}
 
 		tflog.Debug(ctx, fmt.Sprintf("Node pool %s is in state %s", nodepoolid, nodepool.Status.State))
 	}
-	return fmt.Errorf("timeout waiting for node pool creation")
+	return fmt.Errorf("timeout waiting for node pool to reach state %q", state)
 }

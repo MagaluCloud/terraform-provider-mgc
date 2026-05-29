@@ -5,4 +5,5 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
   replicas     = 1
   min_replicas = 1
   max_replicas = 5
+  version      = mgc_kubernetes_cluster.cluster_with_nodepool.version
 }
