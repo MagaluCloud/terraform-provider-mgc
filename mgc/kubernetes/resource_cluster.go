@@ -102,11 +102,16 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				WriteOnly:   true,
 			},
 			"version": schema.StringAttribute{
-				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format.",
-				Optional:    true,
-				Computed:    true,
+				Description: "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format. " +
+					"Changing this value upgrades the control plane in place (no replacement); Terraform holds the apply until the cluster returns to a running state on the new version. " +
+					"Upgrade the control plane before the node pools",
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^v\d+\.\d+\.\d+$`), "must follow the standard \"vX.Y.Z\" format, e.g. v1.31.0"),
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -223,7 +228,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 
 	data.EnabledServerGroup = types.BoolNull()
 
-	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, "running", "provisioned")
+	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, "", "running", "provisioned")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		data.ID = types.StringValue(cluster.ID)
@@ -235,7 +240,7 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
-func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId string, states ...string) (k8sSDK.Cluster, error) {
+func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId, expectedVersion string, states ...string) (k8sSDK.Cluster, error) {
 	var result *k8sSDK.Cluster
 	var err error
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
@@ -246,7 +251,7 @@ func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId st
 		}
 		state := strings.ToLower(result.Status.State)
 
-		if slices.Contains(states, state) {
+		if slices.Contains(states, state) && (expectedVersion == "" || result.Version == expectedVersion) {
 			return *result, nil
 		}
 		if state == "failed" {
@@ -283,7 +288,12 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 	state.AllowedCidrs = plan.AllowedCidrs
 	state.Description = plan.Description
 
-	upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), "running")
+	expectedVersion := ""
+	if !plan.Version.IsUnknown() && !plan.Version.IsNull() {
+		expectedVersion = plan.Version.ValueString()
+	}
+
+	upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), expectedVersion, "running")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -305,7 +315,7 @@ func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	if _, err := r.GetClusterPooling(ctx, data.ID.ValueString(), "deleted"); err != nil {
+	if _, err := r.GetClusterPooling(ctx, data.ID.ValueString(), "", "deleted"); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -354,6 +364,10 @@ func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) 
 
 	if plan.Description.ValueString() != state.Description.ValueString() {
 		patch.Description = plan.Description.ValueStringPointer()
+	}
+	if !plan.Version.IsUnknown() && !plan.Version.IsNull() && plan.Version.ValueString() != state.Version.ValueString() {
+		version := plan.Version.ValueStringPointer()
+		patch.Version = version
 	}
 	return patch
 }

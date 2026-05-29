@@ -20,6 +20,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
   replicas     = 1
   min_replicas = 1
   max_replicas = 5
+  version      = mgc_kubernetes_cluster.cluster_with_nodepool.version
 }
 ```
 
@@ -44,6 +45,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 							The subnets must belong to the same VPC.
 							This field cannot be changed after the node pool is created
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
+- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format. Changing this value upgrades the node pool in place (no replacement); Terraform holds the apply until the node pool returns to a running state on the new version. The node pool version must not exceed the cluster's control plane version, and the cluster must be in running state to perform the upgrade.
 
 ### Read-Only
 
@@ -52,7 +54,6 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 - `labels` (Map of String) Map of labels for the node pool.
 - `security_groups` (Set of String) List of security groups for the node pool.
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
-- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`
