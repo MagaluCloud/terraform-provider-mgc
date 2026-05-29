@@ -24,3 +24,13 @@ resource "mgc_container_registry_user" "user" {}
 - `created_at` (String) Timestamp when the user was created
 - `id` (String) Unique identifier of the container registry user
 - `username` (String) Username assigned to the container registry user
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import mgc_container_registry_user.user <user_id>
+```

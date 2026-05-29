@@ -1,0 +1,1 @@
+terraform import mgc_container_registry_member.member <registry_id>,<member_id>
