@@ -42,15 +42,8 @@ var cvssSourceAttrTypes = map[string]attr.Type{
 	"vector": types.StringType,
 }
 
-var cvssMaxAttrTypes = map[string]attr.Type{
-	"source": types.StringType,
-	"score":  types.Float64Type,
-	"vector": types.StringType,
-}
-
 var cvssAttrTypes = map[string]attr.Type{
 	"preferred": types.ObjectType{AttrTypes: cvssSourceAttrTypes},
-	"max":       types.ObjectType{AttrTypes: cvssMaxAttrTypes},
 	"by_source": types.MapType{ElemType: types.ObjectType{AttrTypes: cvssSourceAttrTypes}},
 }
 
@@ -104,7 +97,6 @@ func (r *DataSourceCRScanVulnerabilities) Schema(_ context.Context, _ datasource
 							Computed: true,
 							AttributeTypes: map[string]attr.Type{
 								"preferred": types.ObjectType{AttrTypes: cvssSourceAttrTypes},
-								"max":       types.ObjectType{AttrTypes: cvssMaxAttrTypes},
 								"by_source": types.MapType{ElemType: types.ObjectType{AttrTypes: cvssSourceAttrTypes}},
 							},
 						},
@@ -170,27 +162,10 @@ func cvssSourceObject(_ context.Context, src *crSDK.VulnerabilityCvssSourceRespo
 	})
 }
 
-func cvssMaxObject(_ context.Context, max *crSDK.VulnerabilityCvssMaxResponse) (types.Object, diag.Diagnostics) {
-	if max == nil {
-		return types.ObjectNull(cvssMaxAttrTypes), nil
-	}
-	return types.ObjectValue(cvssMaxAttrTypes, map[string]attr.Value{
-		"source": types.StringPointerValue(max.Source),
-		"score":  types.Float64PointerValue(max.Score),
-		"vector": types.StringPointerValue(max.Vector),
-	})
-}
-
 func cvssToObject(ctx context.Context, c crSDK.VulnerabilityCvssResponse) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	preferred, d := cvssSourceObject(ctx, c.Preferred)
-	diags.Append(d...)
-	if diags.HasError() {
-		return types.ObjectNull(cvssAttrTypes), diags
-	}
-
-	max, d := cvssMaxObject(ctx, c.Max)
 	diags.Append(d...)
 	if diags.HasError() {
 		return types.ObjectNull(cvssAttrTypes), diags
@@ -217,7 +192,6 @@ func cvssToObject(ctx context.Context, c crSDK.VulnerabilityCvssResponse) (types
 
 	obj, d := types.ObjectValue(cvssAttrTypes, map[string]attr.Value{
 		"preferred": preferred,
-		"max":       max,
 		"by_source": bySourceMap,
 	})
 	diags.Append(d...)
