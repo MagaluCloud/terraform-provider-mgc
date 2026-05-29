@@ -56,6 +56,7 @@ Read-Only:
 Read-Only:
 
 - `by_source` (Map of Object) (see [below for nested schema](#nestedobjatt--vulnerabilities--cvss--by_source))
+- `max` (Object) (see [below for nested schema](#nestedobjatt--vulnerabilities--cvss--max))
 - `preferred` (Object) (see [below for nested schema](#nestedobjatt--vulnerabilities--cvss--preferred))
 
 <a id="nestedobjatt--vulnerabilities--cvss--by_source"></a>
@@ -64,6 +65,16 @@ Read-Only:
 Read-Only:
 
 - `score` (Number)
+- `vector` (String)
+
+
+<a id="nestedobjatt--vulnerabilities--cvss--max"></a>
+### Nested Schema for `vulnerabilities.cvss.max`
+
+Read-Only:
+
+- `score` (Number)
+- `source` (String)
 - `vector` (String)
 
 
