@@ -42,15 +42,13 @@ var cvssSourceAttrTypes = map[string]attr.Type{
 	"vector": types.StringType,
 }
 
-var cvssMaxAttrTypes = map[string]attr.Type{
-	"source": types.StringType,
-	"score":  types.Float64Type,
-	"vector": types.StringType,
+var cvssScoreOnlyAttrTypes = map[string]attr.Type{
+	"score": types.Float64Type,
 }
 
 var cvssAttrTypes = map[string]attr.Type{
-	"preferred": types.ObjectType{AttrTypes: cvssSourceAttrTypes},
-	"max":       types.ObjectType{AttrTypes: cvssMaxAttrTypes},
+	"preferred": types.ObjectType{AttrTypes: cvssScoreOnlyAttrTypes},
+	"max":       types.ObjectType{AttrTypes: cvssScoreOnlyAttrTypes},
 	"by_source": types.MapType{ElemType: types.ObjectType{AttrTypes: cvssSourceAttrTypes}},
 }
 
@@ -103,8 +101,8 @@ func (r *DataSourceCRScanVulnerabilities) Schema(_ context.Context, _ datasource
 						"cvss": schema.ObjectAttribute{
 							Computed: true,
 							AttributeTypes: map[string]attr.Type{
-								"preferred": types.ObjectType{AttrTypes: cvssSourceAttrTypes},
-								"max":       types.ObjectType{AttrTypes: cvssMaxAttrTypes},
+								"preferred": types.ObjectType{AttrTypes: cvssScoreOnlyAttrTypes},
+								"max":       types.ObjectType{AttrTypes: cvssScoreOnlyAttrTypes},
 								"by_source": types.MapType{ElemType: types.ObjectType{AttrTypes: cvssSourceAttrTypes}},
 							},
 						},
@@ -160,37 +158,33 @@ func (r *DataSourceCRScanVulnerabilities) Read(ctx context.Context, req datasour
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func cvssSourceObject(_ context.Context, src *crSDK.VulnerabilityCvssSourceResponse) (types.Object, diag.Diagnostics) {
-	if src == nil {
-		return types.ObjectNull(cvssSourceAttrTypes), nil
+func cvssScoreObject(score *float64) (types.Object, diag.Diagnostics) {
+	if score == nil {
+		return types.ObjectNull(cvssScoreOnlyAttrTypes), nil
 	}
-	return types.ObjectValue(cvssSourceAttrTypes, map[string]attr.Value{
-		"score":  types.Float64PointerValue(src.Score),
-		"vector": types.StringPointerValue(src.Vector),
-	})
-}
-
-func cvssMaxObject(_ context.Context, max *crSDK.VulnerabilityCvssMaxResponse) (types.Object, diag.Diagnostics) {
-	if max == nil {
-		return types.ObjectNull(cvssMaxAttrTypes), nil
-	}
-	return types.ObjectValue(cvssMaxAttrTypes, map[string]attr.Value{
-		"source": types.StringPointerValue(max.Source),
-		"score":  types.Float64PointerValue(max.Score),
-		"vector": types.StringPointerValue(max.Vector),
+	return types.ObjectValue(cvssScoreOnlyAttrTypes, map[string]attr.Value{
+		"score": types.Float64PointerValue(score),
 	})
 }
 
 func cvssToObject(ctx context.Context, c crSDK.VulnerabilityCvssResponse) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	preferred, d := cvssSourceObject(ctx, c.Preferred)
+	var preferredScore *float64
+	if c.Preferred != nil {
+		preferredScore = c.Preferred.Score
+	}
+	preferred, d := cvssScoreObject(preferredScore)
 	diags.Append(d...)
 	if diags.HasError() {
 		return types.ObjectNull(cvssAttrTypes), diags
 	}
 
-	max, d := cvssMaxObject(ctx, c.Max)
+	var maxScore *float64
+	if c.Max != nil {
+		maxScore = c.Max.Score
+	}
+	max, d := cvssScoreObject(maxScore)
 	diags.Append(d...)
 	if diags.HasError() {
 		return types.ObjectNull(cvssAttrTypes), diags

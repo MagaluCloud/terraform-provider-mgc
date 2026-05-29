@@ -74,8 +74,6 @@ Read-Only:
 Read-Only:
 
 - `score` (Number)
-- `source` (String)
-- `vector` (String)
 
 
 <a id="nestedobjatt--vulnerabilities--cvss--preferred"></a>
@@ -84,4 +82,3 @@ Read-Only:
 Read-Only:
 
 - `score` (Number)
-- `vector` (String)
