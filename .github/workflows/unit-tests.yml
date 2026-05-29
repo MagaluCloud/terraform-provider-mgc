@@ -13,6 +13,7 @@ jobs:
   test:
     name: Run Unit Tests (${{ matrix.os }})
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
