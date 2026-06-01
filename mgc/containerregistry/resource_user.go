@@ -41,7 +41,7 @@ func (r *ContainerRegistryUserResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.usersService = crSDK.New(&dataConfig.CoreConfig).Users()
+	r.usersService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Users()
 }
 
 func (r *ContainerRegistryUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

@@ -251,7 +251,7 @@ func (d *DataSourceKubernetesNode) Configure(ctx context.Context, req datasource
 		return
 	}
 
-	d.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
+	d.sdkClient = sdkK8s.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Nodepools()
 
 }
 

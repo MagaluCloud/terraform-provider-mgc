@@ -56,7 +56,7 @@ func (r *DataSourceDbReplica) Configure(_ context.Context, req datasource.Config
 		resp.Diagnostics.AddError("invalid provider data", "expected utils.DataConfig")
 		return
 	}
-	r.dbaasReplicas = dbSDK.New(&cfg.CoreConfig).Replicas()
+	r.dbaasReplicas = dbSDK.New(cfg.CoreFor(utils.ServiceDatabase)).Replicas()
 }
 
 func (r *DataSourceDbReplica) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

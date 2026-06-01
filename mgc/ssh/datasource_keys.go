@@ -46,7 +46,7 @@ func (r *DataSourceSSH) Configure(ctx context.Context, req datasource.ConfigureR
 		return
 	}
 
-	r.sshKeys = sshSDK.New(&dataConfig.CoreConfig).Keys()
+	r.sshKeys = sshSDK.New(dataConfig.CoreFor(utils.ServiceSSH)).Keys()
 
 }
 

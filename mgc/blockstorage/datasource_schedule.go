@@ -49,7 +49,7 @@ func (r *DataSourceBsSchedule) Configure(ctx context.Context, req datasource.Con
 		return
 	}
 
-	client := storageSDK.New(&dataConfig.CoreConfig)
+	client := storageSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage))
 	r.bsScheduler = client.Schedulers()
 }
 

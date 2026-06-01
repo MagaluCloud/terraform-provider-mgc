@@ -32,7 +32,7 @@ func (r *DataSourceLbaasNetworkBackends) Configure(_ context.Context, req dataso
 		resp.Diagnostics.AddError("Failed to get provider data", "Failed to get provider data")
 		return
 	}
-	client := lbSDK.New(&dataConfig.CoreConfig)
+	client := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkBackend = client.NetworkBackends()
 }
 

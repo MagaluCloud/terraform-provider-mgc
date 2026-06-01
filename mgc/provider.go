@@ -44,11 +44,25 @@ type mgcProvider struct {
 var rgxUUIDv4 = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type ProviderModel struct {
-	Region        types.String `tfsdk:"region"`
-	Env           types.String `tfsdk:"env"`
-	ApiKey        types.String `tfsdk:"api_key"`
-	KeyPairID     types.String `tfsdk:"key_pair_id"`
-	KeyPairSecret types.String `tfsdk:"key_pair_secret"`
+	Region        types.String    `tfsdk:"region"`
+	Env           types.String    `tfsdk:"env"`
+	ApiKey        types.String    `tfsdk:"api_key"`
+	KeyPairID     types.String    `tfsdk:"key_pair_id"`
+	KeyPairSecret types.String    `tfsdk:"key_pair_secret"`
+	Endpoints     *EndpointsModel `tfsdk:"endpoints"`
+}
+
+type EndpointsModel struct {
+	BlockStorage      types.String `tfsdk:"block_storage"`
+	ContainerRegistry types.String `tfsdk:"container_registry"`
+	Database          types.String `tfsdk:"database"`
+	Kubernetes        types.String `tfsdk:"kubernetes"`
+	Lbaas             types.String `tfsdk:"lbaas"`
+	Network           types.String `tfsdk:"network"`
+	ObjectStorage     types.String `tfsdk:"object_storage"`
+	Platform          types.String `tfsdk:"platform"`
+	SSH               types.String `tfsdk:"ssh"`
+	VirtualMachine    types.String `tfsdk:"virtual_machine"`
 }
 
 func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -59,6 +73,23 @@ func (p *mgcProvider) Metadata(ctx context.Context, req provider.MetadataRequest
 func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Terraform Provider for Magalu Cloud",
+		Blocks: map[string]schema.Block{
+			"endpoints": schema.SingleNestedBlock{
+				Description: "Custom endpoint URLs for individual Magalu Cloud services. Useful for local development, testing, or private deployments.",
+				Attributes: map[string]schema.Attribute{
+					"block_storage":      schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Block Storage service."},
+					"container_registry": schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Container Registry service."},
+					"database":           schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Database (DBaaS) service."},
+					"kubernetes":         schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Kubernetes service."},
+					"lbaas":              schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Load Balancer as a Service (LBaaS)."},
+					"network":            schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Network service."},
+					"object_storage":     schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Object Storage (S3-compatible) service."},
+					"platform":           schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Platform service."},
+					"ssh":                schema.StringAttribute{Optional: true, Description: "Custom endpoint for the SSH Keys service."},
+					"virtual_machine":    schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Virtual Machines service."},
+				},
+			},
+		},
 		Attributes: map[string]schema.Attribute{
 			"env": schema.StringAttribute{
 				Description: "The environment to use. Options: prod / pre-prod / dev-qa. Default is " + defaultEnv,
@@ -179,7 +210,28 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 	httpClient := output.CoreConfig.GetConfig().HTTPClient
 	httpClient.Transport = internalhttp.NewRequestIDRoundTripper(httpClient.Transport)
 
+	if plan.Endpoints != nil {
+		endpoints := make(map[string]string)
+		setEndpoint(endpoints, utils.ServiceBlockStorage, plan.Endpoints.BlockStorage)
+		setEndpoint(endpoints, utils.ServiceContainerRegistry, plan.Endpoints.ContainerRegistry)
+		setEndpoint(endpoints, utils.ServiceDatabase, plan.Endpoints.Database)
+		setEndpoint(endpoints, utils.ServiceKubernetes, plan.Endpoints.Kubernetes)
+		setEndpoint(endpoints, utils.ServiceLbaas, plan.Endpoints.Lbaas)
+		setEndpoint(endpoints, utils.ServiceNetwork, plan.Endpoints.Network)
+		setEndpoint(endpoints, utils.ServiceObjectStorage, plan.Endpoints.ObjectStorage)
+		setEndpoint(endpoints, utils.ServicePlatform, plan.Endpoints.Platform)
+		setEndpoint(endpoints, utils.ServiceSSH, plan.Endpoints.SSH)
+		setEndpoint(endpoints, utils.ServiceVirtualMachine, plan.Endpoints.VirtualMachine)
+		output.SetServiceEndpoints(endpoints)
+	}
+
 	return output
+}
+
+func setEndpoint(m map[string]string, service string, val types.String) {
+	if !val.IsNull() && !val.IsUnknown() && val.ValueString() != "" {
+		m[service] = val.ValueString()
+	}
 }
 
 func New(version string) func() provider.Provider {

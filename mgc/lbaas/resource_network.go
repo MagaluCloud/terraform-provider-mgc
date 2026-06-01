@@ -60,7 +60,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	lbaasClient := lbSDK.New(&dataConfig.CoreConfig)
+	lbaasClient := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkBackend = lbaasClient.NetworkBackends()
 	r.lbNetworkACL = lbaasClient.NetworkACLs()
 	r.lbNetworkHealthCheck = lbaasClient.NetworkHealthChecks()

@@ -81,7 +81,7 @@ func (r *bsVolumes) Configure(ctx context.Context, req resource.ConfigureRequest
 		return
 	}
 
-	r.bsVolumes = storageSDK.New(&dataConfig.CoreConfig).Volumes()
+	r.bsVolumes = storageSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).Volumes()
 }
 
 type bsVolumesResourceModel struct {

@@ -176,7 +176,7 @@ func (r *NetworkSecurityGroupDataSource) Configure(ctx context.Context, req data
 		return
 	}
 
-	r.networkSecurityGroups = netSDK.New(&dataConfig.CoreConfig).SecurityGroups()
+	r.networkSecurityGroups = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).SecurityGroups()
 }
 
 func (r *NetworkSecurityGroupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

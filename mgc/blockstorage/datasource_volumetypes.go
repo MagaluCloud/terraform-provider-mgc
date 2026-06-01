@@ -50,7 +50,7 @@ func (r *DataSourceBsVolumeTypes) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	r.bsVolumeTypes = bsSDK.New(&dataConfig.CoreConfig).VolumeTypes()
+	r.bsVolumeTypes = bsSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).VolumeTypes()
 }
 
 func (r *DataSourceBsVolumeTypes) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
