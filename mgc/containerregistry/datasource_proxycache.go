@@ -43,7 +43,7 @@ func (pc *ProxyCacheDataSource) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	pc.proxyCacheService = crSDK.New(&dataConfig.CoreConfig).ProxyCaches()
+	pc.proxyCacheService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).ProxyCaches()
 }
 
 func (pc *ProxyCacheDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

@@ -47,7 +47,7 @@ func (r *VolumeAttach) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	r.blockStorageVolumes = storageSDK.New(&dataConfig.CoreConfig).Volumes()
+	r.blockStorageVolumes = storageSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).Volumes()
 }
 
 func (r *VolumeAttach) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {

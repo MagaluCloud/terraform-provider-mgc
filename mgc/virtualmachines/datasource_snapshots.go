@@ -108,7 +108,7 @@ func (r *DataSourceVmSnapshots) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.vmSnapshot = vmSDK.New(&dataConfig.CoreConfig).Snapshots()
+	r.vmSnapshot = vmSDK.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
 }
 
 func (r *DataSourceVmSnapshots) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

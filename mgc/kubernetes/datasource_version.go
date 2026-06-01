@@ -45,7 +45,7 @@ func (r *DataSourceKubernetesVersion) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Versions()
+	r.sdkClient = sdkK8s.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Versions()
 }
 
 func (r *DataSourceKubernetesVersion) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

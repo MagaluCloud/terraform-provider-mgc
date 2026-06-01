@@ -126,8 +126,8 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	r.vmInstances = computeSdk.New(&dataConfig.CoreConfig).Instances()
-	r.vmSnapshots = computeSdk.New(&dataConfig.CoreConfig).Snapshots()
+	r.vmInstances = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Instances()
+	r.vmSnapshots = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
 }
 
 type vmInstancesResourceModel struct {

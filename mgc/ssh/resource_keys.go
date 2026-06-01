@@ -41,7 +41,7 @@ func (r *sshKeys) Configure(ctx context.Context, req resource.ConfigureRequest, 
 		return
 	}
 
-	r.sshKeys = sdkSSHKeys.New(&dataConfig.CoreConfig).Keys()
+	r.sshKeys = sdkSSHKeys.New(dataConfig.CoreFor(utils.ServiceSSH)).Keys()
 }
 
 type sshKeyModel struct {

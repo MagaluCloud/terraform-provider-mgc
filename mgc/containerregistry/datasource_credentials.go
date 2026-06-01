@@ -42,7 +42,7 @@ func (r *DataSourceCRCredentials) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	r.crCredentials = crSDK.New(&dataConfig.CoreConfig).Credentials()
+	r.crCredentials = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Credentials()
 }
 
 func (r *DataSourceCRCredentials) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

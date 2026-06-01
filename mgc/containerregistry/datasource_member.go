@@ -43,7 +43,7 @@ func (r *DataSourceCRMember) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	r.membersService = crSDK.New(&dataConfig.CoreConfig).Members()
+	r.membersService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Members()
 }
 
 func (r *DataSourceCRMember) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

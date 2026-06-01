@@ -68,7 +68,7 @@ func (r *k8sClusterResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 
-	r.k8sCluster = k8sSDK.New(&dataConfig.CoreConfig).Clusters()
+	r.k8sCluster = k8sSDK.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Clusters()
 }
 
 func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

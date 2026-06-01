@@ -70,7 +70,7 @@ func (r *DataSourceCRScanVulnerabilities) Configure(ctx context.Context, req dat
 		return
 	}
 
-	r.scansService = crSDK.New(&dataConfig.CoreConfig).Scans()
+	r.scansService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Scans()
 }
 
 func (r *DataSourceCRScanVulnerabilities) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

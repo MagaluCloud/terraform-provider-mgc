@@ -41,7 +41,7 @@ func (r *vmInterfaceAttach) Configure(ctx context.Context, req resource.Configur
 		return
 	}
 
-	r.vmInstance = computeSdk.New(&dataConfig.CoreConfig).Instances()
+	r.vmInstance = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Instances()
 }
 
 func (r *vmInterfaceAttach) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

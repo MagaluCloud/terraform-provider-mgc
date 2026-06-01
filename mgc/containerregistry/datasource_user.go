@@ -40,7 +40,7 @@ func (r *DataSourceCRUser) Configure(ctx context.Context, req datasource.Configu
 		return
 	}
 
-	r.usersService = crSDK.New(&dataConfig.CoreConfig).Users()
+	r.usersService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Users()
 }
 
 func (r *DataSourceCRUser) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

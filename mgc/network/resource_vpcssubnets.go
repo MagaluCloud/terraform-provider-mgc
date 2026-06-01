@@ -136,8 +136,8 @@ func (r *mgcNetworkVpcsSubnetsResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.networkVpcsSubnets = netSDK.New(&dataConfig.CoreConfig).VPCs()
-	r.networkSubnets = netSDK.New(&dataConfig.CoreConfig).Subnets()
+	r.networkVpcsSubnets = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
+	r.networkSubnets = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Subnets()
 	r.region = dataConfig.Region
 }
 

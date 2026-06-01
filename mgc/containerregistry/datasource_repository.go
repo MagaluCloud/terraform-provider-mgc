@@ -44,7 +44,7 @@ func (r *DataSourceCRRepository) Configure(ctx context.Context, req datasource.C
 		return
 	}
 
-	r.crRepositories = crSDK.New(&dataConfig.CoreConfig).Repositories()
+	r.crRepositories = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Repositories()
 }
 
 func (r *DataSourceCRRepository) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

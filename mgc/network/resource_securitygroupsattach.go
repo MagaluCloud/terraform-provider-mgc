@@ -42,7 +42,7 @@ func (r *NetworkSecurityGroupsAttachResource) Configure(ctx context.Context, req
 		return
 	}
 
-	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
+	r.networkPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Ports()
 }
 
 func (r *NetworkSecurityGroupsAttachResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

@@ -69,7 +69,7 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 	}
 
 	r.region = dataConfig.Region
-	r.sdkNodepool = k8sSDK.New(&dataConfig.CoreConfig).Nodepools()
+	r.sdkNodepool = k8sSDK.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Nodepools()
 }
 
 func (r *NewNodePoolResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
