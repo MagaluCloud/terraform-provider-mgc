@@ -51,7 +51,7 @@ func (r *DataSourceAvailabilityZones) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	r.sdkClient = sdkAzs.New(dataConfig.CoreFor(utils.ServicePlatform)).AvailabilityZones()
+	r.sdkClient = sdkAzs.New(&dataConfig.CoreConfig).AvailabilityZones()
 }
 
 func (r *DataSourceAvailabilityZones) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

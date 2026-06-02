@@ -62,7 +62,6 @@ type EndpointsModel struct {
 	Lbaas             types.String `tfsdk:"lbaas"`
 	Network           types.String `tfsdk:"network"`
 	ObjectStorage     types.String `tfsdk:"object_storage"`
-	Platform          types.String `tfsdk:"platform"`
 	SSH               types.String `tfsdk:"ssh"`
 	VirtualMachine    types.String `tfsdk:"virtual_machine"`
 }
@@ -86,7 +85,6 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					"lbaas":              endpointAttribute("Custom endpoint for the Load Balancer as a Service (LBaaS)."),
 					"network":            endpointAttribute("Custom endpoint for the Network service."),
 					"object_storage":     endpointAttribute("Custom endpoint for the Object Storage (S3-compatible) service."),
-					"platform":           endpointAttribute("Custom endpoint for the Platform service."),
 					"ssh":                endpointAttribute("Custom endpoint for the SSH Keys service."),
 					"virtual_machine":    endpointAttribute("Custom endpoint for the Virtual Machines service."),
 				},
@@ -222,7 +220,6 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 		setEndpoint(endpoints, utils.ServiceLbaas, plan.Endpoints.Lbaas)
 		setEndpoint(endpoints, utils.ServiceNetwork, plan.Endpoints.Network)
 		setEndpoint(endpoints, utils.ServiceObjectStorage, plan.Endpoints.ObjectStorage)
-		setEndpoint(endpoints, utils.ServicePlatform, plan.Endpoints.Platform)
 		setEndpoint(endpoints, utils.ServiceSSH, plan.Endpoints.SSH)
 		setEndpoint(endpoints, utils.ServiceVirtualMachine, plan.Endpoints.VirtualMachine)
 		output.SetServiceEndpoints(endpoints)

@@ -12,7 +12,6 @@ const (
 	ServiceLbaas             = "lbaas"
 	ServiceNetwork           = "network"
 	ServiceObjectStorage     = "object_storage"
-	ServicePlatform          = "platform"
 	ServiceSSH               = "ssh"
 	ServiceVirtualMachine    = "virtual_machine"
 )
@@ -58,12 +57,20 @@ func (d *DataConfig) CoreFor(service string) *sdk.CoreClient {
 	)
 }
 
-// ObjectStorageEndpoint returns the custom S3 endpoint URL and true when a
-// custom endpoint is configured for object storage; otherwise returns "", false.
-func (d *DataConfig) ObjectStorageEndpoint() (string, bool) {
+// EndpointFor returns the custom base URL configured for the given service and
+// true when one is set; otherwise returns "", false. It is needed for services
+// whose SDK client ignores the CoreClient base URL (e.g. global services that
+// must be overridden through a dedicated option).
+func (d *DataConfig) EndpointFor(service string) (string, bool) {
 	if len(d.serviceEndpoints) == 0 {
 		return "", false
 	}
-	url, ok := d.serviceEndpoints[ServiceObjectStorage]
+	url, ok := d.serviceEndpoints[service]
 	return url, ok && url != ""
+}
+
+// ObjectStorageEndpoint returns the custom S3 endpoint URL and true when a
+// custom endpoint is configured for object storage; otherwise returns "", false.
+func (d *DataConfig) ObjectStorageEndpoint() (string, bool) {
+	return d.EndpointFor(ServiceObjectStorage)
 }
