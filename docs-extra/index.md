@@ -101,8 +101,8 @@ provider "mgc" {
   region  = var.region
 
   endpoints {
-    block_storage = "https://localhost:8080"
-    network       = "https://network.internal.example.com"
+    virtual_machine   = "http://localhost:8080"
+    object_storage    = "https://s3-endpoint-example.com"
   }
 }
 ```
