@@ -3,8 +3,10 @@ package mgc
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"runtime"
+	"strings"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/containerregistry"
@@ -77,20 +79,21 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 			"endpoints": schema.SingleNestedBlock{
 				Description: "Custom endpoint URLs for individual Magalu Cloud services. Useful for local development, testing, or private deployments.",
 				Attributes: map[string]schema.Attribute{
-					"block_storage":      schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Block Storage service."},
-					"container_registry": schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Container Registry service."},
-					"database":           schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Database (DBaaS) service."},
-					"kubernetes":         schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Kubernetes service."},
-					"lbaas":              schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Load Balancer as a Service (LBaaS)."},
-					"network":            schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Network service."},
-					"object_storage":     schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Object Storage (S3-compatible) service."},
-					"platform":           schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Platform service."},
-					"ssh":                schema.StringAttribute{Optional: true, Description: "Custom endpoint for the SSH Keys service."},
-					"virtual_machine":    schema.StringAttribute{Optional: true, Description: "Custom endpoint for the Virtual Machines service."},
+					"block_storage":      endpointAttribute("Custom endpoint for the Block Storage service."),
+					"container_registry": endpointAttribute("Custom endpoint for the Container Registry service."),
+					"database":           endpointAttribute("Custom endpoint for the Database (DBaaS) service."),
+					"kubernetes":         endpointAttribute("Custom endpoint for the Kubernetes service."),
+					"lbaas":              endpointAttribute("Custom endpoint for the Load Balancer as a Service (LBaaS)."),
+					"network":            endpointAttribute("Custom endpoint for the Network service."),
+					"object_storage":     endpointAttribute("Custom endpoint for the Object Storage (S3-compatible) service."),
+					"platform":           endpointAttribute("Custom endpoint for the Platform service."),
+					"ssh":                endpointAttribute("Custom endpoint for the SSH Keys service."),
+					"virtual_machine":    endpointAttribute("Custom endpoint for the Virtual Machines service."),
 				},
 			},
 		},
 		Attributes: map[string]schema.Attribute{
+			// "env" is intentionally omitted from the published docs (docs-extra/index.md)
 			"env": schema.StringAttribute{
 				Description: "The environment to use. Options: prod / pre-prod / dev-qa. Default is " + defaultEnv,
 				Optional:    true,
@@ -229,8 +232,50 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 }
 
 func setEndpoint(m map[string]string, service string, val types.String) {
-	if !val.IsNull() && !val.IsUnknown() && val.ValueString() != "" {
-		m[service] = val.ValueString()
+	if val.IsNull() || val.IsUnknown() {
+		return
+	}
+	v := strings.TrimRight(strings.TrimSpace(val.ValueString()), "/")
+	if v != "" {
+		m[service] = v
+	}
+}
+
+// endpointAttribute builds the schema definition for a custom service endpoint
+func endpointAttribute(description string) schema.StringAttribute {
+	return schema.StringAttribute{
+		Optional:    true,
+		Description: description,
+		Validators:  []validator.String{endpointURLValidator{}},
+	}
+}
+
+type endpointURLValidator struct{}
+
+func (endpointURLValidator) Description(_ context.Context) string {
+	return "value must be an absolute URL with an http or https scheme and a host"
+}
+
+func (v endpointURLValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (endpointURLValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	raw := strings.TrimSpace(req.ConfigValue.ValueString())
+	if raw == "" {
+		return
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid endpoint URL",
+			fmt.Sprintf("%q must be an absolute URL including an http/https scheme and a host, e.g. https://localhost:8080. "+
+				"Provide only the base URL; the service path is appended automatically.", raw),
+		)
 	}
 }
 
