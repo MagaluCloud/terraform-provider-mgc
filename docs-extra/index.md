@@ -47,7 +47,6 @@ terraform {
 provider "mgc" {
   api_key    = var.api_key
   region     = var.region
-  env        = var.env
   key_pair_id = var.key_pair_id
   key_pair_secret = var.key_pair_secret
 }
@@ -63,7 +62,6 @@ provider "mgc" {
 
 ### Optional
 
-- `env` (String) The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.
 - `region` (String) The region to use for resources. Options: br-ne1 / br-se1 / br-mgl1 / br-mc1. Default is br-se1.
 - `key_pair_id` (String) Key Pair ID for Object Storage. Requires `key_pair_secret`.
 - `key_pair_secret` (String) Key Pair Secret for Object Storage. Requires `key_pair_id`.

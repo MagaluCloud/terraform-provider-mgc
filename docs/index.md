@@ -47,7 +47,6 @@ terraform {
 provider "mgc" {
   api_key    = var.api_key
   region     = var.region
-  env        = var.env
   key_pair_id = var.key_pair_id
   key_pair_secret = var.key_pair_secret
 }
