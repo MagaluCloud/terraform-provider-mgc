@@ -82,3 +82,60 @@ data "mgc_object_storage_bucket" "cors_details" {
 data "mgc_object_storage_bucket" "policy_details" {
   bucket = mgc_object_storage_buckets.policy_example.bucket
 }
+
+resource "mgc_object_storage_objects" "hello" {
+  bucket  = mgc_object_storage_buckets.basic.bucket
+  key     = "hello.txt"
+  content = "Hello, World!"
+}
+
+resource "mgc_object_storage_objects" "config" {
+  bucket       = mgc_object_storage_buckets.cors_example.bucket
+  key          = "config/settings.json"
+  content      = jsonencode({ environment = "test", version = 1 })
+  content_type = "application/json"
+}
+
+# Test 4: Bucket with lock enabled for object lock testing
+resource "mgc_object_storage_buckets" "locked" {
+  bucket     = format("%s-locked", var.bucket_name)
+  versioning = true
+  lock       = true
+}
+
+# Test 5: Object with lock
+resource "mgc_object_storage_objects" "locked_object" {
+  bucket                      = mgc_object_storage_buckets.locked.bucket
+  key                         = "locked-file.txt"
+  content                     = "This file is locked"
+  object_lock_retain_until_date = "2027-12-31T23:59:59Z"
+}
+
+# Data source: get details for a specific object
+data "mgc_object_storage_object" "hello_details" {
+  bucket = mgc_object_storage_buckets.basic.bucket
+  key    = mgc_object_storage_objects.hello.key
+}
+
+data "mgc_object_storage_object" "config_details" {
+  bucket = mgc_object_storage_buckets.cors_example.bucket
+  key    = mgc_object_storage_objects.config.key
+}
+
+data "mgc_object_storage_object" "locked_object_details" {
+  bucket = mgc_object_storage_buckets.locked.bucket
+  key    = mgc_object_storage_objects.locked_object.key
+}
+
+# Data source: list all objects in a bucket
+data "mgc_object_storage_objects" "basic_objects" {
+  bucket = mgc_object_storage_buckets.basic.bucket
+}
+
+data "mgc_object_storage_objects" "cors_objects" {
+  bucket = mgc_object_storage_buckets.cors_example.bucket
+}
+
+data "mgc_object_storage_objects" "locked_objects" {
+  bucket = mgc_object_storage_buckets.locked.bucket
+}
