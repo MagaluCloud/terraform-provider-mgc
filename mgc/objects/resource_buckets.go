@@ -64,7 +64,7 @@ func (r *objectStorageBuckets) Configure(ctx context.Context, req resource.Confi
 
 	endpoint, err := resolveS3Endpoint(dataConfig)
 	if err != nil {
-		resp.Diagnostics.AddError("Invalid region/env for object storage", endpoint.String())
+		resp.Diagnostics.AddError("Invalid region/env for object storage", err.Error())
 		return
 	}
 
