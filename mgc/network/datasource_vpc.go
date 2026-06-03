@@ -38,7 +38,7 @@ func (r *NetworkVPCDatasource) Configure(ctx context.Context, req datasource.Con
 		return
 	}
 
-	r.networkVPC = netSDK.New(&dataConfig.CoreConfig).VPCs()
+	r.networkVPC = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
 }
 
 func (r *NetworkVPCDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

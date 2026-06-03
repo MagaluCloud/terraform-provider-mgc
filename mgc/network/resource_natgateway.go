@@ -93,7 +93,7 @@ func (r *natGatewayResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 
-	r.sdkNetwork = network.New(&dataConfig.CoreConfig).NatGateways()
+	r.sdkNetwork = network.New(dataConfig.CoreFor(utils.ServiceNetwork)).NatGateways()
 	r.region = dataConfig.Region
 }
 

@@ -666,3 +666,66 @@ func TestSetRequiresReplaceOnChangeEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestStringNullIfEmpty(t *testing.T) {
+	tests := []struct {
+		name              string
+		configValue       types.String
+		planValue         types.String
+		expectedPlanValue types.String
+	}{
+		{
+			name:              "empty string becomes null",
+			configValue:       types.StringValue(""),
+			planValue:         types.StringValue(""),
+			expectedPlanValue: types.StringNull(),
+		},
+		{
+			name:              "non-empty string unchanged",
+			configValue:       types.StringValue("my-cert"),
+			planValue:         types.StringValue("my-cert"),
+			expectedPlanValue: types.StringValue("my-cert"),
+		},
+		{
+			name:              "null config unchanged",
+			configValue:       types.StringNull(),
+			planValue:         types.StringNull(),
+			expectedPlanValue: types.StringNull(),
+		},
+		{
+			name:              "unknown config unchanged",
+			configValue:       types.StringUnknown(),
+			planValue:         types.StringUnknown(),
+			expectedPlanValue: types.StringUnknown(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			modifier := StringNullIfEmptyModifier()
+			req := planmodifier.StringRequest{
+				ConfigValue: tt.configValue,
+				PlanValue:   tt.planValue,
+			}
+			resp := &planmodifier.StringResponse{
+				PlanValue: tt.planValue,
+			}
+
+			modifier.PlanModifyString(context.Background(), req, resp)
+
+			assert.True(t, resp.PlanValue.Equal(tt.expectedPlanValue),
+				"PlanValue = %v, want %v", resp.PlanValue, tt.expectedPlanValue)
+		})
+	}
+}
+
+func TestStringNullIfEmpty_Description(t *testing.T) {
+	modifier := StringNullIfEmptyModifier()
+	expected := "Treats an empty string value as null."
+	assert.Equal(t, expected, modifier.Description(context.Background()))
+	assert.Equal(t, expected, modifier.MarkdownDescription(context.Background()))
+}
+
+func TestStringNullIfEmpty_IntegrationWithFramework(t *testing.T) {
+	var _ planmodifier.String = StringNullIfEmptyModifier()
+}

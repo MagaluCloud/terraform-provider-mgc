@@ -47,7 +47,7 @@ func (r *DataSourceKubernetesFlavor) Configure(ctx context.Context, req datasour
 		return
 	}
 
-	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Flavors()
+	r.sdkClient = sdkK8s.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Flavors()
 }
 
 func (r *DataSourceKubernetesFlavor) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

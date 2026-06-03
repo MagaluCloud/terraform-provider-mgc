@@ -45,7 +45,7 @@ func (r *NetworkSecurityGroupsResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.networkSecurityGroups = netSDK.New(&dataConfig.CoreConfig).SecurityGroups()
+	r.networkSecurityGroups = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).SecurityGroups()
 }
 
 func (r *NetworkSecurityGroupsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

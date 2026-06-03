@@ -50,7 +50,7 @@ func (r *DataSourceDbInstanceTypes) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	r.dbaasInstanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
+	r.dbaasInstanceTypes = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).InstanceTypes()
 }
 
 func (r *DataSourceDbInstanceTypes) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

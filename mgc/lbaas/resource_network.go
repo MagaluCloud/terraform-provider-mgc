@@ -60,7 +60,7 @@ func (r *LoadBalancerResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	lbaasClient := lbSDK.New(&dataConfig.CoreConfig)
+	lbaasClient := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkBackend = lbaasClient.NetworkBackends()
 	r.lbNetworkACL = lbaasClient.NetworkACLs()
 	r.lbNetworkHealthCheck = lbaasClient.NetworkHealthChecks()
@@ -379,6 +379,9 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 						"id": schema.StringAttribute{
 							Description: "The unique identifier of the listener.",
 							Computed:    true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"backend_name": schema.StringAttribute{
 							Description: "The name of the backend associated with this listener.",
@@ -428,6 +431,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 							},
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(),
+								utils.StringNullIfEmptyModifier(),
 							},
 						},
 					},
