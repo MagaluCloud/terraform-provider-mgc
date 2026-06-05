@@ -65,6 +65,36 @@ func (_m *RepositoriesService) Get(ctx context.Context, registryID string, repos
 	return r0, r1
 }
 
+// GetByID provides a mock function with given fields: ctx, registryID, repositoryID
+func (_m *RepositoriesService) GetByID(ctx context.Context, registryID string, repositoryID string) (*containerregistry.RepositoryResponse, error) {
+	ret := _m.Called(ctx, registryID, repositoryID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByID")
+	}
+
+	var r0 *containerregistry.RepositoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*containerregistry.RepositoryResponse, error)); ok {
+		return rf(ctx, registryID, repositoryID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *containerregistry.RepositoryResponse); ok {
+		r0 = rf(ctx, registryID, repositoryID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*containerregistry.RepositoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, registryID, repositoryID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // List provides a mock function with given fields: ctx, registryID, opts
 func (_m *RepositoriesService) List(ctx context.Context, registryID string, opts containerregistry.RepositoryListOptions) (*helpers.PaginatedResponse[containerregistry.RepositoryResponse], error) {
 	ret := _m.Called(ctx, registryID, opts)
