@@ -50,7 +50,7 @@ func (r *DataSourceVmInstances) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.vmInstance = vmSDK.New(&dataConfig.CoreConfig).Instances()
+	r.vmInstance = vmSDK.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Instances()
 }
 
 func (r *DataSourceVmInstances) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

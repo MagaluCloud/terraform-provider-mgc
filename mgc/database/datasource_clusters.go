@@ -41,7 +41,7 @@ func (ds *DBaaSClustersDataSource) Configure(ctx context.Context, req datasource
 		resp.Diagnostics.AddError("Failed to get provider data", "Provider data has unexpected type")
 		return
 	}
-	ds.dbaasClusters = dbSDK.New(&dataConfig.CoreConfig).Clusters()
+	ds.dbaasClusters = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Clusters()
 }
 
 func (ds *DBaaSClustersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

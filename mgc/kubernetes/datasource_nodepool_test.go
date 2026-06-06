@@ -103,6 +103,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				Taints:                     []Taint{{Effect: types.StringValue("NoSchedule"), Key: types.StringValue("app"), Value: types.StringValue("critical")}},
 
 				AvailabilityZones: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("br-sao-1-a")}),
+				SubnetIDs:         types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
@@ -150,6 +151,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				Taints:                     nil,
 
 				AvailabilityZones: types.SetNull(types.StringType),
+				SubnetIDs:         types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},
@@ -189,6 +191,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				Taints:                     nil,
 
 				AvailabilityZones: types.SetNull(types.StringType),
+				SubnetIDs:         types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Null(),
 			},
 		},
@@ -228,6 +231,7 @@ func TestConvertGetResultToFlattened(t *testing.T) {
 				Taints:                     nil,
 
 				AvailabilityZones: types.SetNull(types.StringType),
+				SubnetIDs:         types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Value(110),
 			},
 		},

@@ -102,5 +102,5 @@ func (r *mgcNetworkSubnetpoolsDatasource) Configure(ctx context.Context, req dat
 		return
 	}
 
-	r.networkSubnetpools = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
+	r.networkSubnetpools = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).SubnetPools()
 }

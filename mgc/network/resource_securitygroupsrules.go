@@ -134,7 +134,7 @@ func (r *NetworkSecurityGroupsRulesResource) Configure(ctx context.Context, req 
 		return
 	}
 
-	r.networkRules = netSDK.New(&dataConfig.CoreConfig).Rules()
+	r.networkRules = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Rules()
 }
 
 func (r *NetworkSecurityGroupsRulesResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

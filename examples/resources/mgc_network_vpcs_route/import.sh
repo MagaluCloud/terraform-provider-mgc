@@ -1,0 +1,1 @@
+terraform import mgc_network_vpcs_route.example vpc_id,route_id

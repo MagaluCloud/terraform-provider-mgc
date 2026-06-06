@@ -42,7 +42,7 @@ func (r *DBaaSParameterResource) Configure(ctx context.Context, req resource.Con
 		resp.Diagnostics.AddError("Invalid provider data", "expected utils.DataConfig")
 		return
 	}
-	r.dbaasParameters = dbSDK.New(&cfg.CoreConfig).Parameters()
+	r.dbaasParameters = dbSDK.New(cfg.CoreFor(utils.ServiceDatabase)).Parameters()
 }
 
 func (r *DBaaSParameterResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

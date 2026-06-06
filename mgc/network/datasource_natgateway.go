@@ -74,7 +74,7 @@ func (d *natGatewayDataSource) Configure(_ context.Context, req datasource.Confi
 		return
 	}
 
-	d.sdkNetwork = network.New(&dataConfig.CoreConfig).NatGateways()
+	d.sdkNetwork = network.New(dataConfig.CoreFor(utils.ServiceNetwork)).NatGateways()
 }
 
 func (d *natGatewayDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

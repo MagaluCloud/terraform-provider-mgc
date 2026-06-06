@@ -20,6 +20,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
   replicas     = 1
   min_replicas = 1
   max_replicas = 5
+  version      = mgc_kubernetes_cluster.cluster_with_nodepool.version
 }
 ```
 
@@ -31,15 +32,20 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 - `cluster_id` (String) UUID of the Kubernetes cluster.
 - `flavor_name` (String) Definition of the CPU, RAM, and storage capacity of the nodes.
 - `name` (String) Name of the node pool.
-- `replicas` (Number) Number of replicas of the nodes in the node pool.
+- `replicas` (Number) Initial number of replicas of the nodes in the node pool. Required at creation; after creation, changes to this value are ignored because the replica count is managed by the API (e.g. via autoscaling between min_replicas and max_replicas).
 
 ### Optional
 
-- `availability_zones` (Set of String) List of availability zones where the node pool is deployed.
+- `availability_zones` (Set of String, Deprecated) List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
+- `subnet_ids` (Set of String) List of subnet ids. When omitted, the cluster’s default subnets will be used.
+							Only one subnet per availability zone is allowed.
+							The subnets must belong to the same VPC.
+							This field cannot be changed after the node pool is created
 - `taints` (Attributes List) Property associating a set of nodes. (see [below for nested schema](#nestedatt--taints))
+- `version` (String) The native Kubernetes version of the node pool. Use the standard "vX.Y.Z" format. Changing this value upgrades the node pool in place (no replacement); Terraform holds the apply until the node pool returns to a running state on the new version. The node pool version must not exceed the cluster's control plane version, and the cluster must be in running state to perform the upgrade.
 
 ### Read-Only
 

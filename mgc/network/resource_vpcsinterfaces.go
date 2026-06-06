@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+	"net/http"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -48,8 +50,8 @@ func (r *NetworkVPCInterfaceResource) Configure(ctx context.Context, req resourc
 		return
 	}
 
-	r.networkVpcsPorts = netSDK.New(&dataConfig.CoreConfig).VPCs()
-	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
+	r.networkVpcsPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
+	r.networkPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Ports()
 }
 
 func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -232,8 +234,15 @@ func (r *NetworkVPCInterfaceResource) Delete(ctx context.Context, req resource.D
 
 	err := r.networkPorts.Delete(ctx, model.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		return
+		switch e := err.(type) {
+		case *clientSDK.HTTPError:
+			if e.StatusCode == http.StatusNotFound {
+				return
+			}
+		default:
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
 	}
 }
 

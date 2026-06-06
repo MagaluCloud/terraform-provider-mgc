@@ -1,0 +1,1 @@
+terraform import mgc_object_storage_objects.object bucket_name/object_key

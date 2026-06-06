@@ -1,11 +1,16 @@
 package kubernetes
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -271,6 +276,70 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 				assert.Equal(t, types.StringValue(tc.expected), tfModel.MachineTypesSource)
 			})
 		}
+	})
+}
+
+func TestCreateKubernetesSDKNetworkRequest(t *testing.T) {
+	t.Run("returns nil when the configured set is null so the API uses the default VPC", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetNull(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("a cluster's network is described by the subnet IDs it should run on", func(t *testing.T) {
+		set := types.SetValueMust(types.StringType, []attr.Value{
+			types.StringValue("11111111-1111-1111-1111-111111111111"),
+			types.StringValue("22222222-2222-2222-2222-222222222222"),
+		})
+
+		request := CreateKubernetesSDKNetworkRequest(set)
+
+		assert.NotNil(t, request)
+		assert.ElementsMatch(t, []string{
+			"11111111-1111-1111-1111-111111111111",
+			"22222222-2222-2222-2222-222222222222",
+		}, request.SubnetIDs)
+	})
+
+}
+
+func TestClusterImportState(t *testing.T) {
+	ctx := context.Background()
+	r := &k8sClusterResource{}
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	clusterSchema := schemaResp.Schema
+
+	newImportResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State: tfsdk.State{
+				Schema: clusterSchema,
+				Raw:    tftypes.NewValue(clusterSchema.Type().TerraformType(ctx), nil),
+			},
+		}
+	}
+
+	t.Run("an empty import id is rejected so the user is told to provide one", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: ""}, resp)
+
+		assert.True(t, resp.Diagnostics.HasError(), "an empty id must produce an error diagnostic")
+	})
+
+	t.Run("an imported cluster's id is written into state without dragging write-only attributes along", func(t *testing.T) {
+		resp := newImportResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "cluster-uuid"}, resp)
+
+		assert.False(t, resp.Diagnostics.HasError(), "valid import must not error: %v", resp.Diagnostics)
+
+		var imported KubernetesClusterCreateResourceModel
+		diags := resp.State.Get(ctx, &imported)
+		assert.False(t, diags.HasError(), "reading state back must succeed: %v", diags)
+
+		assert.Equal(t, types.StringValue("cluster-uuid"), imported.ID)
+		assert.True(t, imported.EnabledServerGroup.IsNull(),
+			"enabled_server_group is write-only and must not be persisted to state on import")
 	})
 }
 

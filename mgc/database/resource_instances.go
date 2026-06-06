@@ -110,9 +110,9 @@ func (r *DBaaSInstanceResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 
-	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
-	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
-	r.dbaasInstanceTypes = dbSDK.New(&dataConfig.CoreConfig).InstanceTypes()
+	r.dbaasInstances = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Instances()
+	r.dbaasEngines = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Engines()
+	r.dbaasInstanceTypes = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).InstanceTypes()
 }
 
 func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -223,7 +223,7 @@ func (r *DBaaSInstanceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"backup_retention_days": schema.Int64Attribute{
-				Description: "Number of days to retain automated backups (1-35 days). Zero disables automated backups. Default is 7 days.",
+				Description: "Number of days to retain automated backups (1-35 days). Default is 7 days.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.Int64{

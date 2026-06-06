@@ -126,8 +126,8 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	r.vmInstances = computeSdk.New(&dataConfig.CoreConfig).Instances()
-	r.vmSnapshots = computeSdk.New(&dataConfig.CoreConfig).Snapshots()
+	r.vmInstances = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Instances()
+	r.vmSnapshots = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
 }
 
 type vmInstancesResourceModel struct {
@@ -246,14 +246,14 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: `The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
 If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
 Read the documentation guides for more details.`,
-				// Optional: true,
-				Computed:   true,
+				Optional: true,
+				Computed: true,
 				Validators: []validator.String{
-					// stringvalidator.ConflictsWith(path.MatchRoot("vpc_id")),
-					// stringvalidator.LengthAtLeast(1),
+					stringvalidator.ConflictsWith(path.MatchRoot("vpc_id")),
+					stringvalidator.LengthAtLeast(1),
 				},
 				PlanModifiers: []planmodifier.String{
-					// stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -398,10 +398,11 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 
 	createNetwork := computeSdk.CreateParametersNetwork{
 		AssociatePublicIp: state.AllocatePublicIpv4.ValueBoolPointer(),
-		Interface:         &computeSdk.CreateParametersNetworkInterface{
-			// ID: state.NetworkInterfaceId.ValueStringPointer(),
+		Interface: &computeSdk.CreateParametersNetworkInterface{
+			ID: state.NetworkInterfaceId.ValueStringPointer(),
 		},
 	}
+
 	if sg != nil {
 		createNetwork.Interface.SecurityGroups = sg
 	}
@@ -509,6 +510,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data vmInstancesResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}

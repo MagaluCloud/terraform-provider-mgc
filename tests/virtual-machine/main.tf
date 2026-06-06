@@ -53,18 +53,18 @@ resource "mgc_ssh_keys" "ssh_key" {
 # }
 
 # Test Case 3: VM Instance with custom interface
-# resource "mgc_network_vpcs_interfaces" "custom_interface" {
-#   name   = "custom-pip-interface"
-#   vpc_id = "144e5176-5a75-4afc-ae75-38160f9fd21d"
-# }
+resource "mgc_network_vpcs_interfaces" "custom_interface" {
+  name   = "custom-pip-interface"
+  vpc_id = "144e5176-5a75-4afc-ae75-38160f9fd21d"
+}
 
-# resource "mgc_virtual_machine_instances" "instance_with_custom_interface" {
-#   name         = "tc4-instance-with-custom-interface-hc"
-#   machine_type = var.machine_type
-#   image        = "cloud-ubuntu-24.04 LTS"
-#   ssh_key_name = mgc_ssh_keys.ssh_key.name
-#   # network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
-# }
+resource "mgc_virtual_machine_instances" "instance_with_custom_interface" {
+  name                 = "tc4-instance-with-custom-interface-hc"
+  machine_type         = var.machine_type
+  image                = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name         = mgc_ssh_keys.ssh_key.name
+  network_interface_id = mgc_network_vpcs_interfaces.custom_interface.id
+}
 
 resource "mgc_virtual_machine_instances" "instance_with_pip" {
   name                 = "tc4-instance-with-public-ip"

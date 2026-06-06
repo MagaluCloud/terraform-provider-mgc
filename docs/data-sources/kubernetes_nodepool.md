@@ -31,6 +31,10 @@ output "nodepool" {
 - `cluster_id` (String) Cluster UUID.
 - `id` (String) Nodepool UUID.
 
+### Optional
+
+- `subnet_ids` (Set of String) List of subnet ids.
+
 ### Read-Only
 
 - `auto_scale_max_replicas` (Number) Maximum number of replicas for auto-scaling.
@@ -54,6 +58,7 @@ output "nodepool" {
 - `status_state` (String) Current state of the nodepool.
 - `taints` (Attributes List) List of taints. (see [below for nested schema](#nestedatt--taints))
 - `updated_at` (String) Last update timestamp.
+- `version` (String) The native Kubernetes version of the nodepool.
 
 <a id="nestedatt--taints"></a>
 ### Nested Schema for `taints`

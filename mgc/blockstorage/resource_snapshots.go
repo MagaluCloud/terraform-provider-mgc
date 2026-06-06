@@ -71,7 +71,7 @@ func (r *bsSnapshots) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	r.bsSnapshots = storageSDK.New(&dataConfig.CoreConfig).Snapshots()
+	r.bsSnapshots = storageSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).Snapshots()
 }
 
 type bsSnapshotsResourceModel struct {

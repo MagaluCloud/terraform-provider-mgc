@@ -43,7 +43,7 @@ func (r *vmSnapshots) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	r.vmSnapshots = computeSdk.New(&dataConfig.CoreConfig).Snapshots()
+	r.vmSnapshots = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
 }
 
 type vmSnapshotsResourceModel struct {

@@ -50,7 +50,7 @@ func (r *DataSourceCRImages) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	r.crImages = crSDK.New(&dataConfig.CoreConfig).Images()
+	r.crImages = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Images()
 }
 
 func (r *DataSourceCRImages) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

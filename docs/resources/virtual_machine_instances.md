@@ -94,6 +94,9 @@ This attribute can only be used when "network_interface_id" is not set.
 - `image` (String) The image name used for the virtual machine instance.
 			 This attribute is required when not creating the instance from a snapshot (i.e., when "snapshot_id" is not set).
 			 If "snapshot_id" is provided, the snapshot will be used instead of an image.
+- `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
+If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
+Read the documentation guides for more details.
 - `snapshot_id` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
 - `user_data` (String) User data for instance initialization (encoded in base64).
@@ -106,9 +109,6 @@ This attribute can only be used when "network_interface_id" is not set.
 - `ipv4` (String) The primary network interface public IPv4 address of the virtual machine instance.
 - `ipv6` (String) The primary network interface IPv6 address of the virtual machine instance.
 - `local_ipv4` (String) The primary network interface IPv4 address of the virtual machine instance.
-- `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
-If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
-Read the documentation guides for more details.
 - `network_interfaces` (Attributes List) The network interfaces attached to the virtual machine instance. (see [below for nested schema](#nestedatt--network_interfaces))
 
 <a id="nestedatt--network_interfaces"></a>

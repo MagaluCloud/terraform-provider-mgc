@@ -101,7 +101,7 @@ func (r *DBaaSClusterResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	sdkClient := dbSDK.New(&dataConfig.CoreConfig)
+	sdkClient := dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase))
 	r.dbaasClusters = sdkClient.Clusters()
 	r.dbaasEngines = sdkClient.Engines()
 	r.dbaasInstanceTypes = sdkClient.InstanceTypes()
@@ -394,6 +394,21 @@ func (r *DBaaSClusterResource) Read(ctx context.Context, req resource.ReadReques
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
+
+	engineInfo, err := r.dbaasEngines.Get(ctx, detailedCluster.EngineID)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+	state.EngineName = types.StringValue(engineInfo.Name)
+	state.EngineVersion = types.StringValue(engineInfo.Version)
+
+	instanceInfo, err := r.dbaasInstanceTypes.Get(ctx, detailedCluster.InstanceTypeID)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+	state.InstanceType = types.StringValue(instanceInfo.Label)
 
 	r.populateModelFromDetailResponse(detailedCluster, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

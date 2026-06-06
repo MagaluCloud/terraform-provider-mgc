@@ -49,7 +49,7 @@ func (r *DataSourceVmImages) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	r.vmImageService = vmSDK.New(&dataConfig.CoreConfig).Images()
+	r.vmImageService = vmSDK.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Images()
 }
 
 func (r *DataSourceVmImages) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

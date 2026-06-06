@@ -83,7 +83,7 @@ func (r *mgcNetworkSubnetpoolsResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.subnetPoolsService = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
+	r.subnetPoolsService = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).SubnetPools()
 }
 
 func (r *mgcNetworkSubnetpoolsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

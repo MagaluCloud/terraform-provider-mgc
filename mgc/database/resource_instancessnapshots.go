@@ -63,7 +63,7 @@ func (r *DBaaSInstanceSnapshotResource) Configure(ctx context.Context, req resou
 		return
 	}
 
-	r.dbaasInstances = dbSDK.New(&dataConfig.CoreConfig).Instances()
+	r.dbaasInstances = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Instances()
 }
 
 func (r *DBaaSInstanceSnapshotResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

@@ -133,7 +133,7 @@ func (r *NetworkVPCInterfacesDatasource) Configure(ctx context.Context, req data
 		return
 	}
 
-	r.networkInterfaces = netSDK.New(&dataConfig.CoreConfig).Ports()
+	r.networkInterfaces = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Ports()
 }
 
 func (r *NetworkVPCInterfacesDatasource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
