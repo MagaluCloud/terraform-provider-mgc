@@ -32,7 +32,8 @@ NC     := \033[0m # No Color
 
 # Declare all targets as phony
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
-        tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all
+        tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all \
+        gen-commands-json
 
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
@@ -110,6 +111,11 @@ generate-docs: tf-gen-docs ## Generate full documentation
 	@cp -r $(DOCS_EXTRA_DIR)/. $(DOCS_DIR)
 	@echo -e "$(GREEN)Documentation generated successfully.$(NC)"
 
+gen-commands-json: ## Generate commands.json from provider documentation
+	@echo -e "$(GREEN)Generating commands.json...$(NC)"
+	@cd $(SCRIPT_DIR)/scripts && $(GO) run gen_commands_json.go
+	@echo -e "$(GREEN)commands.json generated successfully.$(NC)"
+
 go-fmt: ## Format Go code
 	@echo -e "$(GREEN)Formatting Go code...$(NC)"
 	@$(GOFMT) -s -l -w .
@@ -126,7 +132,7 @@ build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
 
-before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory ## Run all checks before committing code
+before-commit: go-test go-fmt generate-docs check-example-usage check-empty-subcategory gen-commands-json ## Run all checks before committing code
 	@echo -e "$(GREEN)All pre-commit checks passed!$(NC)"
 
 debug: ## Run the provider in debug mode
