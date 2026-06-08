@@ -9391,8 +9391,8 @@
           },
           {
             "name": "type",
-            "description": "Tipo de endereço (por exemplo, 'leitura-gravação', 'somente leitura'). A importação é compatível com a seguinte sintaxe: É possível usar o comando [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import), por exemplo: ```shell terraform import mgc_dbaas_clusters.my_cluster_no_parameter_group <cluster_id> ```",
-            "original_description": "Address type (e.g., 'read-write', 'read-only'). Import is supported using the following syntax: The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example: ```shell terraform import mgc_dbaas_clusters.my_cluster_no_parameter_group <cluster_id> ```",
+            "description": "Tipo de endereço (por exemplo, \"read-write\", \"read-only\").",
+            "original_description": "Address type (e.g., 'read-write', 'read-only').",
             "type": "string",
             "required": false,
             "read_only": true,
@@ -10109,8 +10109,8 @@
           },
           {
             "name": "value",
-            "description": "Valor correspondente à chave de taint. A importação é suportada usando a seguinte sintaxe: É possível usar o comando [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import), por exemplo: ```shell terraform import mgc_kubernetes_nodepool.nodepool my_cluster_id,my_nodepool_id terraform import mgc_kubernetes_nodepool.nodepool ac9709ae-b298-41c6-bc58-92a6b8b92d8b,cc3ae8e5-07ae-4c45-8573-600bd26e9f40 ```",
-            "original_description": "Value corresponding to the taint key. Import is supported using the following syntax: The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example: ```shell terraform import mgc_kubernetes_nodepool.nodepool my_cluster_id,my_nodepool_id terraform import mgc_kubernetes_nodepool.nodepool ac9709ae-b298-41c6-bc58-92a6b8b92d8b,cc3ae8e5-07ae-4c45-8573-600bd26e9f40 ```",
+            "description": "Valor correspondente à chave de contaminação.",
+            "original_description": "Value corresponding to the taint key.",
             "type": "string",
             "required": false,
             "read_only": false,
@@ -10667,8 +10667,8 @@
           },
           {
             "name": "id",
-            "description": "O identificador único do certificado TLS. A importação é suportada usando a seguinte sintaxe: É possível usar o comando [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import), por exemplo: ```shell terraform import mgc_lbaas_network.http_proxy my_lbaas_id ```",
-            "original_description": "The unique identifier of the TLS certificate. Import is supported using the following syntax: The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example: ```shell terraform import mgc_lbaas_network.http_proxy my_lbaas_id ```",
+            "description": "O identificador único do certificado TLS.",
+            "original_description": "The unique identifier of the TLS certificate.",
             "type": "string",
             "required": false,
             "read_only": true,
@@ -11705,8 +11705,8 @@
           },
           {
             "name": "primary",
-            "description": "Se a interface de rede é primária. A importação é suportada usando a seguinte sintaxe: O comando [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import) pode ser usado, por exemplo: ```shell terraform import mgc_virtual_machine_instances.basic_instance 123 ```",
-            "original_description": "Whether the network interface is primary. Import is supported using the following syntax: The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example: ```shell terraform import mgc_virtual_machine_instances.basic_instance 123 ```",
+            "description": "Se a interface de rede é a primária.",
+            "original_description": "Whether the network interface is primary.",
             "type": "bool",
             "required": false,
             "read_only": true,

@@ -216,6 +216,9 @@ func parseNestedSchemas(content string) map[string][]Attribute {
 		attrPath := m[1]
 		headingEnd := strings.Index(part, m[0]) + len(m[0])
 		sectionContent := part[headingEnd:]
+		if i := strings.Index(sectionContent, "\n## "); i != -1 {
+			sectionContent = sectionContent[:i]
+		}
 
 		var attrs []Attribute
 		for _, sub := range []struct {
