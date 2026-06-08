@@ -8650,6 +8650,30 @@
     ],
     "import": "# Example: Import an existing schedule\nterraform import mgc_block_storage_schedule.daily_backup \"schedule-123\""
   },
+  "resource.block_storage_schedule_attach": {
+    "command": "# Create a block storage volume\nresource \"mgc_block_storage_volumes\" \"example_volume\" {\n  name              = \"example-volume\"\n  availability_zone = \"br-ne1-a\"\n  size              = 50\n  type              = \"cloud_nvme1k\"\n}\n\n# Create a snapshot schedule\nresource \"mgc_block_storage_schedule\" \"daily_backup\" {\n  name                              = \"daily-backup-schedule\"\n  description                       = \"Daily backup schedule for production volumes\"\n  snapshot_type                     = \"instant\"\n  policy_retention_in_days          = 7\n  policy_frequency_daily_start_time = \"02:00:00\"\n}\n\n# Attach the volume to the schedule\nresource \"mgc_block_storage_schedule_attach\" \"example_attach\" {\n  schedule_id = mgc_block_storage_schedule.daily_backup.id\n  volume_id   = mgc_block_storage_volumes.example_volume.id\n}\n\n# Multiple volumes can be attached to the same schedule\nresource \"mgc_block_storage_volumes\" \"another_volume\" {\n  name              = \"another-volume\"\n  availability_zone = \"br-ne1-a\"\n  size              = 100\n  type              = \"cloud_nvme1k\"\n}\n\nresource \"mgc_block_storage_schedule_attach\" \"another_attach\" {\n  schedule_id = mgc_block_storage_schedule.daily_backup.id\n  volume_id   = mgc_block_storage_volumes.another_volume.id\n}\n\n# A volume can also be attached to multiple schedules\nresource \"mgc_block_storage_schedule\" \"weekly_backup\" {\n  name                              = \"weekly-backup-schedule\"\n  description                       = \"Weekly backup schedule for long-term retention\"\n  snapshot_type                     = \"object\"\n  policy_retention_in_days          = 30\n  policy_frequency_daily_start_time = \"03:00:00\"\n}\n\nresource \"mgc_block_storage_schedule_attach\" \"multi_schedule_attach\" {\n  schedule_id = mgc_block_storage_schedule.weekly_backup.id\n  volume_id   = mgc_block_storage_volumes.example_volume.id\n}",
+    "attributes": [
+      {
+        "name": "schedule_id",
+        "description": "O ID da programação do snapshot ao qual o volume deve ser anexado.",
+        "original_description": "The ID of the snapshot schedule to attach the volume to.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "volume_id",
+        "description": "O ID do volume de armazenamento em bloco a ser associado à programação.",
+        "original_description": "The ID of the block storage volume to attach to the schedule.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      }
+    ],
+    "import": "# Import a block storage schedule attach resource\n# The import ID format is: schedule_id,volume_id\n\n# Example: Import an existing schedule-volume attachment\nterraform import mgc_block_storage_schedule_attach.example_attach \"schedule-123,volume-456\""
+  },
   "resource.block_storage_snapshots": {
     "command": "resource \"mgc_block_storage_snapshots\" \"snapshot_example\" {\n  name        = \"snapshot-example-new\"\n  description = \"Example snapshot description\"\n  type        = \"instant\"\n  volume_id   = mgc_block_storage_volumes.example_volume.id\n}",
     "attributes": [
