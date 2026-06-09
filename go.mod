@@ -1,6 +1,6 @@
 module github.com/MagaluCloud/terraform-provider-mgc
 
-go 1.25.3
+go 1.26.3
 
 require (
 	github.com/MagaluCloud/mgc-sdk-go v1.16.0
