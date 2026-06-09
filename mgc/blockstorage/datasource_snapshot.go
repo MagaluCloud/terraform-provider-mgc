@@ -52,7 +52,7 @@ func (r *DataSourceBsSnapshotDatasource) Configure(ctx context.Context, req data
 		return
 	}
 
-	r.bsSnapshotService = bsSDK.New(&dataConfig.CoreConfig).Snapshots()
+	r.bsSnapshotService = bsSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).Snapshots()
 }
 
 func GetBsSnapshotAttributes(idRequired bool) map[string]schema.Attribute {

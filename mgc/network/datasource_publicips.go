@@ -37,7 +37,7 @@ func (r *NetworkPublicIPsDataSource) Configure(ctx context.Context, req datasour
 		return
 	}
 
-	r.networkPIP = netSDK.New(&dataConfig.CoreConfig).PublicIPs()
+	r.networkPIP = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).PublicIPs()
 }
 
 func (r *NetworkPublicIPsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

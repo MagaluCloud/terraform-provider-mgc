@@ -41,7 +41,7 @@ resource "mgc_kubernetes_cluster" "cluster" {
 							You must specify exactly one subnet per availability zone.
 							The subnets must belong to the same VPC.
 							This field cannot be changed after the node pool is created
-- `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format.
+- `version` (String) The native Kubernetes version of the cluster. Use the standard "vX.Y.Z" format. Changing this value upgrades the control plane in place (no replacement); Terraform holds the apply until the cluster returns to a running state on the new version. Upgrade the control plane before the node pools
 
 ### Read-Only
 

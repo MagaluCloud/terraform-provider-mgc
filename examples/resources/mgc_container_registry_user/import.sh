@@ -1,0 +1,1 @@
+terraform import mgc_container_registry_user.user <user_id>

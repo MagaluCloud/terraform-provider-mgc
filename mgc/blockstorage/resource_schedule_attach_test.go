@@ -2,6 +2,7 @@ package blockstorage
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -79,7 +80,7 @@ func TestScheduleAttachResource_Configure(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		providerData interface{}
+		providerData any
 		expectError  bool
 	}{
 		{
@@ -215,13 +216,7 @@ func TestScheduleAttachResource_Read(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 				}
 			} else {
-				contains := false
-				for _, v := range get.Volumes {
-					if v == data.VolumeID.ValueString() {
-						contains = true
-						break
-					}
-				}
+				contains := slices.Contains(get.Volumes, data.VolumeID.ValueString())
 
 				if tt.expectError && !contains {
 					// This is expected - volume not found in list

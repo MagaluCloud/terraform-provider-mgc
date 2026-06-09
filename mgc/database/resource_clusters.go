@@ -101,7 +101,7 @@ func (r *DBaaSClusterResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	sdkClient := dbSDK.New(&dataConfig.CoreConfig)
+	sdkClient := dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase))
 	r.dbaasClusters = sdkClient.Clusters()
 	r.dbaasEngines = sdkClient.Engines()
 	r.dbaasInstanceTypes = sdkClient.InstanceTypes()

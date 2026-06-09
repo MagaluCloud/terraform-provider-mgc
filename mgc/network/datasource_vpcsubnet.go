@@ -122,7 +122,7 @@ func (r *mgcNetworkVpcsSubnetDatasource) Configure(ctx context.Context, req data
 		return
 	}
 
-	r.networkSubnet = netSDK.New(&dataConfig.CoreConfig).Subnets()
+	r.networkSubnet = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Subnets()
 	r.region = dataConfig.Region
 }
 

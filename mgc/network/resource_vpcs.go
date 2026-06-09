@@ -47,7 +47,7 @@ func (r *NetworkVPCResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 
-	r.networkVPC = netSDK.New(&dataConfig.CoreConfig).VPCs()
+	r.networkVPC = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
 }
 
 func (r *NetworkVPCResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -111,7 +111,7 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 			return
 		}
 		tflog.Info(ctx, "VPC is not yet created, waiting for 10 seconds",
-			map[string]interface{}{"status": res.Status})
+			map[string]any{"status": res.Status})
 		time.Sleep(10 * time.Second)
 	}
 

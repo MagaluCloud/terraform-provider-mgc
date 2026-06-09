@@ -66,7 +66,7 @@ func (r *DataSourceKubernetesNodepool) Configure(ctx context.Context, req dataso
 	}
 
 	r.region = dataConfig.Region
-	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Nodepools()
+	r.sdkClient = sdkK8s.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Nodepools()
 }
 
 func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

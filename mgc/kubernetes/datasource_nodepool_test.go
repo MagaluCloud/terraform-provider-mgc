@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1186,13 +1187,7 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 					azValues[i] = azAttr.(types.String).ValueString()
 				}
 				for i, expected := range expectedValues {
-					found := false
-					for _, actual := range azValues {
-						if actual == expected {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(azValues, expected)
 					if !found {
 						t.Errorf("AvailabilityZone %d: expected '%s', not found in actual values %v",
 							i, expected, azValues)
@@ -1277,13 +1272,7 @@ func TestConvertGetResultToFlattenedUtilsEdgeCases(t *testing.T) {
 				}
 
 				for _, expected := range expectedValues {
-					found := false
-					for _, actual := range azValues {
-						if actual == expected {
-							found = true
-							break
-						}
-					}
+					found := slices.Contains(azValues, expected)
 					if !found {
 						t.Errorf("Unicode AZ: expected '%s', not found in actual values %v", expected, azValues)
 					}
@@ -1457,7 +1446,7 @@ func TestConvertGetResultToFlattenedResourceLeaks(t *testing.T) {
 		largeNodepool.Taints = &taints
 
 		// Run conversion multiple times to check for accumulating memory usage
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			result, err := ConvertGetResultToFlattened(ctx, largeNodepool, "cluster-leak", "region-leak")
 			if err != nil {
 				t.Fatalf("Error in iteration %d: %v", i, err)

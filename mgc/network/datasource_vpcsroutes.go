@@ -47,7 +47,7 @@ func (r *NetworkVpcsRoutesDatasource) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	r.networkRoute = netSDK.New(&dataConfig.CoreConfig).VpcsRoutes()
+	r.networkRoute = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VpcsRoutes()
 }
 
 func (r *NetworkVpcsRoutesDatasource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

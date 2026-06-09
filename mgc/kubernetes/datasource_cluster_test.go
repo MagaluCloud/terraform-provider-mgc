@@ -217,7 +217,7 @@ func TestDataSourceClusterNodePoolsSchemaMatchesStruct(t *testing.T) {
 		declared[name] = struct{}{}
 	}
 
-	npType := reflect.TypeOf(NodePool{})
+	npType := reflect.TypeFor[NodePool]()
 	for i := 0; i < npType.NumField(); i++ {
 		tag := npType.Field(i).Tag.Get("tfsdk")
 		if tag == "" || tag == "-" {

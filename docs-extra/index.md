@@ -47,7 +47,6 @@ terraform {
 provider "mgc" {
   api_key    = var.api_key
   region     = var.region
-  env        = var.env
   key_pair_id = var.key_pair_id
   key_pair_secret = var.key_pair_secret
 }
@@ -63,12 +62,49 @@ provider "mgc" {
 
 ### Optional
 
-- `env` (String) The environment to use. Options: prod / pre-prod / dev-qa. Default is prod.
 - `region` (String) The region to use for resources. Options: br-ne1 / br-se1 / br-mgl1 / br-mc1. Default is br-se1.
 - `key_pair_id` (String) Key Pair ID for Object Storage. Requires `key_pair_secret`.
 - `key_pair_secret` (String) Key Pair Secret for Object Storage. Requires `key_pair_id`.
+- `endpoints` (Block, Optional) Custom endpoint URLs for individual Magalu Cloud services. Useful for local development, testing, or private deployments. (see [below for nested schema](#nestedblock--endpoints))
 
 When configuring Object Storage features, provide both `key_pair_id` and `key_pair_secret` together to enable authenticated Bucket operations.
+
+<a id="nestedblock--endpoints"></a>
+### Nested Schema for `endpoints`
+
+Override the base URL of one or more services. Each value must be an absolute
+URL with an `http`/`https` scheme and a host (e.g. `https://localhost:8080`).
+Provide **only the base URL** — the provider appends the service path
+automatically (so `https://localhost:8080` becomes
+`https://localhost:8080/<service-path>/...`). A trailing slash is trimmed
+automatically. Any service left unset uses the default endpoint derived from
+`region`.
+
+Optional:
+
+- `block_storage` (String) Custom endpoint for the Block Storage service.
+- `container_registry` (String) Custom endpoint for the Container Registry service.
+- `database` (String) Custom endpoint for the Database (DBaaS) service.
+- `kubernetes` (String) Custom endpoint for the Kubernetes service.
+- `lbaas` (String) Custom endpoint for the Load Balancer as a Service (LBaaS).
+- `network` (String) Custom endpoint for the Network service.
+- `object_storage` (String) Custom endpoint for the Object Storage (S3-compatible) service. Unlike the other services, this value is used as the full S3 endpoint, not as a base URL with an appended service path.
+- `ssh` (String) Custom endpoint for the SSH Keys service.
+- `virtual_machine` (String) Custom endpoint for the Virtual Machines service.
+
+#### Example Usage
+
+```terraform
+provider "mgc" {
+  api_key = var.api_key
+  region  = var.region
+
+  endpoints {
+    virtual_machine   = "http://localhost:8080"
+    object_storage    = "https://s3-endpoint-example.com"
+  }
+}
+```
 
 ## Contributing
 

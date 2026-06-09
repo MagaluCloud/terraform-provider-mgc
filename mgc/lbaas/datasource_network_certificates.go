@@ -35,7 +35,7 @@ func (r *DataSourceLbaasNetworkCertificates) Configure(_ context.Context, req da
 		return
 	}
 
-	client := lbSDK.New(&dataConfig.CoreConfig)
+	client := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkTLS = client.NetworkCertificates()
 }
 
