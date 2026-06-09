@@ -58,7 +58,7 @@
     "attributes": [
       {
         "name": "id",
-        "description": "O identificador único da programação do snapshot.",
+        "description": "O identificador único do agendamento do snapshot.",
         "original_description": "The unique identifier of the snapshot schedule.",
         "type": "string",
         "required": true,
@@ -67,7 +67,7 @@
       },
       {
         "name": "created_at",
-        "description": "A data e hora em que a programação foi criada.",
+        "description": "A data e hora em que o agendamento foi criado.",
         "original_description": "The timestamp when the schedule was created.",
         "type": "string",
         "required": false,
@@ -76,7 +76,7 @@
       },
       {
         "name": "description",
-        "description": "Descrição da programação de snapshots.",
+        "description": "Descrição do agendamento de snapshots.",
         "original_description": "The description of the snapshot schedule.",
         "type": "string",
         "required": false,
@@ -85,7 +85,7 @@
       },
       {
         "name": "name",
-        "description": "O nome da programação do snapshot.",
+        "description": "O nome do agendamento do snapshot.",
         "original_description": "The name of the snapshot schedule.",
         "type": "string",
         "required": false,
@@ -121,7 +121,7 @@
       },
       {
         "name": "state",
-        "description": "O estado atual da programação.",
+        "description": "O estado atual do agendamento.",
         "original_description": "The current state of the schedule.",
         "type": "string",
         "required": false,
@@ -130,7 +130,7 @@
       },
       {
         "name": "updated_at",
-        "description": "A data e hora da última atualização da programação.",
+        "description": "A data e hora da última atualização do agendamento.",
         "original_description": "The timestamp when the schedule was last updated.",
         "type": "string",
         "required": false,
@@ -162,7 +162,7 @@
         "nested_attributes": [
           {
             "name": "created_at",
-            "description": "A data e hora em que a programação foi criada.",
+            "description": "A data e hora em que o agendamento foi criado.",
             "original_description": "The timestamp when the schedule was created.",
             "type": "string",
             "required": false,
@@ -171,7 +171,7 @@
           },
           {
             "name": "description",
-            "description": "Descrição da programação de snapshots.",
+            "description": "Descrição do agendamento de snapshots.",
             "original_description": "The description of the snapshot schedule.",
             "type": "string",
             "required": false,
@@ -180,7 +180,7 @@
           },
           {
             "name": "id",
-            "description": "O identificador único da programação do snapshot.",
+            "description": "O identificador único do agendamento do snapshot.",
             "original_description": "The unique identifier of the snapshot schedule.",
             "type": "string",
             "required": false,
@@ -189,7 +189,7 @@
           },
           {
             "name": "name",
-            "description": "O nome da programação do snapshot.",
+            "description": "O nome do agendamento do snapshot.",
             "original_description": "The name of the snapshot schedule.",
             "type": "string",
             "required": false,
@@ -225,7 +225,7 @@
           },
           {
             "name": "state",
-            "description": "O estado atual da programação.",
+            "description": "O estado atual do agendamento.",
             "original_description": "The current state of the schedule.",
             "type": "string",
             "required": false,
@@ -234,7 +234,7 @@
           },
           {
             "name": "updated_at",
-            "description": "A data e hora da última atualização da programação.",
+            "description": "A data e hora da última atualização do agendamento.",
             "original_description": "The timestamp when the schedule was last updated.",
             "type": "string",
             "required": false,
@@ -742,7 +742,7 @@
           },
           {
             "name": "id",
-            "description": "O identificador único do instantâneo do volume.",
+            "description": "O identificador único do snapshot do volume.",
             "original_description": "The unique identifier of the volume snapshot.",
             "type": "string",
             "required": false,
@@ -993,7 +993,7 @@
     "attributes": [
       {
         "name": "member_id",
-        "description": "ID do registro de filiação",
+        "description": "ID do registro de membro",
         "original_description": "ID of the membership entry",
         "type": "string",
         "required": true,
@@ -1011,7 +1011,7 @@
       },
       {
         "name": "created_at",
-        "description": "Data e hora em que a assinatura foi criada",
+        "description": "Data e hora em que a associação foi criada",
         "original_description": "Timestamp when the membership was created",
         "type": "string",
         "required": false,
@@ -1029,7 +1029,7 @@
       },
       {
         "name": "updated_at",
-        "description": "Data e hora da última atualização da assinatura",
+        "description": "Data e hora da última atualização da associação",
         "original_description": "Timestamp when the membership was last updated",
         "type": "string",
         "required": false,
@@ -1070,7 +1070,7 @@
         "nested_attributes": [
           {
             "name": "created_at",
-            "description": "Data e hora em que a assinatura foi criada",
+            "description": "Data e hora em que a associação foi criada",
             "original_description": "Timestamp when the membership was created",
             "type": "string",
             "required": false,
@@ -1079,7 +1079,7 @@
           },
           {
             "name": "id",
-            "description": "Identificador único do registro de filiação",
+            "description": "Identificador único do registro de membro",
             "original_description": "Unique identifier of the membership entry",
             "type": "string",
             "required": false,
@@ -1106,7 +1106,7 @@
           },
           {
             "name": "updated_at",
-            "description": "Data e hora da última atualização da assinatura",
+            "description": "Data e hora da última atualização da associação",
             "original_description": "Timestamp when the membership was last updated",
             "type": "string",
             "required": false,
@@ -1269,7 +1269,7 @@
     "attributes": [
       {
         "name": "scan_id",
-        "description": "ID da digitalização a ser inspecionada",
+        "description": "ID do scan a ser inspecionada",
         "original_description": "ID of the scan to inspect",
         "type": "string",
         "required": true,
@@ -1453,7 +1453,7 @@
       },
       {
         "name": "digest",
-        "description": "Resumo da imagem digitalizada",
+        "description": "Digest da imagem digitalizada",
         "original_description": "Digest of the scanned image",
         "type": "string",
         "required": false,
@@ -1554,7 +1554,7 @@
       },
       {
         "name": "status",
-        "description": "Status atual da digitalização",
+        "description": "Status atual do scan",
         "original_description": "Current status of the scan",
         "type": "string",
         "required": false,
@@ -1772,7 +1772,7 @@
     "attributes": [
       {
         "name": "digest_or_tag",
-        "description": "Resumo ou tag que identifica a imagem",
+        "description": "Digest ou tag que identifica a imagem",
         "original_description": "Digest or tag identifying the image",
         "type": "string",
         "required": true,
@@ -1799,7 +1799,7 @@
       },
       {
         "name": "scans",
-        "description": "Histórico de digitalizações da imagem",
+        "description": "Histórico de scans da imagem",
         "original_description": "Scan history for the image",
         "type": "array(object)",
         "required": false,
@@ -1826,7 +1826,7 @@
           },
           {
             "name": "digest",
-            "description": "Resumo da imagem digitalizada",
+            "description": "Digest da imagem digitalizada",
             "original_description": "Digest of the scanned image",
             "type": "string",
             "required": false,
@@ -1844,7 +1844,7 @@
           },
           {
             "name": "id",
-            "description": "Identificador único da digitalização",
+            "description": "Identificador único do scan",
             "original_description": "Unique identifier of the scan",
             "type": "string",
             "required": false,
@@ -1936,7 +1936,7 @@
           },
           {
             "name": "status",
-            "description": "Status atual da digitalização",
+            "description": "Status atual do scan",
             "original_description": "Current status of the scan",
             "type": "string",
             "required": false,
@@ -2038,7 +2038,7 @@
           },
           {
             "name": "registry_name",
-            "description": "O nome do repositório que contém este repositório",
+            "description": "O nome do registro que contém este repositório",
             "original_description": "The name of the registry containing this repository",
             "type": "string",
             "required": false,
@@ -2108,7 +2108,7 @@
       },
       {
         "name": "registry_name",
-        "description": "O nome do repositório que contém este repositório",
+        "description": "O nome do registro que contém este repositório",
         "original_description": "The name of the registry containing this repository",
         "type": "string",
         "required": false,
@@ -2205,7 +2205,7 @@
       },
       {
         "name": "backup_retention_days",
-        "description": "Número de dias de retenção das cópias de segurança automáticas.",
+        "description": "Número de dias de retenção das backups automáticos.",
         "original_description": "Number of days to retain automated backups.",
         "type": "number",
         "required": false,
@@ -2241,7 +2241,7 @@
       },
       {
         "name": "engine_id",
-        "description": "ID do mecanismo de banco de dados utilizado pelo cluster.",
+        "description": "ID do engine de banco de dados utilizado pelo cluster.",
         "original_description": "ID of the database engine used by the cluster.",
         "type": "string",
         "required": false,
@@ -2336,7 +2336,7 @@
     "attributes": [
       {
         "name": "engine_id_filter",
-        "description": "Filtrar clusters por ID do mecanismo.",
+        "description": "Filtrar clusters por ID do engine.",
         "original_description": "Filter clusters by engine ID.",
         "type": "string",
         "required": false,
@@ -2446,7 +2446,7 @@
           },
           {
             "name": "backup_retention_days",
-            "description": "Número de dias de retenção das cópias de segurança automáticas.",
+            "description": "Número de dias de retenção das backups automáticos.",
             "original_description": "Number of days to retain automated backups.",
             "type": "number",
             "required": false,
@@ -2482,7 +2482,7 @@
           },
           {
             "name": "engine_id",
-            "description": "ID do mecanismo de banco de dados utilizado pelo cluster.",
+            "description": "ID do engine de banco de dados utilizado pelo cluster.",
             "original_description": "ID of the database engine used by the cluster.",
             "type": "string",
             "required": false,
@@ -2579,7 +2579,7 @@
     "attributes": [
       {
         "name": "status",
-        "description": "Filtre para retornar os motores com base em seu status. Se definido como ATIVO, retorna apenas os motores ativos. Se definido como OBSOLETO, retorna apenas os motores obsoletos.",
+        "description": "Filtre para retornar os engines com base em seu status. Se definido como ATIVO, retorna apenas os motores ativos. Se definido como OBSOLETO, retorna apenas os motores obsoletos.",
         "original_description": "Filter to return engines based on their status. If set to ACTIVE, returns only active engines. If set to DEPRECATED, returns only deprecated engines.",
         "type": "string",
         "required": false,
@@ -2588,7 +2588,7 @@
       },
       {
         "name": "engines",
-        "description": "Lista de mecanismos de banco de dados disponíveis",
+        "description": "Lista de engines de banco de dados disponíveis",
         "original_description": "List of available database engines",
         "type": "array(object)",
         "required": false,
@@ -2597,7 +2597,7 @@
         "nested_attributes": [
           {
             "name": "id",
-            "description": "O ID do mecanismo de banco de dados",
+            "description": "O ID do engine de banco de dados",
             "original_description": "The ID of the database engine",
             "type": "string",
             "required": false,
@@ -2606,7 +2606,7 @@
           },
           {
             "name": "name",
-            "description": "O nome do mecanismo de banco de dados",
+            "description": "O nome do engine de banco de dados",
             "original_description": "The name of the database engine",
             "type": "string",
             "required": false,
@@ -2615,7 +2615,7 @@
           },
           {
             "name": "status",
-            "description": "O status do mecanismo de banco de dados",
+            "description": "O status do engine de banco de dados",
             "original_description": "The status of the database engine",
             "type": "string",
             "required": false,
@@ -2624,7 +2624,7 @@
           },
           {
             "name": "version",
-            "description": "A versão do mecanismo de banco de dados",
+            "description": "A versão do engine de banco de dados",
             "original_description": "The version of the database engine",
             "type": "string",
             "required": false,
@@ -2696,7 +2696,7 @@
       },
       {
         "name": "backup_retention_days",
-        "description": "Número de dias de retenção das cópias de segurança",
+        "description": "Número de dias de retenção das backups",
         "original_description": "Number of days to retain backups",
         "type": "number",
         "required": false,
@@ -2723,7 +2723,7 @@
       },
       {
         "name": "engine_id",
-        "description": "Número de identificação do motor",
+        "description": "ID do engine",
         "original_description": "ID of the engine",
         "type": "string",
         "required": false,
@@ -2926,7 +2926,7 @@
           },
           {
             "name": "backup_retention_days",
-            "description": "Número de dias de retenção das cópias de segurança",
+            "description": "Número de dias de retenção das backups",
             "original_description": "Number of days to retain backups",
             "type": "number",
             "required": false,
@@ -2953,7 +2953,7 @@
           },
           {
             "name": "engine_id",
-            "description": "Número de identificação do motor",
+            "description": "ID do engine",
             "original_description": "ID of the engine",
             "type": "string",
             "required": false,
@@ -3032,7 +3032,7 @@
     "attributes": [
       {
         "name": "id",
-        "description": "ID do instantâneo",
+        "description": "ID do snapshot",
         "original_description": "ID of the snapshot",
         "type": "string",
         "required": true,
@@ -3059,7 +3059,7 @@
       },
       {
         "name": "description",
-        "description": "Descrição do instantâneo",
+        "description": "Descrição do snapshot",
         "original_description": "Description of the snapshot",
         "type": "string",
         "required": false,
@@ -3068,7 +3068,7 @@
       },
       {
         "name": "name",
-        "description": "Nome do instantâneo",
+        "description": "Nome do snapshot",
         "original_description": "Name of the snapshot",
         "type": "string",
         "required": false,
@@ -3077,7 +3077,7 @@
       },
       {
         "name": "size",
-        "description": "Tamanho do instantâneo em bytes",
+        "description": "Tamanho do snapshot em bytes",
         "original_description": "Size of the snapshot in bytes",
         "type": "number",
         "required": false,
@@ -3086,7 +3086,7 @@
       },
       {
         "name": "status",
-        "description": "Status do instantâneo",
+        "description": "Status do snapshot",
         "original_description": "Status of the snapshot",
         "type": "string",
         "required": false,
@@ -3109,7 +3109,7 @@
       },
       {
         "name": "snapshots",
-        "description": "Lista de instantâneos",
+        "description": "Lista de snapshots",
         "original_description": "List of snapshots",
         "type": "array(object)",
         "required": false,
@@ -3136,7 +3136,7 @@
           },
           {
             "name": "description",
-            "description": "Descrição do instantâneo",
+            "description": "Descrição do snapshot",
             "original_description": "Description of the snapshot",
             "type": "string",
             "required": false,
@@ -3145,7 +3145,7 @@
           },
           {
             "name": "id",
-            "description": "ID do instantâneo",
+            "description": "ID do snapshot",
             "original_description": "ID of the snapshot",
             "type": "string",
             "required": false,
@@ -3154,7 +3154,7 @@
           },
           {
             "name": "name",
-            "description": "Nome do instantâneo",
+            "description": "Nome do snapshot",
             "original_description": "Name of the snapshot",
             "type": "string",
             "required": false,
@@ -3163,7 +3163,7 @@
           },
           {
             "name": "size",
-            "description": "Tamanho do instantâneo em bytes",
+            "description": "Tamanho do snapshot em bytes",
             "original_description": "Size of the snapshot in bytes",
             "type": "number",
             "required": false,
@@ -3172,7 +3172,7 @@
           },
           {
             "name": "status",
-            "description": "Status do instantâneo",
+            "description": "Status do snapshot",
             "original_description": "Status of the snapshot",
             "type": "string",
             "required": false,
@@ -3206,7 +3206,7 @@
       },
       {
         "name": "engine_id",
-        "description": "Número de identificação do motor",
+        "description": "ID do engine",
         "original_description": "ID of the engine",
         "type": "string",
         "required": false,
@@ -3256,7 +3256,7 @@
           },
           {
             "name": "engine_id",
-            "description": "ID do mecanismo do grupo de parâmetros",
+            "description": "ID do engine do grupo de parâmetros",
             "original_description": "Parameter Group Engine ID",
             "type": "string",
             "required": false,
@@ -3407,7 +3407,7 @@
       },
       {
         "name": "engine_id",
-        "description": "ID do motor da réplica",
+        "description": "ID do engine da réplica",
         "original_description": "Engine ID of the replica",
         "type": "string",
         "required": false,
@@ -3416,7 +3416,7 @@
       },
       {
         "name": "finished_at",
-        "description": "Carimbo de data/hora de parada no formato RFC3339",
+        "description": "Timestamp de encerramento no formato RFC3339",
         "original_description": "Stop timestamp in RFC3339 format",
         "type": "string",
         "required": false,
@@ -3443,7 +3443,7 @@
       },
       {
         "name": "maintenance_scheduled_at",
-        "description": "Próximo carimbo de data/hora de manutenção no formato RFC3339",
+        "description": "Próximo timestamp de manutenção no formato RFC3339",
         "original_description": "Next maintenance timestamp in RFC3339 format",
         "type": "string",
         "required": false,
@@ -3470,7 +3470,7 @@
       },
       {
         "name": "started_at",
-        "description": "Carimbo de data/hora de início no formato RFC3339",
+        "description": "Timestamp de início no formato RFC3339",
         "original_description": "Start timestamp in RFC3339 format",
         "type": "string",
         "required": false,
@@ -3506,7 +3506,7 @@
       },
       {
         "name": "volume_type",
-        "description": "Volume padrão",
+        "description": "Tipo de volume",
         "original_description": "Volume type",
         "type": "string",
         "required": false,
@@ -3576,7 +3576,7 @@
           },
           {
             "name": "engine_id",
-            "description": "ID do motor",
+            "description": "ID do engine",
             "original_description": "Engine ID",
             "type": "string",
             "required": false,
@@ -3585,7 +3585,7 @@
           },
           {
             "name": "finished_at",
-            "description": "Carimbo de data/hora de conclusão",
+            "description": "Timestamp de conclusão",
             "original_description": "Finish timestamp",
             "type": "string",
             "required": false,
@@ -3648,7 +3648,7 @@
           },
           {
             "name": "started_at",
-            "description": "Carimbo de data/hora de início",
+            "description": "Timestamp de início",
             "original_description": "Start timestamp",
             "type": "string",
             "required": false,
@@ -3657,7 +3657,7 @@
           },
           {
             "name": "status",
-            "description": "Situação atual",
+            "description": "Status atual",
             "original_description": "Current status",
             "type": "string",
             "required": false,
@@ -3684,7 +3684,7 @@
           },
           {
             "name": "volume_type",
-            "description": "Volume padrão",
+            "description": "Tipo de volume",
             "original_description": "Volume type",
             "type": "string",
             "required": false,
@@ -3763,7 +3763,7 @@
       },
       {
         "name": "controlplane",
-        "description": "Objeto da resposta do conjunto de nós.",
+        "description": "Objeto da resposta do node pool.",
         "original_description": "Object of the node pool response.",
         "type": "object",
         "required": false,
@@ -3808,7 +3808,7 @@
           },
           {
             "name": "flavor_name",
-            "description": "Nome do sabor.",
+            "description": "Nome do flavor.",
             "original_description": "Name of the Flavor.",
             "type": "string",
             "required": false,
@@ -3817,7 +3817,7 @@
           },
           {
             "name": "id",
-            "description": "UUID do conjunto de nós.",
+            "description": "UUID do node pool.",
             "original_description": "Node pool's UUID.",
             "type": "string",
             "required": false,
@@ -3835,7 +3835,7 @@
           },
           {
             "name": "max_replicas",
-            "description": "Número máximo de réplicas para o autoescalonamento.",
+            "description": "Número máximo de réplicas para o escalonamento automático.",
             "original_description": "Maximum number of replicas for autoscaling.",
             "type": "number",
             "required": false,
@@ -3844,7 +3844,7 @@
           },
           {
             "name": "min_replicas",
-            "description": "Número mínimo de réplicas para o autoescalonamento.",
+            "description": "Número mínimo de réplicas para o escalonamento automático.",
             "original_description": "Minimum number of replicas for autoscaling.",
             "type": "number",
             "required": false,
@@ -3853,7 +3853,7 @@
           },
           {
             "name": "name",
-            "description": "Nome do conjunto de nós",
+            "description": "Nome do node pool",
             "original_description": "Node pool name",
             "type": "string",
             "required": false,
@@ -3871,7 +3871,7 @@
           },
           {
             "name": "replicas",
-            "description": "Número de réplicas dos nós no conjunto de nós.",
+            "description": "Número de réplicas dos nós no node pool.",
             "original_description": "Number of replicas of the nodes in the node pool.",
             "type": "number",
             "required": false,
@@ -3880,7 +3880,7 @@
           },
           {
             "name": "security_groups",
-            "description": "Nome do grupo de segurança para definir regras que permitam o tráfego de rede no conjunto de nós de trabalho.",
+            "description": "Nome do grupo de segurança para definir regras que permitam o tráfego de rede no node pool de trabalho.",
             "original_description": "Name of the security group to define rules allowing network traffic in the worker node pool.",
             "type": "array(string)",
             "required": false,
@@ -3889,7 +3889,7 @@
           },
           {
             "name": "state",
-            "description": "Estado atual do conjunto de nós ou do plano de controle.",
+            "description": "Estado atual do node pool ou do plano de controle.",
             "original_description": "Current state of the node pool or control plane.",
             "type": "string",
             "required": false,
@@ -3898,7 +3898,7 @@
           },
           {
             "name": "status_messages",
-            "description": "Mensagem detalhada sobre o status do conjunto de nós ou do plano de controle.",
+            "description": "Mensagem detalhada sobre o status do node pool ou do plano de controle.",
             "original_description": "Detailed message about the status of the node pool or control plane.",
             "type": "array(string)",
             "required": false,
@@ -3907,7 +3907,7 @@
           },
           {
             "name": "taints",
-            "description": "Propriedade para associar um conjunto de nós.",
+            "description": "Propriedade para associar um node pool.",
             "original_description": "Property for associating a set of nodes.",
             "type": "array(object)",
             "required": false,
@@ -3916,7 +3916,7 @@
             "nested_attributes": [
               {
                 "name": "effect",
-                "description": "O efeito da contaminação nas vagens que não toleram essa contaminação.",
+                "description": "O efeito da taint nos pods que não toleram essa taint.",
                 "original_description": "The effect of the taint on pods that do not tolerate the taint.",
                 "type": "string",
                 "required": false,
@@ -3925,7 +3925,7 @@
               },
               {
                 "name": "key",
-                "description": "Chave da marcação a ser aplicada ao nó.",
+                "description": "Chave da taint a ser aplicado ao nó.",
                 "original_description": "Key of the taint to be applied to the node.",
                 "type": "string",
                 "required": false,
@@ -3934,7 +3934,7 @@
               },
               {
                 "name": "value",
-                "description": "Valor correspondente à chave de contaminação.",
+                "description": "Valor correspondente à chave de taint.",
                 "original_description": "Value corresponding to the taint key.",
                 "type": "string",
                 "required": false,
@@ -3983,7 +3983,7 @@
       },
       {
         "name": "enabled_server_group",
-        "description": "Indica se um grupo de servidores com política de anti-afinidade é utilizado para o cluster e seus conjuntos de nós.",
+        "description": "Indica se um grupo de servidores com política de anti-afinidade é utilizado para o cluster e seus node pools.",
         "original_description": "Indicates if a server group with anti-affinity policy is used for the cluster and its node pools.",
         "type": "bool",
         "required": false,
@@ -4055,7 +4055,7 @@
       },
       {
         "name": "node_pools",
-        "description": "Uma matriz que representa um conjunto de nós dentro de um cluster do Kubernetes.",
+        "description": "Uma lista que representa um node pool dentro de um cluster do Kubernetes.",
         "original_description": "An array representing a set of nodes within a Kubernetes cluster.",
         "type": "array(object)",
         "required": false,
@@ -4073,7 +4073,7 @@
           },
           {
             "name": "availability_zones",
-            "description": "Lista das zonas de disponibilidade nas quais os nós do conjunto de nós estão distribuídos.",
+            "description": "Lista das zonas de disponibilidade nas quais os nós do node pool estão distribuídos.",
             "original_description": "List of availability zones where the nodes in the node pool are distributed.",
             "type": "set(string)",
             "required": false,
@@ -4100,7 +4100,7 @@
           },
           {
             "name": "id",
-            "description": "UUID do conjunto de nós.",
+            "description": "UUID do node pool.",
             "original_description": "Node pool's UUID.",
             "type": "string",
             "required": false,
@@ -4109,7 +4109,7 @@
           },
           {
             "name": "labels",
-            "description": "Mapa de rótulos para o conjunto de nós.",
+            "description": "Mapa de rótulos para o node pool.",
             "original_description": "Map of labels for the node pool.",
             "type": "map(string)",
             "required": false,
@@ -4118,7 +4118,7 @@
           },
           {
             "name": "max_pods_per_node",
-            "description": "Número máximo de pods que podem ser agendados em cada nó do conjunto de nós.",
+            "description": "Número máximo de pods que podem ser agendados em cada nó do node pool.",
             "original_description": "Maximum number of pods that can be scheduled on each node in the node pool.",
             "type": "number",
             "required": false,
@@ -4127,7 +4127,7 @@
           },
           {
             "name": "max_replicas",
-            "description": "Número máximo de réplicas para o autoescalonamento.",
+            "description": "Número máximo de réplicas para o escalonamento automático.",
             "original_description": "Maximum number of replicas for autoscaling.",
             "type": "number",
             "required": false,
@@ -4136,7 +4136,7 @@
           },
           {
             "name": "min_replicas",
-            "description": "Número mínimo de réplicas para o autoescalonamento.",
+            "description": "Número mínimo de réplicas para o escalonamento automático.",
             "original_description": "Minimum number of replicas for autoscaling.",
             "type": "number",
             "required": false,
@@ -4145,7 +4145,7 @@
           },
           {
             "name": "name",
-            "description": "Nome do conjunto de nós.",
+            "description": "Nome do node pool.",
             "original_description": "Name of the node pool.",
             "type": "string",
             "required": false,
@@ -4154,7 +4154,7 @@
           },
           {
             "name": "replicas",
-            "description": "Número de réplicas dos nós no conjunto de nós.",
+            "description": "Número de réplicas dos nós no node pool.",
             "original_description": "Number of replicas of the nodes in the node pool.",
             "type": "number",
             "required": false,
@@ -4163,7 +4163,7 @@
           },
           {
             "name": "security_groups",
-            "description": "Lista de grupos de segurança para o conjunto de nós.",
+            "description": "Lista de grupos de segurança para o node pool.",
             "original_description": "List of security groups for the node pool.",
             "type": "set(string)",
             "required": false,
@@ -4172,7 +4172,7 @@
           },
           {
             "name": "taints",
-            "description": "Propriedade que associa um conjunto de nós.",
+            "description": "Propriedade que associa um node pool.",
             "original_description": "Property associating a set of nodes.",
             "type": "array(object)",
             "required": false,
@@ -4181,7 +4181,7 @@
             "nested_attributes": [
               {
                 "name": "effect",
-                "description": "O efeito da contaminação nas vagens que não toleram essa contaminação.",
+                "description": "O efeito da taint nos pods que não toleram essa taint.",
                 "original_description": "The effect of the taint on pods that do not tolerate the taint.",
                 "type": "string",
                 "required": false,
@@ -4190,7 +4190,7 @@
               },
               {
                 "name": "key",
-                "description": "Chave da marcação a ser aplicada ao nó.",
+                "description": "Chave da taint a ser aplicado ao nó.",
                 "original_description": "Key of the taint to be applied to the node.",
                 "type": "string",
                 "required": false,
@@ -4199,7 +4199,7 @@
               },
               {
                 "name": "value",
-                "description": "Valor correspondente à chave de contaminação.",
+                "description": "Valor correspondente à chave de taint.",
                 "original_description": "Value corresponding to the taint key.",
                 "type": "string",
                 "required": false,
@@ -4391,7 +4391,7 @@
         "nested_attributes": [
           {
             "name": "id",
-            "description": "ID do sabor.",
+            "description": "ID do flavor.",
             "original_description": "ID of the flavor.",
             "type": "string",
             "required": false,
@@ -4400,7 +4400,7 @@
           },
           {
             "name": "name",
-            "description": "Nome do sabor.",
+            "description": "Nome do flavor.",
             "original_description": "Name of the flavor.",
             "type": "string",
             "required": false,
@@ -4418,7 +4418,7 @@
           },
           {
             "name": "size",
-            "description": "A intensidade do sabor.",
+            "description": "O tamanho do flavor.",
             "original_description": "Size of the flavor.",
             "type": "number",
             "required": false,
@@ -4438,7 +4438,7 @@
       },
       {
         "name": "nodepool",
-        "description": "Configuração do conjunto de nós.",
+        "description": "Configuração do node pool.",
         "original_description": "Node pool configuration.",
         "type": "array(object)",
         "required": false,
@@ -4447,7 +4447,7 @@
         "nested_attributes": [
           {
             "name": "id",
-            "description": "ID do sabor.",
+            "description": "ID do flavor.",
             "original_description": "ID of the flavor.",
             "type": "string",
             "required": false,
@@ -4456,7 +4456,7 @@
           },
           {
             "name": "name",
-            "description": "Nome do sabor.",
+            "description": "Nome do flavor.",
             "original_description": "Name of the flavor.",
             "type": "string",
             "required": false,
@@ -4474,7 +4474,7 @@
           },
           {
             "name": "size",
-            "description": "A intensidade do sabor.",
+            "description": "O tamanho do flavor.",
             "original_description": "Size of the flavor.",
             "type": "number",
             "required": false,
@@ -4508,7 +4508,7 @@
       },
       {
         "name": "nodepool_id",
-        "description": "ID do conjunto de nós.",
+        "description": "ID do node pool.",
         "original_description": "ID of the node pool.",
         "type": "string",
         "required": true,
@@ -4627,7 +4627,7 @@
           },
           {
             "name": "capacity_hugepages_1gi",
-            "description": "Capacidade de páginas gigantes (1 Gi).",
+            "description": "Capacidade de hugepages (1 Gi).",
             "original_description": "Hugepages capacity (1Gi).",
             "type": "string",
             "required": false,
@@ -4636,7 +4636,7 @@
           },
           {
             "name": "capacity_hugepages_2mi",
-            "description": "Capacidade de páginas gigantes (2 Mi).",
+            "description": "Capacidade de hugepages (2 Mi).",
             "original_description": "Hugepages capacity (2Mi).",
             "type": "string",
             "required": false,
@@ -4654,7 +4654,7 @@
           },
           {
             "name": "capacity_pods",
-            "description": "Capacidade dos compartimentos.",
+            "description": "Capacidade de pods.",
             "original_description": "Pods capacity.",
             "type": "string",
             "required": false,
@@ -4726,7 +4726,7 @@
           },
           {
             "name": "infrastructure_kube_proxy_version",
-            "description": "Era uma versão proxy.",
+            "description": "Versão do kube-proxy.",
             "original_description": "Kube-proxy version.",
             "type": "string",
             "required": false,
@@ -4780,7 +4780,7 @@
           },
           {
             "name": "nodepool_name",
-            "description": "Nome do conjunto de nós.",
+            "description": "Nome do node pool.",
             "original_description": "Name of the nodepool.",
             "type": "string",
             "required": false,
@@ -4807,7 +4807,7 @@
           },
           {
             "name": "taints",
-            "description": "Lista de marcações de nó.",
+            "description": "Lista de taints do nó.",
             "original_description": "List of node taints.",
             "type": "array(object)",
             "required": false,
@@ -4816,7 +4816,7 @@
             "nested_attributes": [
               {
                 "name": "effect",
-                "description": "O efeito da contaminação.",
+                "description": "O efeito da taint.",
                 "original_description": "The effect of the taint.",
                 "type": "string",
                 "required": false,
@@ -4825,7 +4825,7 @@
               },
               {
                 "name": "key",
-                "description": "A chave da contaminação.",
+                "description": "A chave da taint.",
                 "original_description": "The key of the taint.",
                 "type": "string",
                 "required": false,
@@ -4834,7 +4834,7 @@
               },
               {
                 "name": "value",
-                "description": "O valor da mancha.",
+                "description": "O valor da taint.",
                 "original_description": "The value of the taint.",
                 "type": "string",
                 "required": false,
@@ -4879,7 +4879,7 @@
       },
       {
         "name": "auto_scale_max_replicas",
-        "description": "Número máximo de réplicas para o autoescalar.",
+        "description": "Número máximo de réplicas para o escalonamento automático.",
         "original_description": "Maximum number of replicas for auto-scaling.",
         "type": "number",
         "required": false,
@@ -4888,7 +4888,7 @@
       },
       {
         "name": "auto_scale_min_replicas",
-        "description": "Número mínimo de réplicas para o autoescalonamento.",
+        "description": "Número mínimo de réplicas para o escalonamento automático.",
         "original_description": "Minimum number of replicas for auto-scaling.",
         "type": "number",
         "required": false,
@@ -4942,7 +4942,7 @@
       },
       {
         "name": "instance_template_flavor_name",
-        "description": "Nome da variante para o modelo de instância.",
+        "description": "Nome da flavor para o modelo de instância.",
         "original_description": "Flavor name for the instance template.",
         "type": "string",
         "required": false,
@@ -4987,7 +4987,7 @@
       },
       {
         "name": "labels",
-        "description": "Etiquetas associadas ao conjunto de nós.",
+        "description": "Etiquetas associadas ao node pool.",
         "original_description": "Labels attached to the nodepool.",
         "type": "map(string)",
         "required": false,
@@ -5005,7 +5005,7 @@
       },
       {
         "name": "name",
-        "description": "Nome do conjunto de nós.",
+        "description": "Nome do node pool.",
         "original_description": "Name of the nodepool.",
         "type": "string",
         "required": false,
@@ -5041,7 +5041,7 @@
       },
       {
         "name": "status_state",
-        "description": "Situação atual do conjunto de nós.",
+        "description": "Status atual do node pool.",
         "original_description": "Current state of the nodepool.",
         "type": "string",
         "required": false,
@@ -5050,7 +5050,7 @@
       },
       {
         "name": "taints",
-        "description": "Lista de contaminações.",
+        "description": "Lista de taints.",
         "original_description": "List of taints.",
         "type": "array(object)",
         "required": false,
@@ -5059,7 +5059,7 @@
         "nested_attributes": [
           {
             "name": "effect",
-            "description": "Efeito de contaminação.",
+            "description": "Efeito de taint.",
             "original_description": "Taint effect.",
             "type": "string",
             "required": false,
@@ -5068,7 +5068,7 @@
           },
           {
             "name": "key",
-            "description": "Chave de contaminação.",
+            "description": "Chave de taint.",
             "original_description": "Taint key.",
             "type": "string",
             "required": false,
@@ -5077,7 +5077,7 @@
           },
           {
             "name": "value",
-            "description": "Valor de contaminação.",
+            "description": "Valor de taint.",
             "original_description": "Taint value.",
             "type": "string",
             "required": false,
@@ -5097,7 +5097,7 @@
       },
       {
         "name": "version",
-        "description": "A versão nativa do Kubernetes do conjunto de nós.",
+        "description": "A versão nativa do Kubernetes do node pool.",
         "original_description": "The native Kubernetes version of the nodepool.",
         "type": "string",
         "required": false,
@@ -5181,7 +5181,7 @@
           },
           {
             "name": "ethertype",
-            "description": "O tipo de éter para a regra ACL.",
+            "description": "O ethertype para a regra ACL.",
             "original_description": "The ethertype for the ACL rule.",
             "type": "string",
             "required": false,
@@ -5237,7 +5237,7 @@
       },
       {
         "name": "health_checks",
-        "description": "Lista de IDs de exames médicos.",
+        "description": "Lista de IDs de health checks.",
         "original_description": "List of health check IDs.",
         "type": "array(string)",
         "required": false,
@@ -5246,7 +5246,7 @@
       },
       {
         "name": "listeners",
-        "description": "Lista de IDs de ouvintes.",
+        "description": "Lista de IDs de listeners.",
         "original_description": "List of listener IDs.",
         "type": "array(string)",
         "required": false,
@@ -5350,7 +5350,7 @@
       },
       {
         "name": "close_connections_on_host_health_failure",
-        "description": "Se as conexões devem ser encerradas quando uma verificação de integridade do host falhar.",
+        "description": "Se as conexões devem ser encerradas quando uma health check do host falhar.",
         "original_description": "Whether to close connections when a host health check fails.",
         "type": "bool",
         "required": false,
@@ -5368,7 +5368,7 @@
       },
       {
         "name": "health_check_id",
-        "description": "O ID da verificação de integridade associado, se houver.",
+        "description": "O ID da health check associado, se houver.",
         "original_description": "The associated health check ID, if any.",
         "type": "string",
         "required": false,
@@ -5474,7 +5474,7 @@
           },
           {
             "name": "close_connections_on_host_health_failure",
-            "description": "Se as conexões devem ser encerradas quando uma verificação de integridade do host falhar.",
+            "description": "Se as conexões devem ser encerradas quando uma health check do host falhar.",
             "original_description": "Whether to close connections when a host health check fails.",
             "type": "bool",
             "required": false,
@@ -5492,7 +5492,7 @@
           },
           {
             "name": "health_check_id",
-            "description": "ID do exame médico associado, se houver.",
+            "description": "ID do health check associado, se houver.",
             "original_description": "Associated health check ID, if any.",
             "type": "string",
             "required": false,
@@ -5693,7 +5693,7 @@
     "attributes": [
       {
         "name": "id",
-        "description": "O ID do Exame de Saúde.",
+        "description": "O ID do Health Check.",
         "original_description": "The Health Check ID.",
         "type": "string",
         "required": true,
@@ -5711,7 +5711,7 @@
       },
       {
         "name": "description",
-        "description": "Descrição do exame médico.",
+        "description": "Descrição do health check.",
         "original_description": "The description of the health check.",
         "type": "string",
         "required": false,
@@ -5729,7 +5729,7 @@
       },
       {
         "name": "healthy_threshold_count",
-        "description": "O número de verificações de saúde consecutivas bem-sucedidas exigidas.",
+        "description": "O número de health checks consecutivas bem-sucedidas exigidas.",
         "original_description": "The number of consecutive successful health checks required.",
         "type": "number",
         "required": false,
@@ -5738,7 +5738,7 @@
       },
       {
         "name": "initial_delay_seconds",
-        "description": "O intervalo inicial antes do início dos exames médicos.",
+        "description": "O intervalo inicial antes do início dos health checks.",
         "original_description": "The initial delay before starting health checks.",
         "type": "number",
         "required": false,
@@ -5747,7 +5747,7 @@
       },
       {
         "name": "interval_seconds",
-        "description": "O intervalo entre os exames médicos.",
+        "description": "O intervalo entre os health checks.",
         "original_description": "The interval between health checks.",
         "type": "number",
         "required": false,
@@ -5756,7 +5756,7 @@
       },
       {
         "name": "name",
-        "description": "O nome da verificação de integridade.",
+        "description": "O nome da health check.",
         "original_description": "The name of the health check.",
         "type": "string",
         "required": false,
@@ -5765,7 +5765,7 @@
       },
       {
         "name": "path",
-        "description": "O caminho para as verificações de integridade HTTP.",
+        "description": "O caminho para as health checks HTTP.",
         "original_description": "The path for HTTP health checks.",
         "type": "string",
         "required": false,
@@ -5774,7 +5774,7 @@
       },
       {
         "name": "port",
-        "description": "A porta para verificações de integridade.",
+        "description": "A porta para health checks.",
         "original_description": "The port for health checks.",
         "type": "number",
         "required": false,
@@ -5783,7 +5783,7 @@
       },
       {
         "name": "protocol",
-        "description": "O protocolo para a verificação de integridade. Exemplo: 'tcp', 'http'.",
+        "description": "O protocolo para a health check. Exemplo: 'tcp', 'http'.",
         "original_description": "The protocol for the health check. Example: 'tcp', 'http'.",
         "type": "string",
         "required": false,
@@ -5792,7 +5792,7 @@
       },
       {
         "name": "timeout_seconds",
-        "description": "O tempo limite para as verificações de integridade.",
+        "description": "O tempo limite para as health checks.",
         "original_description": "The timeout for health checks.",
         "type": "number",
         "required": false,
@@ -5801,7 +5801,7 @@
       },
       {
         "name": "unhealthy_threshold_count",
-        "description": "O número de verificações de integridade com falha consecutivas antes de marcar como não válido.",
+        "description": "O número de health checks com falha consecutivas antes de marcar como não válido.",
         "original_description": "The number of consecutive failed health checks before marking unhealthy.",
         "type": "number",
         "required": false,
@@ -5824,7 +5824,7 @@
       },
       {
         "name": "health_checks",
-        "description": "Lista de exames médicos.",
+        "description": "Lista de health checks.",
         "original_description": "List of health checks.",
         "type": "array(object)",
         "required": false,
@@ -5833,7 +5833,7 @@
         "nested_attributes": [
           {
             "name": "description",
-            "description": "Descrição do exame médico.",
+            "description": "Descrição do health check.",
             "original_description": "The description of the health check.",
             "type": "string",
             "required": false,
@@ -5851,7 +5851,7 @@
           },
           {
             "name": "healthy_threshold_count",
-            "description": "O número de verificações de saúde consecutivas bem-sucedidas exigidas.",
+            "description": "O número de health checks consecutivas bem-sucedidas exigidas.",
             "original_description": "The number of consecutive successful health checks required.",
             "type": "number",
             "required": false,
@@ -5860,7 +5860,7 @@
           },
           {
             "name": "id",
-            "description": "O ID do Exame de Saúde.",
+            "description": "O ID do Health Check.",
             "original_description": "The Health Check ID.",
             "type": "string",
             "required": false,
@@ -5869,7 +5869,7 @@
           },
           {
             "name": "initial_delay_seconds",
-            "description": "O intervalo inicial antes do início dos exames médicos.",
+            "description": "O intervalo inicial antes do início dos health checks.",
             "original_description": "The initial delay before starting health checks.",
             "type": "number",
             "required": false,
@@ -5878,7 +5878,7 @@
           },
           {
             "name": "interval_seconds",
-            "description": "O intervalo entre os exames médicos.",
+            "description": "O intervalo entre os health checks.",
             "original_description": "The interval between health checks.",
             "type": "number",
             "required": false,
@@ -5887,7 +5887,7 @@
           },
           {
             "name": "name",
-            "description": "O nome da verificação de integridade.",
+            "description": "O nome da health check.",
             "original_description": "The name of the health check.",
             "type": "string",
             "required": false,
@@ -5896,7 +5896,7 @@
           },
           {
             "name": "path",
-            "description": "O caminho para as verificações de integridade HTTP.",
+            "description": "O caminho para as health checks HTTP.",
             "original_description": "The path for HTTP health checks.",
             "type": "string",
             "required": false,
@@ -5905,7 +5905,7 @@
           },
           {
             "name": "port",
-            "description": "A porta para verificações de integridade.",
+            "description": "A porta para health checks.",
             "original_description": "The port for health checks.",
             "type": "number",
             "required": false,
@@ -5914,7 +5914,7 @@
           },
           {
             "name": "protocol",
-            "description": "O protocolo para a verificação de integridade. Exemplo: 'tcp', 'http'.",
+            "description": "O protocolo para a health check. Exemplo: 'tcp', 'http'.",
             "original_description": "The protocol for the health check. Example: 'tcp', 'http'.",
             "type": "string",
             "required": false,
@@ -5923,7 +5923,7 @@
           },
           {
             "name": "timeout_seconds",
-            "description": "O tempo limite para as verificações de integridade.",
+            "description": "O tempo limite para as health checks.",
             "original_description": "The timeout for health checks.",
             "type": "number",
             "required": false,
@@ -5932,7 +5932,7 @@
           },
           {
             "name": "unhealthy_threshold_count",
-            "description": "O número de verificações de integridade com falha consecutivas antes de marcar como não válido.",
+            "description": "O número de health checks com falha consecutivas antes de marcar como não válido.",
             "original_description": "The number of consecutive failed health checks before marking unhealthy.",
             "type": "number",
             "required": false,
@@ -5948,7 +5948,7 @@
     "attributes": [
       {
         "name": "id",
-        "description": "O ID do ouvinte.",
+        "description": "O ID do listener.",
         "original_description": "The Listener ID.",
         "type": "string",
         "required": true,
@@ -5975,7 +5975,7 @@
       },
       {
         "name": "description",
-        "description": "A descrição do ouvinte.",
+        "description": "A descrição do listener.",
         "original_description": "The description of the listener.",
         "type": "string",
         "required": false,
@@ -5984,7 +5984,7 @@
       },
       {
         "name": "name",
-        "description": "O nome do ouvinte.",
+        "description": "O nome do listener.",
         "original_description": "The name of the listener.",
         "type": "string",
         "required": false,
@@ -5993,7 +5993,7 @@
       },
       {
         "name": "port",
-        "description": "A porta do ouvinte.",
+        "description": "A porta do listener.",
         "original_description": "The port for the listener.",
         "type": "number",
         "required": false,
@@ -6002,7 +6002,7 @@
       },
       {
         "name": "protocol",
-        "description": "O protocolo do ouvinte. Exemplo: 'tcp', 'tls'.",
+        "description": "O protocolo do listener. Exemplo: 'tcp', 'tls'.",
         "original_description": "The protocol for the listener. Example: 'tcp', 'tls'.",
         "type": "string",
         "required": false,
@@ -6034,7 +6034,7 @@
       },
       {
         "name": "listeners",
-        "description": "Lista de ouvintes.",
+        "description": "Lista de listeners.",
         "original_description": "List of listeners.",
         "type": "array(object)",
         "required": false,
@@ -6052,7 +6052,7 @@
           },
           {
             "name": "description",
-            "description": "A descrição do ouvinte.",
+            "description": "A descrição do listener.",
             "original_description": "The description of the listener.",
             "type": "string",
             "required": false,
@@ -6061,7 +6061,7 @@
           },
           {
             "name": "id",
-            "description": "O ID do ouvinte.",
+            "description": "O ID do listener.",
             "original_description": "The Listener ID.",
             "type": "string",
             "required": false,
@@ -6070,7 +6070,7 @@
           },
           {
             "name": "name",
-            "description": "O nome do ouvinte.",
+            "description": "O nome do listener.",
             "original_description": "The name of the listener.",
             "type": "string",
             "required": false,
@@ -6079,7 +6079,7 @@
           },
           {
             "name": "port",
-            "description": "A porta do ouvinte.",
+            "description": "A porta do listener.",
             "original_description": "The port for the listener.",
             "type": "number",
             "required": false,
@@ -6088,7 +6088,7 @@
           },
           {
             "name": "protocol",
-            "description": "O protocolo do ouvinte. Exemplo: 'tcp', 'tls'.",
+            "description": "O protocolo do listener. Exemplo: 'tcp', 'tls'.",
             "original_description": "The protocol for the listener. Example: 'tcp', 'tls'.",
             "type": "string",
             "required": false,
@@ -6140,7 +6140,7 @@
               },
               {
                 "name": "ethertype",
-                "description": "O tipo de éter para a regra ACL.",
+                "description": "O ethertype para a regra ACL.",
                 "original_description": "The ethertype for the ACL rule.",
                 "type": "string",
                 "required": false,
@@ -6196,7 +6196,7 @@
           },
           {
             "name": "health_checks",
-            "description": "Lista de IDs de exames médicos.",
+            "description": "Lista de IDs de health checks.",
             "original_description": "List of health check IDs.",
             "type": "array(string)",
             "required": false,
@@ -6214,7 +6214,7 @@
           },
           {
             "name": "listeners",
-            "description": "Lista de IDs de ouvintes.",
+            "description": "Lista de IDs de listeners.",
             "original_description": "List of listener IDs.",
             "type": "array(string)",
             "required": false,
@@ -7358,7 +7358,7 @@
       },
       {
         "name": "description",
-        "description": "A descrição para ajudar a identificar o trajeto.",
+        "description": "A descrição para ajudar a identificar a rota.",
         "original_description": "The description to help identify the route.",
         "type": "string",
         "required": false,
@@ -7385,7 +7385,7 @@
       },
       {
         "name": "status",
-        "description": "Situação atual do trajeto.",
+        "description": "Status atual da rota.",
         "original_description": "Current status of the route.",
         "type": "string",
         "required": false,
@@ -7435,7 +7435,7 @@
           },
           {
             "name": "description",
-            "description": "A descrição para ajudar a identificar o trajeto.",
+            "description": "A descrição para ajudar a identificar a rota.",
             "original_description": "The description to help identify the route.",
             "type": "string",
             "required": false,
@@ -7471,7 +7471,7 @@
           },
           {
             "name": "status",
-            "description": "Situação atual do trajeto.",
+            "description": "Status atual da rota.",
             "original_description": "Current status of the route.",
             "type": "string",
             "required": false,
@@ -8263,7 +8263,7 @@
       },
       {
         "name": "vpc_id",
-        "description": "ID da Nuvem Privada Virtual.",
+        "description": "ID da VPC.",
         "original_description": "VPC ID.",
         "type": "string",
         "required": false,
@@ -8383,7 +8383,7 @@
         "nested_attributes": [
           {
             "name": "created_at",
-            "description": "A data e hora em que o instantâneo foi criado.",
+            "description": "A data e hora em que o snapshot foi criado.",
             "original_description": "The timestamp when the snapshot was created.",
             "type": "string",
             "required": false,
@@ -8392,7 +8392,7 @@
           },
           {
             "name": "id",
-            "description": "O ID do instantâneo.",
+            "description": "O ID do snapshot.",
             "original_description": "The ID of the snapshot.",
             "type": "string",
             "required": false,
@@ -8419,7 +8419,7 @@
           },
           {
             "name": "name",
-            "description": "O nome do instantâneo.",
+            "description": "O nome do snapshot.",
             "original_description": "The name of the snapshot.",
             "type": "string",
             "required": false,
@@ -8428,7 +8428,7 @@
           },
           {
             "name": "size",
-            "description": "O tamanho do instantâneo.",
+            "description": "O tamanho do snapshot.",
             "original_description": "The size of the snapshot.",
             "type": "number",
             "required": false,
@@ -8437,7 +8437,7 @@
           },
           {
             "name": "state",
-            "description": "O estado do instantâneo.",
+            "description": "O estado do snapshot.",
             "original_description": "The state of the snapshot.",
             "type": "string",
             "required": false,
@@ -8446,7 +8446,7 @@
           },
           {
             "name": "status",
-            "description": "O status do instantâneo.",
+            "description": "O status do snapshot.",
             "original_description": "The status of the snapshot.",
             "type": "string",
             "required": false,
@@ -8455,7 +8455,7 @@
           },
           {
             "name": "updated_at",
-            "description": "A data e hora da última atualização do instantâneo.",
+            "description": "A data e hora da última atualização do snapshot.",
             "original_description": "The timestamp when the snapshot was last updated.",
             "type": "string",
             "required": false,
@@ -8534,7 +8534,7 @@
           },
           {
             "name": "ram",
-            "description": "Carne de carneiro",
+            "description": "RAM",
             "original_description": "Ram",
             "type": "number",
             "required": false,
@@ -8543,7 +8543,7 @@
           },
           {
             "name": "vcpu",
-            "description": "Processador de altíssima velocidade",
+            "description": "vCPU",
             "original_description": "VCpu",
             "type": "number",
             "required": false,
@@ -8559,7 +8559,7 @@
     "attributes": [
       {
         "name": "name",
-        "description": "O nome da programação do snapshot.",
+        "description": "O nome do agendamento do snapshot.",
         "original_description": "The name of the snapshot schedule.",
         "type": "string",
         "required": true,
@@ -8586,7 +8586,7 @@
       },
       {
         "name": "snapshot_type",
-        "description": "Tipo de instantâneo a ser criado.",
+        "description": "Tipo de snapshot a ser criado.",
         "original_description": "Type of snapshot to create.",
         "type": "string",
         "required": true,
@@ -8595,7 +8595,7 @@
       },
       {
         "name": "description",
-        "description": "Descrição da programação de snapshots.",
+        "description": "Descrição do agendamento de snapshots.",
         "original_description": "The description of the snapshot schedule.",
         "type": "string",
         "required": false,
@@ -8604,7 +8604,7 @@
       },
       {
         "name": "created_at",
-        "description": "A data e hora em que a programação foi criada.",
+        "description": "A data e hora em que o agendamento foi criado.",
         "original_description": "The timestamp when the schedule was created.",
         "type": "string",
         "required": false,
@@ -8613,7 +8613,7 @@
       },
       {
         "name": "id",
-        "description": "O identificador único da programação do snapshot.",
+        "description": "O identificador único do agendamento do snapshot.",
         "original_description": "The unique identifier of the snapshot schedule.",
         "type": "string",
         "required": false,
@@ -8622,7 +8622,7 @@
       },
       {
         "name": "state",
-        "description": "O estado atual da programação.",
+        "description": "O estado atual do agendamento.",
         "original_description": "The current state of the schedule.",
         "type": "string",
         "required": false,
@@ -8631,7 +8631,7 @@
       },
       {
         "name": "updated_at",
-        "description": "A data e hora da última atualização da programação.",
+        "description": "A data e hora da última atualização do agendamento.",
         "original_description": "The timestamp when the schedule was last updated.",
         "type": "string",
         "required": false,
@@ -8640,7 +8640,7 @@
       },
       {
         "name": "volumes",
-        "description": "Lista de IDs de volumes de block storage para os quais serão criados instantâneos.",
+        "description": "Lista de IDs de volumes de block storage para os quais serão criados snapshots.",
         "original_description": "List of block storage volume IDs to create snapshots for.",
         "type": "array(string)",
         "required": false,
@@ -8655,7 +8655,7 @@
     "attributes": [
       {
         "name": "schedule_id",
-        "description": "O ID da programação do snapshot ao qual o volume deve ser anexado.",
+        "description": "O ID do agendamento do snapshot ao qual o volume deve ser anexado.",
         "original_description": "The ID of the snapshot schedule to attach the volume to.",
         "type": "string",
         "required": true,
@@ -8679,7 +8679,7 @@
     "attributes": [
       {
         "name": "description",
-        "description": "Descrição do instantâneo do volume.",
+        "description": "Descrição do snapshot do volume.",
         "original_description": "The description of the volume snapshot.",
         "type": "string",
         "required": true,
@@ -8688,7 +8688,7 @@
       },
       {
         "name": "name",
-        "description": "O nome do instantâneo do volume.",
+        "description": "O nome do snapshot do volume.",
         "original_description": "The name of the volume snapshot.",
         "type": "string",
         "required": true,
@@ -8706,7 +8706,7 @@
       },
       {
         "name": "type",
-        "description": "O tipo do instantâneo.",
+        "description": "O tipo do snapshot.",
         "original_description": "The type of the snapshot.",
         "type": "string",
         "required": false,
@@ -8733,7 +8733,7 @@
       },
       {
         "name": "id",
-        "description": "O identificador único do instantâneo do volume.",
+        "description": "O identificador único do snapshot do volume.",
         "original_description": "The unique identifier of the volume snapshot.",
         "type": "string",
         "required": false,
@@ -8907,7 +8907,7 @@
       },
       {
         "name": "created_at",
-        "description": "Data e hora em que a assinatura foi criada",
+        "description": "Data e hora em que a associação foi criada",
         "original_description": "Timestamp when the membership was created",
         "type": "string",
         "required": false,
@@ -8916,7 +8916,7 @@
       },
       {
         "name": "id",
-        "description": "Identificador único do registro de filiação",
+        "description": "Identificador único do registro de membro",
         "original_description": "Unique identifier of the membership entry",
         "type": "string",
         "required": false,
@@ -8925,7 +8925,7 @@
       },
       {
         "name": "updated_at",
-        "description": "Data e hora da última atualização da assinatura",
+        "description": "Data e hora da última atualização da associação",
         "original_description": "Timestamp when the membership was last updated",
         "type": "string",
         "required": false,
@@ -9027,7 +9027,7 @@
     "attributes": [
       {
         "name": "digest_or_tag",
-        "description": "Resumo ou tag da imagem a ser digitalizada",
+        "description": "Digest ou tag da imagem a ser digitalizada",
         "original_description": "Digest or tag of the image to scan",
         "type": "string",
         "required": true,
@@ -9072,7 +9072,7 @@
       },
       {
         "name": "digest",
-        "description": "Resumo da imagem digitalizada",
+        "description": "Digest da imagem digitalizada",
         "original_description": "Digest of the image that was scanned",
         "type": "string",
         "required": false,
@@ -9090,7 +9090,7 @@
       },
       {
         "name": "id",
-        "description": "Identificador único da digitalização",
+        "description": "Identificador único do scan",
         "original_description": "Unique identifier of the scan",
         "type": "string",
         "required": false,
@@ -9099,7 +9099,7 @@
       },
       {
         "name": "input_tag",
-        "description": "Tag usada para identificar a imagem ao agendar a digitalização",
+        "description": "Tag usada para identificar a imagem ao agendar a scan",
         "original_description": "Tag used to identify the image when scheduling the scan",
         "type": "string",
         "required": false,
@@ -9182,7 +9182,7 @@
       },
       {
         "name": "status",
-        "description": "Status atual da digitalização",
+        "description": "Status atual do scan",
         "original_description": "Current status of the scan",
         "type": "string",
         "required": false,
@@ -9238,7 +9238,7 @@
     "attributes": [
       {
         "name": "engine_name",
-        "description": "Tipo de mecanismo de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação.",
+        "description": "Tipo de engine de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação.",
         "original_description": "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.",
         "type": "string",
         "required": true,
@@ -9247,7 +9247,7 @@
       },
       {
         "name": "engine_version",
-        "description": "Versão do mecanismo de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do mecanismo selecionado. Não pode ser alterada após a criação.",
+        "description": "Versão do engine de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do engine selecionado. Não pode ser alterada após a criação.",
         "original_description": "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.",
         "type": "string",
         "required": true,
@@ -9301,7 +9301,7 @@
       },
       {
         "name": "backup_retention_days",
-        "description": "Número de dias de retenção das cópias de segurança automáticas (1 a 35 dias). O padrão é 7 dias.",
+        "description": "Número de dias de retenção das backups automáticos (1 a 35 dias). O padrão é 7 dias.",
         "original_description": "Number of days to retain automated backups (1-35 days). Default is 7 days.",
         "type": "number",
         "required": false,
@@ -9420,7 +9420,7 @@
       },
       {
         "name": "engine_id",
-        "description": "ID do mecanismo de banco de dados.",
+        "description": "ID do engine de banco de dados.",
         "original_description": "ID of the database engine.",
         "type": "string",
         "required": false,
@@ -9525,7 +9525,7 @@
       },
       {
         "name": "backup_retention_days",
-        "description": "Número de dias de retenção das cópias de segurança automáticas (1 a 35 dias). O padrão é 7 dias.",
+        "description": "Número de dias de retenção das backups automáticos (1 a 35 dias). O padrão é 7 dias.",
         "original_description": "Number of days to retain automated backups (1-35 days). Default is 7 days.",
         "type": "number",
         "required": false,
@@ -9552,7 +9552,7 @@
       },
       {
         "name": "engine_name",
-        "description": "Tipo de mecanismo de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação. Obrigatório ao criar uma nova instância.",
+        "description": "Tipo de engine de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação. Obrigatório ao criar uma nova instância.",
         "original_description": "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation. Required when creating a new instance.",
         "type": "string",
         "required": false,
@@ -9561,7 +9561,7 @@
       },
       {
         "name": "engine_version",
-        "description": "Versão do mecanismo de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do mecanismo selecionado. Obrigatório ao criar uma nova instância.",
+        "description": "Versão do engine de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do engine selecionado. Obrigatório ao criar uma nova instância.",
         "original_description": "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required when creating a new instance.",
         "type": "string",
         "required": false,
@@ -9570,7 +9570,7 @@
       },
       {
         "name": "parameter_group",
-        "description": "ID do grupo de parâmetros a ser usado para a instância. Não é utilizado ao restaurar a partir de um instantâneo.",
+        "description": "ID do grupo de parâmetros a ser usado para a instância. Não é utilizado ao restaurar a partir de um snapshot.",
         "original_description": "ID of the parameter group to use for the instance. Not used when restoring from a snapshot.",
         "type": "string",
         "required": false,
@@ -9624,7 +9624,7 @@
       },
       {
         "name": "engine_id",
-        "description": "Identificador único para o mecanismo de banco de dados.",
+        "description": "Identificador único para o engine de banco de dados.",
         "original_description": "Unique identifier for the database engine.",
         "type": "string",
         "required": false,
@@ -9665,7 +9665,7 @@
     "attributes": [
       {
         "name": "description",
-        "description": "Descrição do instantâneo",
+        "description": "Descrição do snapshot",
         "original_description": "Description of the snapshot",
         "type": "string",
         "required": true,
@@ -9683,7 +9683,7 @@
       },
       {
         "name": "name",
-        "description": "Nome do instantâneo",
+        "description": "Nome do snapshot",
         "original_description": "Name of the snapshot",
         "type": "string",
         "required": true,
@@ -9692,7 +9692,7 @@
       },
       {
         "name": "id",
-        "description": "Identificador único do instantâneo",
+        "description": "Identificador único do snapshot",
         "original_description": "Unique identifier for the snapshot",
         "type": "string",
         "required": false,
@@ -9707,7 +9707,7 @@
     "attributes": [
       {
         "name": "engine_name",
-        "description": "Tipo de mecanismo de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação.",
+        "description": "Tipo de engine de banco de dados a ser usado (por exemplo, 'mysql', 'postgresql'). Não pode ser alterado após a criação.",
         "original_description": "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.",
         "type": "string",
         "required": true,
@@ -9716,7 +9716,7 @@
       },
       {
         "name": "engine_version",
-        "description": "Versão do mecanismo de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do mecanismo selecionado.",
+        "description": "Versão do engine de banco de dados (por exemplo, '8.0', '13.3'). Deve ser compatível com o nome do engine selecionado.",
         "original_description": "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name.",
         "type": "string",
         "required": true,
@@ -9836,7 +9836,7 @@
       },
       {
         "name": "engine_id",
-        "description": "ID do motor",
+        "description": "ID do engine",
         "original_description": "Engine ID",
         "type": "string",
         "required": false,
@@ -9905,7 +9905,7 @@
       },
       {
         "name": "enabled_server_group",
-        "description": "Permite o uso de um grupo de servidores com política de anti-afinidade durante a criação do cluster e de seus conjuntos de nós. O valor padrão é true.",
+        "description": "Permite o uso de um grupo de servidores com política de anti-afinidade durante a criação do cluster e de seus node pools. O valor padrão é true.",
         "original_description": "Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.",
         "type": "bool",
         "required": false,
@@ -9923,7 +9923,7 @@
       },
       {
         "name": "subnet_ids",
-        "description": "Lista de IDs de sub-redes. Quando omitida, as sub-redes selecionadas são herdadas. É necessário especificar exatamente uma sub-rede por zona de disponibilidade. As sub-redes devem pertencer à mesma VPC. Este campo não pode ser alterado após a criação do conjunto de nós",
+        "description": "Lista de IDs de sub-redes. Quando omitida, as sub-redes selecionadas são herdadas. É necessário especificar exatamente uma sub-rede por zona de disponibilidade. As sub-redes devem pertencer à mesma VPC. Este campo não pode ser alterado após a criação do node pool",
         "original_description": "List of subnet ids. When omitted, the subnets chosen are inherited. You must specify exactly one subnet per availability zone. The subnets must belong to the same VPC. This field cannot be changed after the node pool is created",
         "type": "set(string)",
         "required": false,
@@ -9932,7 +9932,7 @@
       },
       {
         "name": "version",
-        "description": "A versão nativa do Kubernetes do cluster. Use o formato padrão \"vX.Y.Z\". Alterar esse valor atualiza o plano de controle no local (sem substituição); o Terraform suspende a aplicação até que o cluster retorne a um estado ativo na nova versão. Atualize o plano de controle antes dos conjuntos de nós",
+        "description": "A versão nativa do Kubernetes do cluster. Use o formato padrão \"vX.Y.Z\". Alterar esse valor atualiza o plano de controle no local (sem substituição); o Terraform suspende a aplicação até que o cluster retorne a um estado ativo na nova versão. Atualize o plano de controle antes dos node pools",
         "original_description": "The native Kubernetes version of the cluster. Use the standard \"vX.Y.Z\" format. Changing this value upgrades the control plane in place (no replacement); Terraform holds the apply until the cluster returns to a running state on the new version. Upgrade the control plane before the node pools",
         "type": "string",
         "required": false,
@@ -10019,7 +10019,7 @@
       },
       {
         "name": "name",
-        "description": "Nome do conjunto de nós.",
+        "description": "Nome do node pool.",
         "original_description": "Name of the node pool.",
         "type": "string",
         "required": true,
@@ -10028,7 +10028,7 @@
       },
       {
         "name": "replicas",
-        "description": "Número inicial de réplicas dos nós no conjunto de nós. Obrigatório na criação; após a criação, as alterações neste valor são ignoradas, pois a contagem de réplicas é gerenciada pela API (por exemplo, por meio do autoescalonamento entre min_replicas e max_replicas).",
+        "description": "Número inicial de réplicas dos nós no node pool. Obrigatório na criação; após a criação, as alterações neste valor são ignoradas, pois a contagem de réplicas é gerenciada pela API (por exemplo, por meio do escalonamento automático entre min_replicas e max_replicas).",
         "original_description": "Initial number of replicas of the nodes in the node pool. Required at creation; after creation, changes to this value are ignored because the replica count is managed by the API (e.g. via autoscaling between min_replicas and max_replicas).",
         "type": "number",
         "required": true,
@@ -10037,7 +10037,7 @@
       },
       {
         "name": "availability_zones",
-        "description": "A lista de zonas de disponibilidade onde o conjunto de nós está implantado está **obsoleta**; use os subnet_ids em vez disso.",
+        "description": "A lista de zonas de disponibilidade onde o node pool está implantado está **obsoleta**; use os subnet_ids em vez disso.",
         "original_description": "List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.",
         "type": "set(string)",
         "required": false,
@@ -10055,7 +10055,7 @@
       },
       {
         "name": "max_replicas",
-        "description": "Número máximo de réplicas para o autoescalonamento.",
+        "description": "Número máximo de réplicas para o escalonamento automático.",
         "original_description": "Maximum number of replicas for autoscaling.",
         "type": "number",
         "required": false,
@@ -10064,7 +10064,7 @@
       },
       {
         "name": "min_replicas",
-        "description": "Número mínimo de réplicas para o autoescalonamento.",
+        "description": "Número mínimo de réplicas para o escalonamento automático.",
         "original_description": "Minimum number of replicas for autoscaling.",
         "type": "number",
         "required": false,
@@ -10073,7 +10073,7 @@
       },
       {
         "name": "subnet_ids",
-        "description": "Lista de IDs de sub-redes. Se omitida, serão utilizadas as sub-redes padrão do cluster. É permitida apenas uma sub-rede por zona de disponibilidade. As sub-redes devem pertencer à mesma VPC. Este campo não pode ser alterado após a criação do conjunto de nós",
+        "description": "Lista de IDs de sub-redes. Se omitida, serão utilizadas as sub-redes padrão do cluster. É permitida apenas uma sub-rede por zona de disponibilidade. As sub-redes devem pertencer à mesma VPC. Este campo não pode ser alterado após a criação do node pool",
         "original_description": "List of subnet ids. When omitted, the cluster’s default subnets will be used. Only one subnet per availability zone is allowed. The subnets must belong to the same VPC. This field cannot be changed after the node pool is created",
         "type": "set(string)",
         "required": false,
@@ -10082,7 +10082,7 @@
       },
       {
         "name": "taints",
-        "description": "Propriedade que associa um conjunto de nós.",
+        "description": "Propriedade que associa um node pool.",
         "original_description": "Property associating a set of nodes.",
         "type": "array(object)",
         "required": false,
@@ -10091,7 +10091,7 @@
         "nested_attributes": [
           {
             "name": "effect",
-            "description": "O efeito da contaminação nas vagens que não toleram essa contaminação.",
+            "description": "O efeito da taint nos pods que não toleram essa taint.",
             "original_description": "The effect of the taint on pods that do not tolerate the taint.",
             "type": "string",
             "required": false,
@@ -10100,7 +10100,7 @@
           },
           {
             "name": "key",
-            "description": "Chave da marcação a ser aplicada ao nó.",
+            "description": "Chave da taint a ser aplicado ao nó.",
             "original_description": "Key of the taint to be applied to the node.",
             "type": "string",
             "required": false,
@@ -10109,7 +10109,7 @@
           },
           {
             "name": "value",
-            "description": "Valor correspondente à chave de contaminação.",
+            "description": "Valor correspondente à chave de taint.",
             "original_description": "Value corresponding to the taint key.",
             "type": "string",
             "required": false,
@@ -10120,7 +10120,7 @@
       },
       {
         "name": "version",
-        "description": "A versão nativa do Kubernetes do conjunto de nós. Use o formato padrão \"vX.Y.Z\". Alterar esse valor atualiza o pool de nós no local (sem substituição); o Terraform suspende a aplicação até que o pool de nós retorne ao estado em execução na nova versão. A versão do pool de nós não deve exceder a versão do plano de controle do cluster, e o cluster deve estar no estado em execução para realizar a atualização.",
+        "description": "A versão nativa do Kubernetes do node pool. Use o formato padrão \"vX.Y.Z\". Alterar esse valor atualiza o pool de nós no local (sem substituição); o Terraform suspende a aplicação até que o pool de nós retorne ao estado em execução na nova versão. A versão do pool de nós não deve exceder a versão do plano de controle do cluster, e o cluster deve estar no estado em execução para realizar a atualização.",
         "original_description": "The native Kubernetes version of the node pool. Use the standard \"vX.Y.Z\" format. Changing this value upgrades the node pool in place (no replacement); Terraform holds the apply until the node pool returns to a running state on the new version. The node pool version must not exceed the cluster's control plane version, and the cluster must be in running state to perform the upgrade.",
         "type": "string",
         "required": false,
@@ -10138,7 +10138,7 @@
       },
       {
         "name": "id",
-        "description": "UUID do conjunto de nós.",
+        "description": "UUID do node pool.",
         "original_description": "Node pool's UUID.",
         "type": "string",
         "required": false,
@@ -10147,7 +10147,7 @@
       },
       {
         "name": "labels",
-        "description": "Mapa de rótulos para o conjunto de nós.",
+        "description": "Mapa de rótulos para o node pool.",
         "original_description": "Map of labels for the node pool.",
         "type": "map(string)",
         "required": false,
@@ -10156,7 +10156,7 @@
       },
       {
         "name": "security_groups",
-        "description": "Lista de grupos de segurança para o conjunto de nós.",
+        "description": "Lista de grupos de segurança para o node pool.",
         "original_description": "List of security groups for the node pool.",
         "type": "set(string)",
         "required": false,
@@ -10254,7 +10254,7 @@
           },
           {
             "name": "close_connections_on_host_health_failure",
-            "description": "Se as conexões devem ser encerradas quando uma verificação de integridade do host falhar.",
+            "description": "Se as conexões devem ser encerradas quando uma health check do host falhar.",
             "original_description": "Whether to close connections when a host health check fails.",
             "type": "bool",
             "required": false,
@@ -10272,7 +10272,7 @@
           },
           {
             "name": "health_check_name",
-            "description": "O nome da verificação de integridade associada a este backend.",
+            "description": "O nome da health check associada a este backend.",
             "original_description": "The name of the health check associated with this backend.",
             "type": "string",
             "required": false,
@@ -10301,7 +10301,7 @@
       },
       {
         "name": "listeners",
-        "description": "Configurações do ouvinte para o balanceador de carga.",
+        "description": "Configurações do listener para o balanceador de carga.",
         "original_description": "Listener configurations for the load balancer.",
         "type": "set(object)",
         "required": true,
@@ -10319,7 +10319,7 @@
           },
           {
             "name": "name",
-            "description": "O nome do ouvinte.",
+            "description": "O nome do listener.",
             "original_description": "The name of the listener.",
             "type": "string",
             "required": true,
@@ -10328,7 +10328,7 @@
           },
           {
             "name": "port",
-            "description": "A porta do ouvinte.",
+            "description": "A porta do listener.",
             "original_description": "The port for the listener.",
             "type": "number",
             "required": true,
@@ -10337,7 +10337,7 @@
           },
           {
             "name": "protocol",
-            "description": "O protocolo do ouvinte. Valores válidos: 'tcp' (para balanceadores de carga de rede), 'tls' (para terminação SSL/TLS). Observação: os valores diferenciam maiúsculas de minúsculas e devem ser escritos em minúsculas.",
+            "description": "O protocolo do listener. Valores válidos: 'tcp' (para balanceadores de carga de rede), 'tls' (para terminação SSL/TLS). Observação: os valores diferenciam maiúsculas de minúsculas e devem ser escritos em minúsculas.",
             "original_description": "The protocol for the listener. Valid values: 'tcp' (for network load balancers), 'tls' (for SSL/TLS termination). Note: values are case-sensitive and must be lowercase.",
             "type": "string",
             "required": true,
@@ -10346,7 +10346,7 @@
           },
           {
             "name": "description",
-            "description": "A descrição do ouvinte.",
+            "description": "A descrição do listener.",
             "original_description": "The description of the listener.",
             "type": "string",
             "required": false,
@@ -10355,7 +10355,7 @@
           },
           {
             "name": "tls_certificate_name",
-            "description": "O nome do certificado TLS para os ouvintes HTTPS.",
+            "description": "O nome do certificado TLS para os listeners HTTPS.",
             "original_description": "The name of the TLS certificate for HTTPS listeners.",
             "type": "string",
             "required": false,
@@ -10364,7 +10364,7 @@
           },
           {
             "name": "id",
-            "description": "O identificador único do ouvinte.",
+            "description": "O identificador único do listener.",
             "original_description": "The unique identifier of the listener.",
             "type": "string",
             "required": false,
@@ -10429,7 +10429,7 @@
           },
           {
             "name": "ethertype",
-            "description": "O tipo de éter para a regra ACL.",
+            "description": "O ethertype para a regra ACL.",
             "original_description": "The ethertype for the ACL rule.",
             "type": "string",
             "required": true,
@@ -10476,7 +10476,7 @@
       },
       {
         "name": "health_checks",
-        "description": "Configurações de verificação de integridade para o balanceador de carga.",
+        "description": "Configurações de health check para o balanceador de carga.",
         "original_description": "Health check configurations for the load balancer.",
         "type": "set(object)",
         "required": false,
@@ -10485,7 +10485,7 @@
         "nested_attributes": [
           {
             "name": "name",
-            "description": "O nome da verificação de integridade.",
+            "description": "O nome da health check.",
             "original_description": "The name of the health check.",
             "type": "string",
             "required": true,
@@ -10494,7 +10494,7 @@
           },
           {
             "name": "port",
-            "description": "A porta para verificações de integridade.",
+            "description": "A porta para health checks.",
             "original_description": "The port for health checks.",
             "type": "number",
             "required": true,
@@ -10503,7 +10503,7 @@
           },
           {
             "name": "protocol",
-            "description": "O protocolo para verificações de integridade. Valores válidos: 'tcp', 'http'. Observação: os valores diferenciam maiúsculas de minúsculas e devem ser escritos em minúsculas.",
+            "description": "O protocolo para health checks. Valores válidos: 'tcp', 'http'. Observação: os valores diferenciam maiúsculas de minúsculas e devem ser escritos em minúsculas.",
             "original_description": "The protocol for health checks. Valid values: 'tcp', 'http'. Note: values are case-sensitive and must be lowercase.",
             "type": "string",
             "required": true,
@@ -10512,7 +10512,7 @@
           },
           {
             "name": "description",
-            "description": "Descrição do exame médico.",
+            "description": "Descrição do health check.",
             "original_description": "The description of the health check.",
             "type": "string",
             "required": false,
@@ -10530,7 +10530,7 @@
           },
           {
             "name": "healthy_threshold_count",
-            "description": "O número de verificações de saúde consecutivas bem-sucedidas exigidas.",
+            "description": "O número de health checks consecutivas bem-sucedidas exigidas.",
             "original_description": "The number of consecutive successful health checks required.",
             "type": "number",
             "required": false,
@@ -10539,7 +10539,7 @@
           },
           {
             "name": "initial_delay_seconds",
-            "description": "O intervalo inicial antes do início dos exames médicos.",
+            "description": "O intervalo inicial antes do início dos health checks.",
             "original_description": "The initial delay before starting health checks.",
             "type": "number",
             "required": false,
@@ -10548,7 +10548,7 @@
           },
           {
             "name": "interval_seconds",
-            "description": "O intervalo entre os exames médicos.",
+            "description": "O intervalo entre os health checks.",
             "original_description": "The interval between health checks.",
             "type": "number",
             "required": false,
@@ -10557,7 +10557,7 @@
           },
           {
             "name": "path",
-            "description": "O caminho para as verificações de integridade HTTP.",
+            "description": "O caminho para as health checks HTTP.",
             "original_description": "The path for HTTP health checks.",
             "type": "string",
             "required": false,
@@ -10566,7 +10566,7 @@
           },
           {
             "name": "timeout_seconds",
-            "description": "O tempo limite para as verificações de integridade.",
+            "description": "O tempo limite para as health checks.",
             "original_description": "The timeout for health checks.",
             "type": "number",
             "required": false,
@@ -10575,7 +10575,7 @@
           },
           {
             "name": "unhealthy_threshold_count",
-            "description": "O número de verificações de integridade com falha consecutivas antes de marcar como não válido.",
+            "description": "O número de health checks com falha consecutivas antes de marcar como não válido.",
             "original_description": "The number of consecutive failed health checks before marking unhealthy.",
             "type": "number",
             "required": false,
@@ -10584,7 +10584,7 @@
           },
           {
             "name": "id",
-            "description": "O identificador único da verificação de integridade.",
+            "description": "O identificador único da health check.",
             "original_description": "The unique identifier of the health check.",
             "type": "string",
             "required": false,
@@ -11134,7 +11134,7 @@
       },
       {
         "name": "description",
-        "description": "A descrição para ajudar a identificar o trajeto.",
+        "description": "A descrição para ajudar a identificar a rota.",
         "original_description": "The description to help identify the route.",
         "type": "string",
         "required": false,
@@ -11161,7 +11161,7 @@
       },
       {
         "name": "status",
-        "description": "Situação atual do trajeto.",
+        "description": "Status atual da rota.",
         "original_description": "Current status of the route.",
         "type": "string",
         "required": false,
@@ -11570,7 +11570,7 @@
       },
       {
         "name": "snapshot_id",
-        "description": "O ID do instantâneo usado para criar a instância da máquina virtual. Se definido, o instantâneo será usado em vez de uma imagem.",
+        "description": "O ID do snapshot usado para criar a instância da máquina virtual. Se definido, o snapshot será usado em vez de uma imagem.",
         "original_description": "The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.",
         "type": "string",
         "required": false,
@@ -11745,7 +11745,7 @@
     "attributes": [
       {
         "name": "name",
-        "description": "O nome do instantâneo.",
+        "description": "O nome do snapshot.",
         "original_description": "The name of the snapshot.",
         "type": "string",
         "required": true,
@@ -11763,7 +11763,7 @@
       },
       {
         "name": "created_at",
-        "description": "A data e hora em que o instantâneo foi criado.",
+        "description": "A data e hora em que o snapshot foi criado.",
         "original_description": "The timestamp when the snapshot was created.",
         "type": "string",
         "required": false,
@@ -11772,7 +11772,7 @@
       },
       {
         "name": "id",
-        "description": "O ID do instantâneo.",
+        "description": "O ID do snapshot.",
         "original_description": "The ID of the snapshot.",
         "type": "string",
         "required": false,
@@ -11781,7 +11781,7 @@
       },
       {
         "name": "updated_at",
-        "description": "A data e hora da última atualização do instantâneo.",
+        "description": "A data e hora da última atualização do snapshot.",
         "original_description": "The timestamp when the snapshot was last updated.",
         "type": "string",
         "required": false,
