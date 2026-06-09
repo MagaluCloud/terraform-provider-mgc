@@ -45,7 +45,7 @@ func (r *DataSourceDbParameterList) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	r.dbaasParameterGroups = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
+	r.dbaasParameterGroups = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).ParametersGroup()
 }
 
 func (r *DataSourceDbParameterList) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

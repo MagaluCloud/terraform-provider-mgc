@@ -56,7 +56,7 @@ func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	r.bsSnapshotService = bsSDK.New(&dataConfig.CoreConfig).Snapshots()
+	r.bsSnapshotService = bsSDK.New(dataConfig.CoreFor(utils.ServiceBlockStorage)).Snapshots()
 }
 
 func (r *DataSourceBsSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {

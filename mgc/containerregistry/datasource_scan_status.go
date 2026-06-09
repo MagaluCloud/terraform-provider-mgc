@@ -61,7 +61,7 @@ func (r *DataSourceCRScanStatus) Configure(ctx context.Context, req datasource.C
 		return
 	}
 
-	r.scansService = crSDK.New(&dataConfig.CoreConfig).Scans()
+	r.scansService = crSDK.New(dataConfig.CoreFor(utils.ServiceContainerRegistry)).Scans()
 }
 
 func (r *DataSourceCRScanStatus) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

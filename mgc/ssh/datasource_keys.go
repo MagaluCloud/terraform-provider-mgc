@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
+	sdkClient "github.com/MagaluCloud/mgc-sdk-go/client"
 	sshSDK "github.com/MagaluCloud/mgc-sdk-go/sshkeys"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -46,7 +47,11 @@ func (r *DataSourceSSH) Configure(ctx context.Context, req datasource.ConfigureR
 		return
 	}
 
-	r.sshKeys = sshSDK.New(&dataConfig.CoreConfig).Keys()
+	var opts []sshSDK.ClientOption
+	if url, ok := dataConfig.EndpointFor(utils.ServiceSSH); ok {
+		opts = append(opts, sshSDK.WithGlobalBasePath(sdkClient.MgcUrl(url)))
+	}
+	r.sshKeys = sshSDK.New(dataConfig.CoreFor(utils.ServiceSSH), opts...).Keys()
 
 }
 

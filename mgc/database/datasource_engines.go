@@ -49,7 +49,7 @@ func (r *DataSourceDbEngines) Configure(ctx context.Context, req datasource.Conf
 		return
 	}
 
-	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
+	r.dbaasEngines = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Engines()
 }
 
 func (r *DataSourceDbEngines) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

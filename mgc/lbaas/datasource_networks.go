@@ -33,7 +33,7 @@ func (r *DataSourceLbaasNetworks) Configure(_ context.Context, req datasource.Co
 		return
 	}
 
-	lbaasClient := lbSDK.New(&dataConfig.CoreConfig)
+	lbaasClient := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkLB = lbaasClient.NetworkLoadBalancers()
 }
 

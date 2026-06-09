@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 
+	sdkClient "github.com/MagaluCloud/mgc-sdk-go/client"
 	sdkSSHKeys "github.com/MagaluCloud/mgc-sdk-go/sshkeys"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -41,7 +42,11 @@ func (r *sshKeys) Configure(ctx context.Context, req resource.ConfigureRequest, 
 		return
 	}
 
-	r.sshKeys = sdkSSHKeys.New(&dataConfig.CoreConfig).Keys()
+	var opts []sdkSSHKeys.ClientOption
+	if url, ok := dataConfig.EndpointFor(utils.ServiceSSH); ok {
+		opts = append(opts, sdkSSHKeys.WithGlobalBasePath(sdkClient.MgcUrl(url)))
+	}
+	r.sshKeys = sdkSSHKeys.New(dataConfig.CoreFor(utils.ServiceSSH), opts...).Keys()
 }
 
 type sshKeyModel struct {

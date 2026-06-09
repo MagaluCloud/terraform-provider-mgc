@@ -51,9 +51,9 @@ func (d *ObjectStorageObjectsDataSource) Configure(ctx context.Context, req data
 		return
 	}
 
-	endpoint, err := utils.RegionToS3Url(dataConfig.Region, dataConfig.Env)
+	endpoint, err := resolveS3Endpoint(dataConfig)
 	if err != nil {
-		resp.Diagnostics.AddError("Invalid region/env for object storage", endpoint.String())
+		resp.Diagnostics.AddError("Invalid region/env for object storage", err.Error())
 		return
 	}
 

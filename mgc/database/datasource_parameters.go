@@ -43,7 +43,7 @@ func (r *DataSourceDbParametersList) Configure(ctx context.Context, req datasour
 		resp.Diagnostics.AddError("Failed to get provider data", "Expected utils.DataConfig")
 		return
 	}
-	r.dbaasParameters = dbSDK.New(&cfg.CoreConfig).Parameters()
+	r.dbaasParameters = dbSDK.New(cfg.CoreFor(utils.ServiceDatabase)).Parameters()
 }
 
 func (r *DataSourceDbParametersList) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {

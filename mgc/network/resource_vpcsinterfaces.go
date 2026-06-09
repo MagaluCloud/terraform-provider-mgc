@@ -50,8 +50,8 @@ func (r *NetworkVPCInterfaceResource) Configure(ctx context.Context, req resourc
 		return
 	}
 
-	r.networkVpcsPorts = netSDK.New(&dataConfig.CoreConfig).VPCs()
-	r.networkPorts = netSDK.New(&dataConfig.CoreConfig).Ports()
+	r.networkVpcsPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
+	r.networkPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Ports()
 }
 
 func (r *NetworkVPCInterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

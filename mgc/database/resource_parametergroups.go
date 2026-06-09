@@ -46,8 +46,8 @@ func (r *DBaaSParameterGroupsResource) Configure(ctx context.Context, req resour
 		return
 	}
 
-	r.dbaasParameterGroups = dbSDK.New(&dataConfig.CoreConfig).ParametersGroup()
-	r.dbaasEngines = dbSDK.New(&dataConfig.CoreConfig).Engines()
+	r.dbaasParameterGroups = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).ParametersGroup()
+	r.dbaasEngines = dbSDK.New(dataConfig.CoreFor(utils.ServiceDatabase)).Engines()
 }
 
 func (r *DBaaSParameterGroupsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

@@ -35,7 +35,7 @@ func (r *DataSourceLbaasNetworkHealthCheck) Configure(_ context.Context, req dat
 		return
 	}
 
-	client := lbSDK.New(&dataConfig.CoreConfig)
+	client := lbSDK.New(dataConfig.CoreFor(utils.ServiceLbaas))
 	r.lbNetworkHeathCheck = client.NetworkHealthChecks()
 }
 

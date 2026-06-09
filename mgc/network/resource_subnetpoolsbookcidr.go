@@ -40,7 +40,7 @@ func (r *NetworkSubnetPoolsBookCIDRResource) Configure(ctx context.Context, req 
 		return
 	}
 
-	r.subnetPoolsService = netSDK.New(&dataConfig.CoreConfig).SubnetPools()
+	r.subnetPoolsService = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).SubnetPools()
 }
 
 func (r *NetworkSubnetPoolsBookCIDRResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

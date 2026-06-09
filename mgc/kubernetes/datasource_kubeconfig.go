@@ -79,6 +79,6 @@ func (r *DataSourceKubernetesClusterKubeConfig) Configure(ctx context.Context, r
 		return
 	}
 
-	r.sdkClient = sdkK8s.New(&dataConfig.CoreConfig).Clusters()
+	r.sdkClient = sdkK8s.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Clusters()
 
 }
