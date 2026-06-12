@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
@@ -20,13 +24,15 @@ import (
 )
 
 type ObjectStorageBucket struct {
-	Bucket     types.String `tfsdk:"bucket"`
-	Versioning types.Bool   `tfsdk:"versioning"`
-	Lock       types.Bool   `tfsdk:"lock"`
-	Policy     types.String `tfsdk:"policy"`
-	CORS       types.Object `tfsdk:"cors"`
-	Region     types.String `tfsdk:"region"`
-	URL        types.String `tfsdk:"url"`
+	Bucket                types.String `tfsdk:"bucket"`
+	Versioning            types.Bool   `tfsdk:"versioning"`
+	Lock                  types.Bool   `tfsdk:"lock"`
+	LockRetentionDuration types.Int64  `tfsdk:"lock_retention_duration"`
+	LockRetentionUnit     types.String `tfsdk:"lock_retention_unit"`
+	Policy                types.String `tfsdk:"policy"`
+	CORS                  types.Object `tfsdk:"cors"`
+	Region                types.String `tfsdk:"region"`
+	URL                   types.String `tfsdk:"url"`
 }
 
 type CORS struct {
@@ -100,6 +106,21 @@ func (r *objectStorageBuckets) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:    true,
 				Description: "Enable object lock for this bucket.",
 				Default:     booldefault.StaticBool(false),
+			},
+			"lock_retention_duration": schema.Int64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Retention duration for object lock.",
+				Default:     int64default.StaticInt64(1),
+			},
+			"lock_retention_unit": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Retention unit for object lock (days or years).",
+				Default:     stringdefault.StaticString("days"),
+				Validators: []validator.String{
+					stringvalidator.OneOf("days", "years"),
+				},
 			},
 			"policy": schema.StringAttribute{
 				Optional:    true,
@@ -182,7 +203,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	if !plan.Lock.IsNull() && plan.Lock.ValueBool() {
-		if err := r.buckets.LockBucket(ctx, bucketName, 1, "days"); err != nil {
+		if err := r.buckets.LockBucket(ctx, bucketName, uint(plan.LockRetentionDuration.ValueInt64()), plan.LockRetentionUnit.ValueString()); err != nil {
 			resp.Diagnostics.AddError(
 				"Error locking bucket",
 				fmt.Sprintf("Could not enable object lock for bucket %s: %s", bucketName, err.Error()),
@@ -302,11 +323,15 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 		state.Versioning = types.BoolValue(false)
 	}
 
-	lockStatus, err := r.buckets.GetBucketLockStatus(ctx, bucketName)
-	if err != nil {
-		state.Lock = types.BoolValue(false)
-	} else {
-		state.Lock = types.BoolValue(lockStatus)
+	lockConfig, err := r.buckets.GetBucketLockConfig(ctx, bucketName)
+	if err == nil && lockConfig != nil {
+		state.Lock = types.BoolValue(lockConfig.Status == "Locked")
+		if lockConfig.Validity != nil {
+			state.LockRetentionDuration = types.Int64Value(int64(*lockConfig.Validity))
+		}
+		if lockConfig.Unit != nil {
+			state.LockRetentionUnit = types.StringValue(*lockConfig.Unit)
+		}
 	}
 
 	policy, err := r.buckets.GetPolicy(ctx, bucketName)
@@ -400,9 +425,9 @@ func (r *objectStorageBuckets) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
-	if !plan.Lock.Equal(state.Lock) {
+	if !plan.Lock.Equal(state.Lock) || !plan.LockRetentionDuration.Equal(state.LockRetentionDuration) || !plan.LockRetentionUnit.Equal(state.LockRetentionUnit) {
 		if plan.Lock.ValueBool() {
-			if err := r.buckets.LockBucket(ctx, bucketName, 1, "days"); err != nil {
+			if err := r.buckets.LockBucket(ctx, bucketName, uint(plan.LockRetentionDuration.ValueInt64()), plan.LockRetentionUnit.ValueString()); err != nil {
 				resp.Diagnostics.AddError(
 					"Error locking bucket",
 					fmt.Sprintf("Could not enable object lock for bucket %s: %s", bucketName, err.Error()),
