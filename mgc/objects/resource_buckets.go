@@ -303,59 +303,59 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	lockStatus, err := r.buckets.GetBucketLockStatus(ctx, bucketName)
-	if err != nil {
-		state.Lock = types.BoolValue(false)
-	} else {
+	if err == nil {
 		state.Lock = types.BoolValue(lockStatus)
 	}
 
 	policy, err := r.buckets.GetPolicy(ctx, bucketName)
-	if err != nil {
-		state.Policy = types.StringValue("")
-	} else if policy != nil {
-		policyJSON, err := json.Marshal(policy)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error serializing bucket policy",
-				fmt.Sprintf("Could not serialize policy for bucket %s: %s", bucketName, err.Error()),
-			)
-			return
+	if err == nil {
+		if policy != nil {
+			policyJSON, err := json.Marshal(policy)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error serializing bucket policy",
+					fmt.Sprintf("Could not serialize policy for bucket %s: %s", bucketName, err.Error()),
+				)
+				return
+			}
+			state.Policy = types.StringValue(string(policyJSON))
+		} else {
+			state.Policy = types.StringValue("")
 		}
-		state.Policy = types.StringValue(string(policyJSON))
-	} else {
-		state.Policy = types.StringValue("")
 	}
 
 	corsConfig, err := r.buckets.GetCORS(ctx, bucketName)
-	if err != nil || corsConfig == nil || len(corsConfig.CORSRules) == 0 {
-		state.CORS = types.ObjectNull(map[string]attr.Type{
-			"allowed_headers": types.ListType{ElemType: types.StringType},
-			"allowed_methods": types.ListType{ElemType: types.StringType},
-			"allowed_origins": types.ListType{ElemType: types.StringType},
-			"expose_headers":  types.ListType{ElemType: types.StringType},
-			"max_age_seconds": types.Int64Type,
-		})
-	} else {
-		tfCORS, err := convertFromCORSConfiguration(ctx, corsConfig)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error converting CORS configuration",
-				fmt.Sprintf("Could not convert CORS configuration: %s", err.Error()),
-			)
-			return
+	if err == nil {
+		if corsConfig == nil || len(corsConfig.CORSRules) == 0 {
+			state.CORS = types.ObjectNull(map[string]attr.Type{
+				"allowed_headers": types.ListType{ElemType: types.StringType},
+				"allowed_methods": types.ListType{ElemType: types.StringType},
+				"allowed_origins": types.ListType{ElemType: types.StringType},
+				"expose_headers":  types.ListType{ElemType: types.StringType},
+				"max_age_seconds": types.Int64Type,
+			})
+		} else {
+			tfCORS, err := convertFromCORSConfiguration(ctx, corsConfig)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error converting CORS configuration",
+					fmt.Sprintf("Could not convert CORS configuration: %s", err.Error()),
+				)
+				return
+			}
+			corsObj, diag := types.ObjectValueFrom(ctx, map[string]attr.Type{
+				"allowed_headers": types.ListType{ElemType: types.StringType},
+				"allowed_methods": types.ListType{ElemType: types.StringType},
+				"allowed_origins": types.ListType{ElemType: types.StringType},
+				"expose_headers":  types.ListType{ElemType: types.StringType},
+				"max_age_seconds": types.Int64Type,
+			}, tfCORS)
+			if diag.HasError() {
+				resp.Diagnostics.Append(diag...)
+				return
+			}
+			state.CORS = corsObj
 		}
-		corsObj, diag := types.ObjectValueFrom(ctx, map[string]attr.Type{
-			"allowed_headers": types.ListType{ElemType: types.StringType},
-			"allowed_methods": types.ListType{ElemType: types.StringType},
-			"allowed_origins": types.ListType{ElemType: types.StringType},
-			"expose_headers":  types.ListType{ElemType: types.StringType},
-			"max_age_seconds": types.Int64Type,
-		}, tfCORS)
-		if diag.HasError() {
-			resp.Diagnostics.Append(diag...)
-			return
-		}
-		state.CORS = corsObj
 	}
 
 	state.Region = types.StringValue(r.region)
