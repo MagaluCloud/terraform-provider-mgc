@@ -4,6 +4,9 @@ SHELL := /bin/bash
 
 SKIP_TF_STEP ?= true
 
+# Test selector for acceptance-test targets (override, e.g. RUN=TestAccKubernetes)
+RUN ?= TestAcc
+
 # Go commands
 GO              := go
 GOFMT           := gofmt
@@ -32,7 +35,7 @@ NC     := \033[0m # No Color
 
 # Declare all targets as phony
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
-        tf-docs-setup tf-gen-docs go-fmt go-vet go-test build before-commit debug clean all
+        tf-docs-setup tf-gen-docs go-fmt go-vet go-test testacc testacc-record testacc-replay build before-commit debug clean all
 
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
@@ -121,6 +124,35 @@ go-vet: ## Run Go vet
 go-test: ## Run Go tests
 	@echo -e "$(GREEN)Running tests...$(NC)"
 	@$(GOTEST) -v ./...
+
+testacc: ## Run acceptance tests (requires MGC_ENDPOINT and MGC_API_KEY)
+	@test -n "$${MGC_ENDPOINT:-}" || { echo -e "$(RED)MGC_ENDPOINT is required (root URL of the API under test)$(NC)"; exit 1; }
+	@test -n "$${MGC_API_KEY:-}"  || { echo -e "$(RED)MGC_API_KEY is required$(NC)"; exit 1; }
+	@echo -e "$(GREEN)Running acceptance tests against $$MGC_ENDPOINT...$(NC)"
+	@TF_ACC=1 $(GOTEST) -v ./mgc/... -run '$(RUN)' -timeout 180m
+
+testacc-record: ## Record VCR cassettes against a live API (requires MGC_ENDPOINT and MGC_API_KEY)
+	@test -n "$${MGC_ENDPOINT:-}" || { echo -e "$(RED)MGC_ENDPOINT is required to record$(NC)"; exit 1; }
+	@test -n "$${MGC_API_KEY:-}"  || { echo -e "$(RED)MGC_API_KEY is required to record$(NC)"; exit 1; }
+	@echo -e "$(GREEN)Recording acceptance-test cassettes against $$MGC_ENDPOINT...$(NC)"
+	@TF_ACC=1 MGC_VCR_MODE=record $(GOTEST) -v ./mgc/... -run '$(RUN)' -timeout 180m
+
+testacc-replay: ## Replay acceptance tests from committed VCR cassettes (no infra/secrets)
+	@echo -e "$(GREEN)Replaying acceptance tests from cassettes...$(NC)"
+	@TF_ACC=1 MGC_VCR_MODE=replay \
+		MGC_ENDPOINT="$${MGC_ENDPOINT:-https://replay.invalid}" \
+		MGC_API_KEY="$${MGC_API_KEY:-00000000-0000-4000-8000-000000000000}" \
+		MGC_POLLING_INTERVAL="$${MGC_POLLING_INTERVAL:-1ms}" \
+		$(GOTEST) -v ./mgc/... -run '$(RUN)' -timeout 30m
+
+.PHONY: sweep
+sweep: ## DESTRUCTIVE: delete leaked acceptance-test resources (tf-acctest-*) on MGC_ENDPOINT
+	@test -n "$${MGC_ENDPOINT:-}" || { echo -e "$(RED)MGC_ENDPOINT is required (root URL of the API to sweep)$(NC)"; exit 1; }
+	@test -n "$${MGC_API_KEY:-}"  || { echo -e "$(RED)MGC_API_KEY is required$(NC)"; exit 1; }
+	@echo -e "$(GREEN)Sweeping leaked tf-acctest resources on $$MGC_ENDPOINT...$(NC)"
+	@$(GOTEST) -v $$(grep -rl AddTestSweepers mgc --include='*_test.go' \
+	  | xargs -n1 dirname | sort -u | sed 's#^#./#') \
+	  -sweep="$${MGC_REGION:-br-se1}" $(if $(SWEEP_RUN),-sweep-run="$(SWEEP_RUN)") -timeout 60m
 
 build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"

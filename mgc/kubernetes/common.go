@@ -150,7 +150,7 @@ func GetSubnetIDs(network *k8sSDK.Network) basetypes.SetValue {
 
 func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkRequest {
 	subnetIDs := utils.ConvertTypeSetToStringArray(set)
-	if subnetIDs == nil || len(*subnetIDs) < 1 {
+	if subnetIDs == nil {
 		return nil
 	}
 

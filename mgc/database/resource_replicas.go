@@ -22,7 +22,7 @@ import (
 
 const (
 	dbaasReplicaProductFamily = "SINGLE_INSTANCE_REPLICA"
-	poolingWaitInterval       = 10 * time.Second
+	poolingWaitInterval       = 1 * time.Second
 )
 
 type DBaaSReplicaModel struct {
