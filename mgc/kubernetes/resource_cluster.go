@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	ClusterPoolingTimeout = 100 * time.Minute
+	ClusterPoolingTimeout = 160 * time.Minute
 )
 
 type KubernetesClusterCreateResourceModel struct {
