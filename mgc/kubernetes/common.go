@@ -108,7 +108,10 @@ func ConvertToNodePoolToTFModel(np *k8sSDK.NodePool, region string) NodePool {
 		labelsMap, _ := types.MapValueFrom(context.Background(), types.StringType, np.Labels)
 		nodePool.Labels = labelsMap
 	} else {
-		nodePool.Labels = types.MapNull(types.StringType)
+		// The API omits labels entirely when there are none, so an empty map
+		// never round-trips. Projecting it as empty rather than null keeps the
+		// state consistent with a `labels = {}` configuration.
+		nodePool.Labels = types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
 
 	if np.SecurityGroups != nil {
