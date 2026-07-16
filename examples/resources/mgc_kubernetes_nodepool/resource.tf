@@ -6,4 +6,11 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
   min_replicas = 1
   max_replicas = 5
   version      = mgc_kubernetes_cluster.cluster_with_nodepool.version
+
+  # Optional labels, set only at creation. Changing them recreates the node pool.
+  labels = {
+    environment = "staging"
+    team        = "devX"
+    tier        = "backend"
+  }
 }

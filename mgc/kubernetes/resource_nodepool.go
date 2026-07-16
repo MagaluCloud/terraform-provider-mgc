@@ -117,10 +117,13 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			},
 
 			"labels": schema.MapAttribute{
-				Description: "Map of labels for the node pool.",
+				Description: "Map of labels to attach to the node pool, as customizable key/value pairs. " +
+					"Optional and only used at creation; changing it after the node pool exists forces a new node pool.",
+				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
 				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.RequiresReplace(),
 					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -270,6 +273,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		Taints:         convertTaintsNP(data.Taints),
 		MaxPodsPerNode: utils.ConvertInt64PointerToIntPointer(data.MaxPodsPerNode.ValueInt64Pointer()),
 		Network:        CreateKubernetesSDKNetworkRequest(data.SubnetIDs),
+		Labels:         convertLabelsToSDK(ctx, data.Labels),
 	}
 
 	if !data.MaxReplicas.IsNull() || !data.MinReplicas.IsNull() {

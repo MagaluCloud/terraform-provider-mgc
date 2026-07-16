@@ -148,6 +148,16 @@ func GetSubnetIDs(network *k8sSDK.Network) basetypes.SetValue {
 	return types.SetValueMust(types.StringType, subnets)
 }
 
+func convertLabelsToSDK(ctx context.Context, labels types.Map) map[string]string {
+	if labels.IsNull() || labels.IsUnknown() {
+		return nil
+	}
+
+	result := make(map[string]string, len(labels.Elements()))
+	labels.ElementsAs(ctx, &result, false)
+	return result
+}
+
 func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkRequest {
 	subnetIDs := utils.ConvertTypeSetToStringArray(set)
 	if subnetIDs == nil || len(*subnetIDs) < 1 {
