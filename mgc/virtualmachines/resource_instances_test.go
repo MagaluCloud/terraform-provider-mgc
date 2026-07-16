@@ -8,7 +8,12 @@ import (
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -168,6 +173,97 @@ func TestVirtualMachineInstancesResource_Schema(t *testing.T) {
 	}
 }
 
+func TestVirtualMachineInstancesResource_Schema_CreationSubnets(t *testing.T) {
+	r := &vmInstances{}
+	resp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	attrRaw, ok := resp.Schema.Attributes["creation_subnets"]
+	require.True(t, ok)
+
+	attr, ok := attrRaw.(schema.ListAttribute)
+	require.True(t, ok)
+
+	t.Run("is a list of subnet IDs the customer sets at creation", func(t *testing.T) {
+		assert.True(t, attr.Optional)
+		assert.Equal(t, types.StringType, attr.ElementType)
+	})
+
+	t.Run("is recorded in state, unlike the write-only creation attributes", func(t *testing.T) {
+		// A write-only attribute is never stored, which would leave no previous
+		// value to compare against and make replace-on-change impossible.
+		assert.False(t, attr.WriteOnly)
+		assert.False(t, attr.Computed)
+	})
+}
+
+func TestRequiresReplaceOnCreationSubnetsChange(t *testing.T) {
+	subnetA := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
+	subnetB := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-b")})
+
+	t.Run("replaces the instance when a recorded subnet changes", func(t *testing.T) {
+		resp := &listplanmodifier.RequiresReplaceIfFuncResponse{}
+
+		requiresReplaceOnCreationSubnetsChange(context.Background(), planmodifier.ListRequest{
+			StateValue: subnetA,
+			PlanValue:  subnetB,
+		}, resp)
+
+		assert.True(t, resp.RequiresReplace)
+	})
+
+	t.Run("keeps an instance whose subnet was never recorded", func(t *testing.T) {
+		// An imported instance has no subnet in state and the API never reports
+		// one, so a difference cannot be proven: destroying it would be wrong.
+		resp := &listplanmodifier.RequiresReplaceIfFuncResponse{}
+
+		requiresReplaceOnCreationSubnetsChange(context.Background(), planmodifier.ListRequest{
+			StateValue: types.ListNull(types.StringType),
+			PlanValue:  subnetA,
+		}, resp)
+
+		assert.False(t, resp.RequiresReplace)
+	})
+}
+
+func TestToNetworkInterfaceIDs(t *testing.T) {
+	t.Run("converts IDs into the SDK reference shape", func(t *testing.T) {
+		list := types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("id-1"),
+			types.StringValue("id-2"),
+		})
+
+		result, diags := toNetworkInterfaceIDs(context.Background(), list)
+
+		assert.False(t, diags.HasError())
+		require.NotNil(t, result)
+		assert.Equal(t, []computeSdk.CreateParametersNetworkInterfaceWithID{
+			{ID: "id-1"},
+			{ID: "id-2"},
+		}, *result)
+	})
+
+	t.Run("returns nil for an unset list so the field is omitted", func(t *testing.T) {
+		result, diags := toNetworkInterfaceIDs(context.Background(), types.ListNull(types.StringType))
+
+		assert.False(t, diags.HasError())
+		assert.Nil(t, result)
+	})
+}
+
+func TestVirtualMachineInstancesResource_ToTerraformModel_CarriesCreationSubnets(t *testing.T) {
+	r := &vmInstances{}
+	inst := buildTestInstance("vm-789", "app-1", "completed", "10.0.2.5", nil, "2001:db8::3")
+	subnets := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
+
+	model := r.toTerraformModel(context.Background(), inst, subnets)
+
+	// The API never reports the subnet, so it survives only by being carried
+	// through from the value the caller already held.
+	require.NotNil(t, model)
+	assert.Equal(t, subnets, model.CreationSubnets)
+}
+
 func TestInstanceStatus_String(t *testing.T) {
 	assert.Equal(t, "creating_error", StatusCreatingError.String())
 	assert.Equal(t, "completed", StatusCompleted.String())
@@ -194,7 +290,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel(t *testing.T) {
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-123", "web-1", "completed", "10.0.0.5", ptrString("1.2.3.4"), "2001:db8::1")
 
-	model := r.toTerraformModel(context.Background(), inst)
+	model := r.toTerraformModel(context.Background(), inst, types.ListNull(types.StringType))
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-123", model.ID.ValueString())
@@ -210,7 +306,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel_WithoutPublicIP(t *tes
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-456", "db-1", "completed", "10.0.1.5", nil, "2001:db8::2")
 
-	model := r.toTerraformModel(context.Background(), inst)
+	model := r.toTerraformModel(context.Background(), inst, types.ListNull(types.StringType))
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-456", model.ID.ValueString())

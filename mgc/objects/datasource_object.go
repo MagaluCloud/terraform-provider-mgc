@@ -113,7 +113,7 @@ func (d *ObjectStorageObjectDataSource) Read(ctx context.Context, req datasource
 	bucketName := data.Bucket.ValueString()
 	objectKey := data.Key.ValueString()
 
-	objMeta, err := d.objects.Metadata(ctx, bucketName, objectKey)
+	objMeta, err := d.objects.Metadata(ctx, bucketName, objectKey, nil)
 	if err != nil {
 		errStr := err.Error()
 		if strings.Contains(errStr, "NoSuchKey") || strings.Contains(errStr, "not found") || strings.Contains(errStr, "does not exist") {

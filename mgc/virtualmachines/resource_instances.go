@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -130,6 +131,35 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 	r.vmSnapshots = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
 }
 
+// requiresReplaceOnCreationSubnetsChange replaces the instance when its subnet
+// changes. The framework only calls this once it knows the value changed on an
+// update, so the single case left to reject is an instance whose subnet was
+// never recorded: the API does not report subnets, so an imported instance
+// holds no value to compare against and must not be destroyed over it.
+func requiresReplaceOnCreationSubnetsChange(_ context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	resp.RequiresReplace = !req.StateValue.IsNull()
+}
+
+// toNetworkInterfaceIDs converts a list of resource IDs into the shape the SDK
+// uses to reference them. A nil result leaves the field out of the request.
+func toNetworkInterfaceIDs(ctx context.Context, list types.List) (*[]computeSdk.CreateParametersNetworkInterfaceWithID, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+
+	var ids []string
+	diags := list.ElementsAs(ctx, &ids, false)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	items := make([]computeSdk.CreateParametersNetworkInterfaceWithID, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, computeSdk.CreateParametersNetworkInterfaceWithID{ID: id})
+	}
+	return &items, diags
+}
+
 type vmInstancesResourceModel struct {
 	ID                     types.String `tfsdk:"id"`
 	Name                   types.String `tfsdk:"name"`
@@ -144,6 +174,7 @@ type vmInstancesResourceModel struct {
 	NetworkInterfaceId     types.String `tfsdk:"network_interface_id"`
 	AllocatePublicIpv4     types.Bool   `tfsdk:"allocate_public_ipv4"`
 	CreationSecurityGroups types.List   `tfsdk:"creation_security_groups"`
+	CreationSubnets        types.List   `tfsdk:"creation_subnets"`
 	LocalIPv4              types.String `tfsdk:"local_ipv4"`
 	IPv6                   types.String `tfsdk:"ipv6"`
 	IPv4                   types.String `tfsdk:"ipv4"`
@@ -284,6 +315,27 @@ This attribute can only be used when "network_interface_id" is not set.`,
 					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 				},
 			},
+			"creation_subnets": schema.ListAttribute{
+				Description: `The subnet in which the primary network interface will be created, given as a list with a single subnet ID.
+The subnet must belong to the same VPC as the instance; this is only validated when the instance is created.
+If not specified, the subnet is chosen by the platform.
+Changing this value replaces the instance, since a subnet can only be chosen at creation.
+This attribute can only be used when "network_interface_id" is not set.`,
+				ElementType: types.StringType,
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.ConflictsWith(path.MatchRoot("network_interface_id")),
+					listvalidator.SizeBetween(1, 1),
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
+				},
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplaceIf(
+						requiresReplaceOnCreationSubnetsChange,
+						"Replaces the instance when the subnet changes.",
+						"Replaces the instance when the subnet changes.",
+					),
+				},
+			},
 			"local_ipv4": schema.StringAttribute{
 				Description: "The primary network interface IPv4 address of the virtual machine instance.",
 				Computed:    true,
@@ -365,7 +417,7 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	convertedData := r.toTerraformModel(ctx, getResult)
+	convertedData := r.toTerraformModel(ctx, getResult, data.CreationSubnets)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedData)...)
 }
 
@@ -380,20 +432,16 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		state.AllocatePublicIpv4 = types.BoolValue(false)
 	}
 
-	var sg *[]computeSdk.CreateParametersNetworkInterfaceWithID
-	if !state.CreationSecurityGroups.IsNull() {
-		var sgIDs []string
-		resp.Diagnostics.Append(state.CreationSecurityGroups.ElementsAs(ctx, &sgIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		items := make([]computeSdk.CreateParametersNetworkInterfaceWithID, 0, len(sgIDs))
-		for _, id := range sgIDs {
-			items = append(items, computeSdk.CreateParametersNetworkInterfaceWithID{
-				ID: id,
-			})
-		}
-		sg = &items
+	sg, diags := toNetworkInterfaceIDs(ctx, state.CreationSecurityGroups)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	subnets, diags := toNetworkInterfaceIDs(ctx, state.CreationSubnets)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	createNetwork := computeSdk.CreateParametersNetwork{
@@ -405,6 +453,9 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if sg != nil {
 		createNetwork.Interface.SecurityGroups = sg
+	}
+	if subnets != nil {
+		createNetwork.Interface.Subnets = subnets
 	}
 	if state.VpcID.ValueString() != "" {
 		createNetwork.Vpc = &computeSdk.IDOrName{
@@ -464,7 +515,7 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, getResponse)
+	convertedResult := r.toTerraformModel(ctx, getResponse, state.CreationSubnets)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -503,7 +554,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, getResult)
+	convertedResult := r.toTerraformModel(ctx, getResult, plan.CreationSubnets)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -551,15 +602,22 @@ func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateR
 		NetworkInterfaceId:     types.StringUnknown(),
 		AllocatePublicIpv4:     types.BoolNull(),
 		CreationSecurityGroups: types.ListNull(types.StringType),
-		LocalIPv4:              types.StringUnknown(),
-		IPv6:                   types.StringUnknown(),
-		IPv4:                   types.StringUnknown(),
-		SnapshotID:             types.StringUnknown(),
+		// The API does not report subnets, so an imported instance starts with
+		// none recorded. requiresReplaceOnCreationSubnetsChange relies on this
+		// to leave the instance alone instead of replacing it.
+		CreationSubnets: types.ListNull(types.StringType),
+		LocalIPv4:       types.StringUnknown(),
+		IPv6:            types.StringUnknown(),
+		IPv4:            types.StringUnknown(),
+		SnapshotID:      types.StringUnknown(),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
-func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance) *vmInstancesResourceModel {
+// toTerraformModel builds the state from what the API reports. The API never
+// reports the subnet the instance was created in, so callers must pass the
+// value they already hold: it is the only way it survives.
+func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance, creationSubnets types.List) *vmInstancesResourceModel {
 	interfaces := []VmInstancesNetworkInterfaceModel{}
 	if server.Network.Interfaces != nil {
 		for _, port := range *server.Network.Interfaces {
@@ -606,6 +664,7 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 
 	data.AllocatePublicIpv4 = types.BoolNull()
 	data.CreationSecurityGroups = types.ListNull(types.StringType)
+	data.CreationSubnets = creationSubnets
 	data.SnapshotID = types.StringNull()
 
 	return &data
