@@ -118,7 +118,10 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 
 			"labels": schema.MapAttribute{
 				Description: "Map of labels to attach to the node pool, as customizable key/value pairs. " +
-					"Optional and only used at creation; changing it after the node pool exists forces a new node pool.",
+					"Optional and only used at creation; changing it after the node pool exists forces a new node pool. " +
+					"To remove every label, set `labels = {}` explicitly: removing the attribute from the " +
+					"configuration keeps the labels already recorded in state, because the value is computed " +
+					"whenever it is not configured.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
