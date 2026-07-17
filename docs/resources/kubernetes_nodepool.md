@@ -21,6 +21,15 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
   min_replicas = 1
   max_replicas = 5
   version      = mgc_kubernetes_cluster.cluster_with_nodepool.version
+
+  # Optional labels, set only at creation. Changing them recreates the node pool.
+  # To remove every label, set `labels = {}`. Deleting the block keeps the labels
+  # already in state.
+  labels = {
+    environment = "staging"
+    team        = "devX"
+    tier        = "backend"
+  }
 }
 ```
 
@@ -37,6 +46,7 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 ### Optional
 
 - `availability_zones` (Set of String, Deprecated) List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.
+- `labels` (Map of String) Map of labels to attach to the node pool, as customizable key/value pairs. Optional and only used at creation; changing it after the node pool exists forces a new node pool. To remove every label, set `labels = {}` explicitly: removing the attribute from the configuration keeps the labels already recorded in state, because the value is computed whenever it is not configured.
 - `max_pods_per_node` (Number) Maximum number of pods per node.
 - `max_replicas` (Number) Maximum number of replicas for autoscaling.
 - `min_replicas` (Number) Minimum number of replicas for autoscaling.
@@ -51,7 +61,6 @@ resource "mgc_kubernetes_nodepool" "nodepool" {
 
 - `created_at` (String) Date of creation of the Kubernetes Node.
 - `id` (String) Node pool's UUID.
-- `labels` (Map of String) Map of labels for the node pool.
 - `security_groups` (Set of String) List of security groups for the node pool.
 - `updated_at` (String) Date of the last change to the Kubernetes Node.
 

@@ -197,7 +197,7 @@ func (r *objectStorageObjects) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
-	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
+	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading object metadata",
 			fmt.Sprintf("Could not read metadata for object %s: %s", plan.Key.ValueString(), err.Error()))
@@ -222,7 +222,7 @@ func (r *objectStorageObjects) Read(ctx context.Context, req resource.ReadReques
 	bucketName := state.Bucket.ValueString()
 	objectKey := state.Key.ValueString()
 
-	objMeta, err := r.objects.Metadata(ctx, bucketName, objectKey)
+	objMeta, err := r.objects.Metadata(ctx, bucketName, objectKey, nil)
 	if err != nil {
 		errStr := err.Error()
 		if strings.Contains(errStr, "NoSuchKey") || strings.Contains(errStr, "not found") || strings.Contains(errStr, "does not exist") {
@@ -269,7 +269,7 @@ func (r *objectStorageObjects) contentChanged(ctx context.Context, plan, state *
 		return false, err
 	}
 
-	meta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
+	meta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), nil)
 	if err != nil {
 		return true, nil
 	}
@@ -342,7 +342,7 @@ func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
-	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString())
+	objMeta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading object metadata",
 			fmt.Sprintf("Could not read metadata for object %s: %s", plan.Key.ValueString(), err.Error()))
