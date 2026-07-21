@@ -134,6 +134,74 @@ make before-commit
 make go-test
 ```
 
+#### Acceptance tests
+
+Acceptance tests (`TestAcc*`) exercise the full Terraform lifecycle (plan, apply,
+import, in-place update, refresh and destroy) through `terraform-plugin-testing`.
+They are endpoint-agnostic: the API they target is decided solely by
+`MGC_ENDPOINT`, which may point to a fake API that simulates Magalu Cloud or to
+the production API. The tests behave identically against either.
+
+```bash
+# Against a locally running fake API (fast; any valid UUIDv4 works as key)
+MGC_ENDPOINT=http://localhost:8080 \
+MGC_API_KEY=8a1f47b0-3a4e-4b91-9e55-1c2d3e4f5a6b \
+MGC_POLLING_INTERVAL=200ms \
+make testacc
+
+# Against production (creates real, billable resources)
+MGC_ENDPOINT=<production API root URL> MGC_API_KEY=<real key> make testacc
+```
+
+Optional variables: `MGC_REGION` (default `br-se1`), `MGC_K8S_VERSION` /
+`MGC_K8S_VERSION_UPGRADE` (cluster versions used by the Kubernetes lifecycle
+test; when unset, `version` is omitted from the config), and
+`MGC_POLLING_INTERVAL` (Go duration overriding the 10s wait between status
+checks — useful against a fake API that transitions states instantly).
+
+Without `TF_ACC` set (exported automatically by `make testacc`), `TestAcc*`
+tests are skipped, so `make go-test` and CI remain unaffected.
+
+##### Recording and replaying with VCR
+
+Acceptance tests can record their HTTP traffic into a **cassette** once and then
+**replay** it on every later run, so regression checks need no infrastructure,
+no credentials and finish in milliseconds. This is driven by `MGC_VCR_MODE`:
+
+| `MGC_VCR_MODE` | Behaviour |
+| --- | --- |
+| unset / `auto` | Record once: replay if a cassette exists, otherwise hit the API and record it. This is what you want for a brand-new test. |
+| `record` | Always hit the live API and (re)record. Requires `MGC_ENDPOINT` + `MGC_API_KEY`. |
+| `replay` | Replay only, from the committed cassette. Fails if the cassette is missing. No network. |
+| `off` / `live` | Bypass VCR entirely and talk to the real API. |
+
+```bash
+# Record cassettes against a live/fake API (run once per new or changed test)
+MGC_ENDPOINT=http://localhost:8080 MGC_API_KEY=<uuid> MGC_K8S_VERSION=<v> \
+MGC_POLLING_INTERVAL=200ms make testacc-record
+
+# Replay from committed cassettes — no infra, no secrets
+make testacc-replay
+```
+
+Cassettes are written under each service package's `testdata/cassettes/`
+directory (e.g. `mgc/kubernetes/testdata/cassettes/<TestName>.yaml`) and are
+meant to be committed. Credentials (`Authorization`, `X-Api-Key`) are scrubbed
+before the cassette is written, and random resource names are seeded from the
+test name so record and replay stay byte-for-byte identical.
+
+> **Replay needs the same non-secret inputs used at record time.** Values that
+> end up in request bodies — `MGC_K8S_VERSION`, `MGC_K8S_VERSION_UPGRADE`,
+> `MGC_REGION` — must match the recording, because the request matcher compares
+> request bodies. `make testacc-replay` defaults `MGC_ENDPOINT`/`MGC_API_KEY`/
+> `MGC_POLLING_INTERVAL` to harmless placeholders but passes these through from
+> your environment.
+
+To wire a new service's acceptance test into VCR, build the recorder with
+`acctest.NewVCR(t)` and use `vcr.ProtoV6ProviderFactories()`, `vcr.RandomName()`
+and `vcr.HTTPClient()` (for any SDK client a check builds directly, e.g.
+`CheckDestroy`) — see `mgc/kubernetes/resource_cluster_acc_test.go`.
+
 ## Contributing
 
 We welcome contributions to the Magalu Cloud Terraform Provider!

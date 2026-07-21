@@ -163,7 +163,7 @@ func convertLabelsToSDK(ctx context.Context, labels types.Map) map[string]string
 
 func CreateKubernetesSDKNetworkRequest(set types.Set) *k8sSDK.KubernetesNetworkRequest {
 	subnetIDs := utils.ConvertTypeSetToStringArray(set)
-	if subnetIDs == nil || len(*subnetIDs) < 1 {
+	if subnetIDs == nil {
 		return nil
 	}
 

@@ -192,7 +192,43 @@ func ConvertTypeSetToArray[T any](set types.Set, extract func(attr.Value) (T, bo
 	return &result
 }
 
+func KnownStringPointer(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueStringPointer()
+}
+
+func KnownBoolPointer(v types.Bool) *bool {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueBoolPointer()
+}
+
+func KnownInt64Pointer(v types.Int64) *int64 {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueInt64Pointer()
+}
+
+func KnownFloat64Pointer(v types.Float64) *float64 {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueFloat64Pointer()
+}
+
 func ConvertTypeSetToStringArray(set types.Set) *[]string {
+	if set.IsNull() {
+		return nil
+	}
+
+	if set.IsUnknown() || len(set.Elements()) == 0 {
+		return &[]string{}
+	}
+
 	return ConvertTypeSetToArray(set, func(v attr.Value) (string, bool) {
 		i, ok := v.(types.String)
 		if !ok {
@@ -200,4 +236,17 @@ func ConvertTypeSetToStringArray(set types.Set) *[]string {
 		}
 		return i.ValueString(), true
 	})
+}
+
+func StringSliceToTypesSet(input *[]string) types.Set {
+	if input == nil {
+		return types.SetNull(types.StringType)
+	}
+
+	values := make([]attr.Value, len(*input))
+	for i, v := range *input {
+		values[i] = types.StringValue(v)
+	}
+
+	return types.SetValueMust(types.StringType, values)
 }

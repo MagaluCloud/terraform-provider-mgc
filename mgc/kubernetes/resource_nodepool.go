@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -35,9 +36,9 @@ const (
 	NodepoolDeletedState = "Deleted"
 )
 
-var (
-	NodepoolTimeout  = time.Minute * 90
-	NodepoolInterval = time.Second * 30
+const (
+	defaultNodepoolPollingTimeout  = time.Minute * 90
+	defaultNodepoolPollingInterval = time.Second * 30
 )
 
 type NodePoolResourceModel struct {
@@ -46,8 +47,10 @@ type NodePoolResourceModel struct {
 }
 
 type NewNodePoolResource struct {
-	sdkNodepool k8sSDK.NodePoolService
-	region      string
+	sdkNodepool     k8sSDK.NodePoolService
+	region          string
+	pollingInterval time.Duration
+	pollingTimeout  time.Duration
 }
 
 func NewNewNodePoolResource() resource.Resource {
@@ -70,6 +73,8 @@ func (r *NewNodePoolResource) Configure(ctx context.Context, req resource.Config
 
 	r.region = dataConfig.Region
 	r.sdkNodepool = k8sSDK.New(dataConfig.CoreFor(utils.ServiceKubernetes)).Nodepools()
+	r.pollingInterval = dataConfig.PollingIntervalOr(defaultNodepoolPollingInterval)
+	r.pollingTimeout = dataConfig.PollingTimeoutOr(defaultNodepoolPollingTimeout)
 }
 
 func (r *NewNodePoolResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
@@ -110,9 +115,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
-				},
-				PlanModifiers: []planmodifier.Int64{
-					utils.UseStateForInt64AfterCreate(),
 				},
 			},
 
@@ -248,18 +250,27 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data NodePoolResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	nodepool, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				"MGC Resource not found the cluster nodepool during refresh",
+				"The nodepool has been automatically removed from the state and will be provisioned",
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
-	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, flattenClusterNodepool(data, *nodepool, r.region))...)
 }
 
 func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -323,7 +334,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, "", NodepoolTimeout, NodepoolInterval)
+	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, "")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -333,6 +344,7 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data NodePoolResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -355,7 +367,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		expectedVersion = data.Version.ValueString()
 	}
 
-	err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, expectedVersion, NodepoolTimeout, NodepoolInterval)
+	err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, expectedVersion)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -367,7 +379,7 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	data.NodePool = ConvertToNodePoolToTFModel(upgraded, r.region)
+	data = flattenClusterNodepool(data, *upgraded, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -402,12 +414,22 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	err := r.sdkNodepool.Delete(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		return
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				"MGC Resource not found the nodepool during delete",
+				"The nodepool has been removed",
+			)
+			return
+		} else if !(errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusConflict) { //Provides protection if the status is “deleting”
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
 	}
 
-	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, "", NodepoolTimeout, NodepoolInterval); err != nil {
+	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, ""); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -484,9 +506,9 @@ func convertStringSetTFToSliceString(ctx context.Context, set types.Set) (*[]str
 	return &result, nil
 }
 
-func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state, expectedVersion string, timeout, interval time.Duration) error {
-	for startTime := time.Now(); time.Since(startTime) < timeout; {
-		time.Sleep(interval)
+func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state, expectedVersion string) error {
+	for startTime := time.Now(); time.Since(startTime) < r.pollingTimeout; {
+		time.Sleep(r.pollingInterval)
 
 		nodepool, err := r.sdkNodepool.Get(ctx, clusterId, nodepoolid)
 		if err != nil {
@@ -500,4 +522,65 @@ func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid,
 		tflog.Debug(ctx, fmt.Sprintf("Node pool %s is in state %s", nodepoolid, nodepool.Status.State))
 	}
 	return fmt.Errorf("timeout waiting for node pool to reach state %q", state)
+}
+
+func flattenClusterNodepool(tfData NodePoolResourceModel, nodepool k8sSDK.NodePool, region string) NodePoolResourceModel {
+	tfData.ID = types.StringValue(nodepool.ID)
+	tfData.Name = utils.FlattenStringValue(tfData.Name, &nodepool.Name)
+	tfData.Version = utils.FlattenStringValue(tfData.Version, nodepool.Version)
+	tfData.CreatedAt = utils.FlattenStringValue(tfData.CreatedAt, utils.ConvertTimeToRFC3339(nodepool.CreatedAt))
+	tfData.UpdatedAt = utils.FlattenStringValue(tfData.UpdatedAt, utils.ConvertTimeToRFC3339(nodepool.UpdatedAt))
+
+	flavor := nodepool.InstanceTemplate.Flavor.Name
+	if flavor == "" {
+		flavor = nodepool.Flavor
+	}
+	tfData.Flavor = utils.FlattenStringValue(tfData.Flavor, &flavor)
+
+	if nodepool.AutoScale != nil {
+		tfData.MaxReplicas = types.Int64PointerValue(utils.ConvertIntPointerToInt64Pointer(nodepool.AutoScale.MaxReplicas))
+		tfData.MinReplicas = types.Int64PointerValue(utils.ConvertIntPointerToInt64Pointer(nodepool.AutoScale.MinReplicas))
+	} else {
+		tfData.MaxReplicas = types.Int64Null()
+		tfData.MinReplicas = types.Int64Null()
+	}
+
+	tfData.MaxPodsPerNode = types.Int64PointerValue(utils.ConvertIntPointerToInt64Pointer(nodepool.MaxPodsPerNode))
+
+	if tfData.Labels.IsUnknown() || len(nodepool.Labels) > 0 || len(tfData.Labels.Elements()) > 0 {
+		labels, _ := types.MapValueFrom(context.Background(), types.StringType, nodepool.Labels)
+		tfData.Labels = labels
+	}
+
+	tfData.SecurityGroups = utils.FlattenTypeSetStringArray(tfData.SecurityGroups, nodepool.SecurityGroups)
+
+	if nodepool.Taints != nil {
+		taints := make([]Taint, len(*nodepool.Taints))
+		for i, taint := range *nodepool.Taints {
+			taints[i] = Taint{
+				Effect: types.StringValue(taint.Effect),
+				Key:    types.StringValue(taint.Key),
+				Value:  types.StringValue(taint.Value),
+			}
+		}
+		tfData.Taints = &taints
+	} else if tfData.Taints != nil && len(*tfData.Taints) > 0 {
+		tfData.Taints = nil
+	}
+
+	if nodepool.AvailabilityZones != nil {
+		azs := make([]string, len(*nodepool.AvailabilityZones))
+		for i, zone := range *nodepool.AvailabilityZones {
+			azs[i] = utils.ConvertXZoneToAvailabilityZone(region, zone)
+		}
+		tfData.AvailabilityZones = utils.FlattenTypeSetStringArray(tfData.AvailabilityZones, &azs)
+	} else {
+		tfData.AvailabilityZones = utils.FlattenTypeSetStringArray(tfData.AvailabilityZones, nil)
+	}
+
+	if subnetIDs := GetSubnetIDs(nodepool.Network); !subnetIDs.IsNull() || tfData.SubnetIDs.IsUnknown() {
+		tfData.SubnetIDs = subnetIDs
+	}
+
+	return tfData
 }
