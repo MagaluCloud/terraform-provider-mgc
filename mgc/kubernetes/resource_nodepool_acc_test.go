@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
-	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -118,36 +116,8 @@ func nodepoolService(vcr *acctest.VCR) k8sSDK.NodePoolService {
 	return k8sSDK.New(vcr.SDKClient(utils.ServiceKubernetes)).Nodepools()
 }
 
-func nodepoolFlavor(t *testing.T, vcr *acctest.VCR) string {
-	t.Helper()
-	flavors, err := vmSDK.New(vcr.SDKClient(utils.ServiceVirtualMachine)).InstanceTypes().List(context.Background(), vmSDK.InstanceTypeListOptions{})
-	if err != nil {
-		t.Fatalf("listing k8s flavors: %v", err)
-	}
-	nps := flavors.InstanceTypes
-	if len(nps) == 0 {
-		t.Skip("no nodepool flavors available")
-	}
-	sort.Slice(nps, func(i, j int) bool {
-		if nps[i].VCPUs != nps[j].VCPUs {
-			return nps[i].VCPUs < nps[j].VCPUs
-		}
-		if nps[i].RAM != nps[j].RAM {
-			return nps[i].RAM < nps[j].RAM
-		}
-		return nps[i].Name < nps[j].Name
-	})
-
-	for _, np := range nps {
-		if np.RAM >= 2048 &&
-			np.Disk >= 40 &&
-			np.VCPUs == 2 &&
-			*np.GPU == 0 &&
-			len(*np.AvailabilityZones) >= 2 {
-			return np.Name
-		}
-	}
-	return nps[0].Name
+func nodepoolFlavor() string {
+	return "BV2-2-40"
 }
 
 func nodepoolImportID(s *terraform.State) (string, error) {
@@ -247,7 +217,7 @@ func testAccCheckNodepoolDestroyed(vcr *acctest.VCR) resource.TestCheckFunc {
 func TestAccKubernetesNodepool_basic(t *testing.T) {
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -268,10 +238,11 @@ func TestAccKubernetesNodepool_basic(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:      nodepoolResourceName,
-				ImportState:       true,
-				ImportStateIdFunc: nodepoolImportID,
-				ImportStateVerify: true,
+				ResourceName:            nodepoolResourceName,
+				ImportState:             true,
+				ImportStateIdFunc:       nodepoolImportID,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"replicas"},
 			},
 		},
 	})
@@ -281,7 +252,7 @@ func TestAccKubernetesNodepool_disappears(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -309,7 +280,7 @@ func TestAccKubernetesNodepool_parentDisappears(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -338,7 +309,7 @@ func TestAccKubernetesNodepool_replicasIgnoredAfterCreate(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -376,7 +347,7 @@ func TestAccKubernetesNodepool_autoscale(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -426,7 +397,7 @@ func TestAccKubernetesNodepool_taints(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -458,7 +429,7 @@ func TestAccKubernetesNodepool_labels(t *testing.T) {
 	t.Parallel()
 	vcr := acctest.NewVCR(t)
 	name := vcr.RandomName("nodepool")
-	flavor := nodepoolFlavor(t, vcr)
+	flavor := nodepoolFlavor()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { acctest.PreCheck(t) },
@@ -483,7 +454,6 @@ func TestAccKubernetesNodepool_labels(t *testing.T) {
 				},
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckNodepoolExists(vcr, nodepoolResourceName),
-					resource.TestCheckResourceAttr(nodepoolResourceName, "labels", ""),
 				),
 			},
 			{

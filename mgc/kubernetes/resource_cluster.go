@@ -136,9 +136,6 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"updated_at": schema.StringAttribute{
 				Description: "Last update date of the Kubernetes cluster.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"region": schema.StringAttribute{
 				Description: "Region where the Kubernetes cluster is located.",

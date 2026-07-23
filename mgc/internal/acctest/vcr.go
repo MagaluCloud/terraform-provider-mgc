@@ -73,8 +73,12 @@ func NewVCR(t *testing.T) *VCR {
 	}
 
 	mode := vcrMode(t)
+	if mode != recorder.ModeReplayOnly && Endpoint() == "" {
+		t.Fatalf("%s must be set when not replaying: acceptance tests no longer fall back to the provider's default (production) endpoint — point %s at the target API before recording or running live",
+			EnvEndpoint, EnvEndpoint)
+	}
 	if mode == recorder.ModeRecordOnly && isLoopbackEndpoint(Endpoint()) {
-		t.Fatalf("refusing to record against fake endpoint %q: published cassettes must come from the real API so replay stays faithful — record against the real cloud (unset %s) or a real API host",
+		t.Fatalf("refusing to record against fake endpoint %q: published cassettes must come from the real API so replay stays faithful — set %s to a real API host",
 			Endpoint(), EnvEndpoint)
 	}
 	cassetteName := cassettePath(t)
@@ -314,6 +318,12 @@ func PollTimeout(def time.Duration) time.Duration {
 	return def
 }
 
+// replayPlaceholderURL is the base URL for out-of-band SDK clients during
+// replay when no endpoint is configured. The .invalid TLD is reserved and never
+// resolves (RFC 6761), and the recorder serves every response anyway — nothing
+// leaves the process. Record/live without an endpoint is refused in NewVCR.
+const replayPlaceholderURL = "https://acctest.invalid"
+
 // SDKClient returns a CoreClient wired to this test's recorder transport, so
 // out-of-band SDK checks (exists/destroy/disappears) are recorded and replayed
 // together with the provider traffic. Building an SDK client any other way in
@@ -321,8 +331,11 @@ func PollTimeout(def time.Duration) time.Duration {
 func (v *VCR) SDKClient(service string) *sdk.CoreClient {
 	url := EndpointFor(service)
 	if url == "" {
-		// No endpoint override: mirror the provider's default URL resolution.
-		url = utils.RegionToUrl(Region(), utils.ENV_PROD)
+		// Only replay reaches here — NewVCR blocks record/live without an
+		// endpoint. The recorder answers every request and the matcher ignores
+		// the host, so this base URL is an unroutable placeholder that never
+		// dials out; deliberately not a real (production) URL.
+		url = replayPlaceholderURL
 	}
 	return sdk.NewMgcClient(
 		sdk.WithAPIKey(effectiveAPIKey()),

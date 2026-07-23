@@ -166,9 +166,6 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 			"updated_at": schema.StringAttribute{
 				Description: "Date of the last change to the Kubernetes Node.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"id": schema.StringAttribute{
 				Description: "Node pool's UUID.",
