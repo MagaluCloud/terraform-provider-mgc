@@ -104,9 +104,10 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			//deprecated
 			"enabled_server_group": schema.BoolAttribute{
-				Description: "Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.",
-				Optional:    true,
-				Computed:    true,
+				Description:        "[DEPRECATED] Enables the use of a server group with anti-affinity policy during the creation of the cluster and its node pools. Default is true.",
+				Optional:           true,
+				Computed:           true,
+				DeprecationMessage: "This attribute has been marked as obsolete and has no effect.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 					boolplanmodifier.RequiresReplace(),
