@@ -7,12 +7,11 @@ import (
 	"time"
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -59,6 +58,27 @@ type mockSnapshotService struct {
 func (m *mockSnapshotService) Restore(ctx context.Context, id string, req computeSdk.RestoreSnapshotRequest) (string, error) {
 	args := m.Called(ctx, id, req)
 	return args.String(0), args.Error(1)
+}
+
+type mockPortService struct {
+	mock.Mock
+	netSDK.PortService
+}
+
+func (m *mockPortService) Get(ctx context.Context, id string) (*netSDK.PortResponse, error) {
+	args := m.Called(ctx, id)
+	res, _ := args.Get(0).(*netSDK.PortResponse)
+	return res, args.Error(1)
+}
+
+// portWithSubnets builds a port response whose addresses reference the given
+// subnet IDs, one address per ID.
+func portWithSubnets(subnetIDs ...string) *netSDK.PortResponse {
+	addrs := make([]netSDK.IpAddress, 0, len(subnetIDs))
+	for _, id := range subnetIDs {
+		addrs = append(addrs, netSDK.IpAddress{IPAddress: "10.0.0.5", SubnetID: id})
+	}
+	return &netSDK.PortResponse{IPAddress: &addrs}
 }
 
 // Helper: Build test instance
@@ -189,40 +209,12 @@ func TestVirtualMachineInstancesResource_Schema_CreationSubnets(t *testing.T) {
 		assert.Equal(t, types.StringType, attr.ElementType)
 	})
 
-	t.Run("is recorded in state, unlike the write-only creation attributes", func(t *testing.T) {
-		// A write-only attribute is never stored, which would leave no previous
-		// value to compare against and make replace-on-change impossible.
+	t.Run("is stored and provider-recovered, unlike the write-only creation attributes", func(t *testing.T) {
+		// Computed (not write-only): the value is recovered from the primary port
+		// on read, so it is recorded in state and gives replace-on-change a
+		// previous value to compare against even for imported instances.
 		assert.False(t, attr.WriteOnly)
-		assert.False(t, attr.Computed)
-	})
-}
-
-func TestRequiresReplaceOnCreationSubnetsChange(t *testing.T) {
-	subnetA := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
-	subnetB := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-b")})
-
-	t.Run("replaces the instance when a recorded subnet changes", func(t *testing.T) {
-		resp := &listplanmodifier.RequiresReplaceIfFuncResponse{}
-
-		requiresReplaceOnCreationSubnetsChange(context.Background(), planmodifier.ListRequest{
-			StateValue: subnetA,
-			PlanValue:  subnetB,
-		}, resp)
-
-		assert.True(t, resp.RequiresReplace)
-	})
-
-	t.Run("keeps an instance whose subnet was never recorded", func(t *testing.T) {
-		// An imported instance has no subnet in state and the API never reports
-		// one, so a difference cannot be proven: destroying it would be wrong.
-		resp := &listplanmodifier.RequiresReplaceIfFuncResponse{}
-
-		requiresReplaceOnCreationSubnetsChange(context.Background(), planmodifier.ListRequest{
-			StateValue: types.ListNull(types.StringType),
-			PlanValue:  subnetA,
-		}, resp)
-
-		assert.False(t, resp.RequiresReplace)
+		assert.True(t, attr.Computed)
 	})
 }
 
@@ -256,12 +248,87 @@ func TestVirtualMachineInstancesResource_ToTerraformModel_CarriesCreationSubnets
 	inst := buildTestInstance("vm-789", "app-1", "completed", "10.0.2.5", nil, "2001:db8::3")
 	subnets := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
 
-	model := r.toTerraformModel(context.Background(), inst, subnets)
+	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{CreationSubnets: subnets})
 
-	// The API never reports the subnet, so it survives only by being carried
-	// through from the value the caller already held.
+	// With no ports service wired the subnet cannot be recovered, so it survives
+	// by being carried through from the value the caller already held.
 	require.NotNil(t, model)
 	assert.Equal(t, subnets, model.CreationSubnets)
+}
+
+func TestResolveCreationSubnets(t *testing.T) {
+	ctx := context.Background()
+	fallback := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("fallback-subnet")})
+	oneSubnet := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
+
+	// buildTestInstance names the primary interface's port "eni-1".
+	const primaryPortID = "eni-1"
+
+	instanceWithoutPrimary := func() *computeSdk.Instance {
+		inst := buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, "")
+		notPrimary := false
+		(*inst.Network.Interfaces)[0].Primary = &notPrimary
+		return inst
+	}
+
+	t.Run("recovers the subnet when the primary port sits in exactly one", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got)
+		ports.AssertExpectations(t)
+	})
+
+	t.Run("treats duplicate subnet across addresses as one", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a", "subnet-a"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got)
+	})
+
+	t.Run("falls back when the primary port spans multiple subnets", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a", "subnet-b"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
+
+	t.Run("falls back when the port lookup fails", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(nil, errors.New("boom"))
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
+
+	t.Run("falls back without querying when there is no primary interface", func(t *testing.T) {
+		ports := &mockPortService{}
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, instanceWithoutPrimary(), fallback)
+
+		assert.Equal(t, fallback, got)
+		ports.AssertNotCalled(t, "Get", mock.Anything, mock.Anything)
+	})
+
+	t.Run("falls back when no ports service is wired", func(t *testing.T) {
+		r := &vmInstances{}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
 }
 
 func TestInstanceStatus_String(t *testing.T) {
@@ -290,7 +357,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel(t *testing.T) {
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-123", "web-1", "completed", "10.0.0.5", ptrString("1.2.3.4"), "2001:db8::1")
 
-	model := r.toTerraformModel(context.Background(), inst, types.ListNull(types.StringType))
+	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{})
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-123", model.ID.ValueString())
@@ -306,7 +373,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel_WithoutPublicIP(t *tes
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-456", "db-1", "completed", "10.0.1.5", nil, "2001:db8::2")
 
-	model := r.toTerraformModel(context.Background(), inst, types.ListNull(types.StringType))
+	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{})
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-456", model.ID.ValueString())
