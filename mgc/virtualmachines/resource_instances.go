@@ -318,10 +318,7 @@ Changing this value replaces the instance, since a subnet can only be chosen at 
 This attribute can only be used when "network_interface_id" is not set.`,
 				ElementType: types.StringType,
 				Optional:    true,
-				// Computed because the value is recovered from the primary port on
-				// read, so an unset (platform-chosen) or imported instance reports
-				// its real subnet instead of drifting against a null state.
-				Computed: true,
+				Computed:    true,
 				Validators: []validator.List{
 					listvalidator.ConflictsWith(path.MatchRoot("network_interface_id")),
 					listvalidator.SizeBetween(1, 1),
