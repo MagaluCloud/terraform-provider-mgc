@@ -384,13 +384,17 @@ func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) 
 func flattenCluster(tfData KubernetesClusterCreateResourceModel, cluster k8sSDK.Cluster) KubernetesClusterCreateResourceModel {
 	tfData.Version = utils.FlattenStringValue(tfData.Version, &cluster.Version)
 	tfData.CreatedAt = utils.FlattenStringValue(tfData.CreatedAt, utils.ConvertTimeToRFC3339(cluster.CreatedAt))
-	tfData.UpdatedAt = utils.FlattenStringValue(tfData.CreatedAt, utils.ConvertTimeToRFC3339(cluster.UpdatedAt))
+	tfData.UpdatedAt = utils.FlattenStringValue(tfData.UpdatedAt, utils.ConvertTimeToRFC3339(cluster.UpdatedAt))
 	tfData.ID = types.StringValue(cluster.ID)
 	tfData.ClusterIPv4CIDR = utils.FlattenStringValue(tfData.ClusterIPv4CIDR, cluster.ClusterIPv4CIDR)
 	tfData.ServicesIpV4CIDR = utils.FlattenStringValue(tfData.ServicesIpV4CIDR, cluster.ServicesIpV4CIDR)
 
-	v := string(*cluster.MachineTypesSource)
-	tfData.MachineTypesSource = utils.FlattenStringValue(tfData.MachineTypesSource, &v)
+	var machineTypesSource *string
+	if cluster.MachineTypesSource != nil {
+		v := string(*cluster.MachineTypesSource)
+		machineTypesSource = &v
+	}
+	tfData.MachineTypesSource = utils.FlattenStringValue(tfData.MachineTypesSource, machineTypesSource)
 
 	if cluster.Platform != nil {
 		tfData.PlatformVersion = utils.FlattenStringValue(tfData.PlatformVersion, &cluster.Platform.Version)
@@ -398,7 +402,6 @@ func flattenCluster(tfData KubernetesClusterCreateResourceModel, cluster k8sSDK.
 		tfData.PlatformVersion = types.StringNull()
 	}
 
-	tfData.Region = utils.FlattenStringValue(tfData.Region, cluster.Region)
 	tfData.Region = utils.FlattenStringValue(tfData.Region, cluster.Region)
 	tfData.SubnetIDs = GetSubnetIDs(cluster.Network)
 
