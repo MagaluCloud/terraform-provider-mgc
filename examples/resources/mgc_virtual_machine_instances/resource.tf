@@ -61,4 +61,6 @@ resource "mgc_virtual_machine_instances" "instance_with_subnet" {
   # The subnet must belong to the same VPC as the instance, and can only be
   # chosen at creation: changing it replaces the instance.
   creation_subnets = [mgc_network_vpcs_subnets.subnet.id]
+  vpc_id = mgc_network_vpc.vpc.id
+
 }
