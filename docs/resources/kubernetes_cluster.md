@@ -3,12 +3,12 @@
 page_title: "mgc_kubernetes_cluster Resource - terraform-provider-mgc"
 subcategory: "Kubernetes"
 description: |-
-  Kubernetes cluster resource in MGC
+  Kubernetes cluster resource in MGC. Provisioning time. Cluster creation is asynchronous: terraform apply blocks until the control plane reaches the running state. This typically takes between 1 and 2 hours. The provider keeps waiting up to the default polling_timeout of 2h40m before giving up. This deadline is configurable on the provider block (polling_timeout = "3h"); the setting is global and applies to every resource.
 ---
 
 # mgc_kubernetes_cluster (Resource)
 
-Kubernetes cluster resource in MGC
+Kubernetes cluster resource in MGC. **Provisioning time.** Cluster creation is asynchronous: `terraform apply` blocks until the control plane reaches the `running` state. This typically takes between **1 and 2 hours**. The provider keeps waiting up to the default `polling_timeout` of **2h40m** before giving up. This deadline is configurable on the provider block (`polling_timeout = "3h"`); the setting is global and applies to every resource.
 
 ## Example Usage
 

@@ -89,7 +89,10 @@ func (r *NewNodePoolResource) ConfigValidators(_ context.Context) []resource.Con
 func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	azRegex := regexp.MustCompile(`^[a-z]{2}-[a-z]+[0-9]+-[a-z]$`)
 	resp.Schema = schema.Schema{
-		Description: "An array representing a set of nodes within a Kubernetes cluster.",
+		Description: "An array representing a set of nodes within a Kubernetes cluster. " +
+			"**Provisioning time.** Node pool creation is asynchronous: `terraform apply` blocks until the nodes reach the `running` state. " +
+			"This can take up to **1h30m**, which is also the default `polling_timeout` the provider waits before giving up. " +
+			"This deadline is configurable on the provider block (`polling_timeout = \"2h\"`); the setting is global and applies to every resource.",
 		Attributes: map[string]schema.Attribute{
 			"flavor_name": schema.StringAttribute{
 				Description: "Definition of the CPU, RAM, and storage capacity of the nodes.",
