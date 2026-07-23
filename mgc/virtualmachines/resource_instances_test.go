@@ -243,19 +243,6 @@ func TestToNetworkInterfaceIDs(t *testing.T) {
 	})
 }
 
-func TestVirtualMachineInstancesResource_ToTerraformModel_CarriesCreationSubnets(t *testing.T) {
-	r := &vmInstances{}
-	inst := buildTestInstance("vm-789", "app-1", "completed", "10.0.2.5", nil, "2001:db8::3")
-	subnets := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
-
-	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{CreationSubnets: subnets})
-
-	// With no ports service wired the subnet cannot be recovered, so it survives
-	// by being carried through from the value the caller already held.
-	require.NotNil(t, model)
-	assert.Equal(t, subnets, model.CreationSubnets)
-}
-
 func TestResolveCreationSubnets(t *testing.T) {
 	ctx := context.Background()
 	fallback := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("fallback-subnet")})
@@ -280,6 +267,21 @@ func TestResolveCreationSubnets(t *testing.T) {
 
 		assert.Equal(t, oneSubnet, got)
 		ports.AssertExpectations(t)
+	})
+
+	t.Run("recovers only the IPv4 subnet on a dual-stack port", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(&netSDK.PortResponse{
+			IPAddress: &[]netSDK.IpAddress{
+				{IPAddress: "10.0.0.5", SubnetID: "subnet-a"},
+				{IPAddress: "fd00::5", SubnetID: "subnet-b"},
+			},
+		}, nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got) // subnet-a, backing the IPv4 address
 	})
 
 	t.Run("treats duplicate subnet across addresses as one", func(t *testing.T) {

@@ -104,7 +104,7 @@ Find out more in the documentation guides.
 This attribute can only be used when "network_interface_id" is not set.
 - `creation_subnets` (List of String) The subnet in which the primary network interface will be created, given as a list with a single subnet ID.
 The subnet must belong to the same VPC as the instance; this is only validated when the instance is created.
-If not specified, the subnet is chosen by the platform.
+If not specified, the subnet is chosen by the platform and reported back here.
 Changing this value replaces the instance, since a subnet can only be chosen at creation.
 This attribute can only be used when "network_interface_id" is not set.
 - `image` (String) The image name used for the virtual machine instance.

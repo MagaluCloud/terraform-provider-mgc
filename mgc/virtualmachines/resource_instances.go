@@ -3,10 +3,10 @@ package virtualmachines
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
@@ -661,7 +661,7 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 }
 
 func (r *vmInstances) resolveCreationSubnets(ctx context.Context, server *computeSdk.Instance, fallback types.List) types.List {
-	if server.Network == nil || server.Network.Interfaces == nil {
+	if r.networkPorts == nil || server.Network == nil || server.Network.Interfaces == nil {
 		return fallback
 	}
 
@@ -688,14 +688,13 @@ func (r *vmInstances) resolveCreationSubnets(ctx context.Context, server *comput
 	return types.ListValueMust(types.StringType, []attr.Value{types.StringValue(subnets[0])})
 }
 
-// distinctSubnetIDs returns the unique, non-empty, IPv4 subnet IDs across a port's
-// addresses, preserving first-seen order.
+// distinctSubnetIDs returns the unique, non-empty subnet IDs backing the port's
+// IPv4 addresses, preserving first-seen order.
 func distinctSubnetIDs(addresses []netSDK.IpAddress) []string {
 	seen := make(map[string]struct{}, len(addresses))
 	ids := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
-		v := *addr.Ethertype
-		if addr.SubnetID == "" || !strings.EqualFold(v, "IPv4") {
+		if addr.SubnetID == "" || !isIPv4(addr.IPAddress) {
 			continue
 		}
 		if _, ok := seen[addr.SubnetID]; ok {
@@ -705,6 +704,11 @@ func distinctSubnetIDs(addresses []netSDK.IpAddress) []string {
 		ids = append(ids, addr.SubnetID)
 	}
 	return ids
+}
+
+func isIPv4(addr string) bool {
+	ip := net.ParseIP(addr)
+	return ip != nil && ip.To4() != nil
 }
 
 func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
