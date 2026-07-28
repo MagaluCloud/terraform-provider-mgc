@@ -331,7 +331,7 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 	if err != nil {
 		state.Policy = jsontypes.NewNormalizedValue("")
 	} else if policy != nil {
-		DropServerInjectedPolicyID(policy, statePolicy)
+		dropServerInejction(policy, statePolicy)
 		policyJSON, err := json.Marshal(policy)
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -560,21 +560,41 @@ func (r *objectStorageBuckets) ImportState(ctx context.Context, req resource.Imp
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func DropServerInjectedPolicyID(fetchedObj *objSdk.Policy, statePolicy string) {
+func dropServerInejction(fetchedObj *objSdk.Policy, statePolicy string) {
 	if statePolicy == "" {
 		return
 	}
 
 	var stateObj map[string]any
-	err := json.Unmarshal([]byte(statePolicy), &stateObj)
-	if err != nil {
+	if err := json.Unmarshal([]byte(statePolicy), &stateObj); err != nil {
 		return
 	}
 
-	_, ok := stateObj["Id"].(string)
-	if ok {
-		return
-	}
+	DropServerInjectedPolicyID(fetchedObj, stateObj)
+	dropServerInjectedStatementSids(fetchedObj, stateObj)
+}
 
-	fetchedObj.Id = ""
+func DropServerInjectedPolicyID(fetchedObj *objSdk.Policy, stateObj map[string]any) {
+	if _, ok := stateObj["Id"].(string); !ok {
+		fetchedObj.Id = ""
+	}
+}
+
+func dropServerInjectedStatementSids(fetchedObj *objSdk.Policy, stateObj map[string]any) {
+	stateStatements, _ := stateObj["Statement"].([]any)
+
+	for i := range fetchedObj.Statement {
+		if i >= len(stateStatements) {
+			continue
+		}
+
+		stmt, ok := stateStatements[i].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if _, ok := stmt["Sid"].(string); !ok {
+			fetchedObj.Statement[i].Sid = ""
+		}
+	}
 }
