@@ -274,7 +274,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 	plan.URL = types.StringValue(fmt.Sprintf("%s/%s", r.endpoint, bucketName))
 
 	if plan.Policy.IsNull() || plan.Policy.IsUnknown() {
-		plan.Policy = jsontypes.NewNormalizedValue("")
+		plan.Policy = jsontypes.NewNormalizedNull()
 	}
 
 	diags = resp.State.Set(ctx, &plan)
@@ -329,7 +329,7 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 	statePolicy := state.Policy.ValueString()
 	policy, err := r.buckets.GetPolicy(ctx, bucketName)
 	if err != nil {
-		state.Policy = jsontypes.NewNormalizedValue("")
+		state.Policy = jsontypes.NewNormalizedNull()
 	} else if policy != nil {
 		dropServerInejction(policy, statePolicy)
 		policyJSON, err := json.Marshal(policy)
@@ -342,7 +342,7 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 		}
 		state.Policy = jsontypes.NewNormalizedValue(string(policyJSON))
 	} else {
-		state.Policy = jsontypes.NewNormalizedValue("")
+		state.Policy = jsontypes.NewNormalizedNull()
 	}
 
 	corsConfig, err := r.buckets.GetCORS(ctx, bucketName)
@@ -517,7 +517,7 @@ func (r *objectStorageBuckets) Update(ctx context.Context, req resource.UpdateRe
 	plan.URL = types.StringValue(fmt.Sprintf("%s/%s", r.endpoint, bucketName))
 
 	if plan.Policy.IsNull() || plan.Policy.IsUnknown() {
-		plan.Policy = jsontypes.NewNormalizedValue("")
+		plan.Policy = jsontypes.NewNormalizedNull()
 	}
 
 	diags := resp.State.Set(ctx, &plan)
