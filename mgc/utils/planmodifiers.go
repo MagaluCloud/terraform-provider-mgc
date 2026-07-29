@@ -303,3 +303,63 @@ func (stringNullIfEmptyModifier) PlanModifyString(_ context.Context, req planmod
 		resp.PlanValue = types.StringNull()
 	}
 }
+
+// stringNullIfUnconfiguredModifier forces the planned value to null when the
+// attribute is absent from configuration, overriding the default
+// Optional+Computed behavior of carrying forward the prior state value.
+type stringNullIfUnconfiguredModifier struct{}
+
+// StringNullIfUnconfiguredModifier returns a planmodifier that plans the
+// attribute as null whenever it is not set in the practitioner configuration,
+// even if the prior state has a value. This is useful for Optional+Computed
+// attributes that are actively managed by the provider (e.g. via a dedicated
+// Set/Delete API call), where removing the attribute from configuration
+// should be treated as an explicit request to clear it, instead of silently
+// preserving whatever value is already in state.
+func StringNullIfUnconfiguredModifier() planmodifier.String {
+	return stringNullIfUnconfiguredModifier{}
+}
+
+func (stringNullIfUnconfiguredModifier) Description(_ context.Context) string {
+	return "Sets the planned value to null when the attribute is absent from configuration, overriding the default Optional+Computed behavior of carrying forward the prior state value."
+}
+
+func (m stringNullIfUnconfiguredModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (stringNullIfUnconfiguredModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.ConfigValue.IsNull() {
+		resp.PlanValue = types.StringNull()
+	}
+}
+
+// objectNullIfUnconfiguredModifier forces the planned value to null when the
+// attribute is absent from configuration, overriding the default
+// Optional+Computed behavior of carrying forward the prior state value.
+type objectNullIfUnconfiguredModifier struct{}
+
+// ObjectNullIfUnconfiguredModifier returns a planmodifier that plans the
+// attribute as null whenever it is not set in the practitioner configuration,
+// even if the prior state has a value. This is useful for Optional+Computed
+// attributes that are actively managed by the provider (e.g. via a dedicated
+// Set/Delete API call), where removing the attribute from configuration
+// should be treated as an explicit request to clear it, instead of silently
+// preserving whatever value is already in state.
+func ObjectNullIfUnconfiguredModifier() planmodifier.Object {
+	return objectNullIfUnconfiguredModifier{}
+}
+
+func (objectNullIfUnconfiguredModifier) Description(_ context.Context) string {
+	return "Sets the planned value to null when the attribute is absent from configuration, overriding the default Optional+Computed behavior of carrying forward the prior state value."
+}
+
+func (m objectNullIfUnconfiguredModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (objectNullIfUnconfiguredModifier) PlanModifyObject(ctx context.Context, req planmodifier.ObjectRequest, resp *planmodifier.ObjectResponse) {
+	if req.ConfigValue.IsNull() {
+		resp.PlanValue = types.ObjectNull(req.ConfigValue.AttributeTypes(ctx))
+	}
+}

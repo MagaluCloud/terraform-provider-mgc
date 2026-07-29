@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -110,13 +109,16 @@ func (r *objectStorageBuckets) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:    true,
 				Description: "Bucket policy document as a JSON string.",
 				CustomType:  jsontypes.NormalizedType{},
+				PlanModifiers: []planmodifier.String{
+					utils.StringNullIfUnconfiguredModifier(),
+				},
 			},
 			"cors": schema.SingleNestedAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "CORS configuration for the bucket.",
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.UseStateForUnknown(),
+					utils.ObjectNullIfUnconfiguredModifier(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"allowed_headers": schema.ListAttribute{
