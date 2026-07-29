@@ -22,7 +22,17 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
-type ObjectStorageBucket struct {
+type objectStorageBucketV0 struct {
+	Bucket     types.String `tfsdk:"bucket"`
+	Versioning types.Bool   `tfsdk:"versioning"`
+	Lock       types.Bool   `tfsdk:"lock"`
+	Policy     types.String `tfsdk:"policy"`
+	CORS       types.Object `tfsdk:"cors"`
+	Region     types.String `tfsdk:"region"`
+	URL        types.String `tfsdk:"url"`
+}
+
+type ObjectStorageBucketV1 struct {
 	Bucket     types.String         `tfsdk:"bucket"`
 	Versioning types.Bool           `tfsdk:"versioning"`
 	Lock       types.Bool           `tfsdk:"lock"`
@@ -83,6 +93,7 @@ func (r *objectStorageBuckets) Configure(ctx context.Context, req resource.Confi
 
 func (r *objectStorageBuckets) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     1,
 		Description: "An object storage bucket.",
 		Attributes: map[string]schema.Attribute{
 			"bucket": schema.StringAttribute{
@@ -172,7 +183,7 @@ func (r *objectStorageBuckets) Schema(ctx context.Context, req resource.SchemaRe
 }
 
 func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ObjectStorageBucket
+	var plan ObjectStorageBucketV1
 	diags := req.Plan.Get(ctx, &plan)
 	if diags.HasError() {
 		resp.Diagnostics = diags
@@ -284,7 +295,7 @@ func (r *objectStorageBuckets) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state ObjectStorageBucket
+	var state ObjectStorageBucketV1
 	diags := req.State.Get(ctx, &state)
 	if diags.HasError() {
 		resp.Diagnostics = diags
@@ -387,13 +398,13 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *objectStorageBuckets) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ObjectStorageBucket
+	var plan ObjectStorageBucketV1
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state ObjectStorageBucket
+	var state ObjectStorageBucketV1
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -527,7 +538,7 @@ func (r *objectStorageBuckets) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *objectStorageBuckets) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state ObjectStorageBucket
+	var state ObjectStorageBucketV1
 	diags := req.State.Get(ctx, &state)
 	if diags.HasError() {
 		resp.Diagnostics = diags
@@ -560,6 +571,58 @@ func (r *objectStorageBuckets) Delete(ctx context.Context, req resource.DeleteRe
 
 func (r *objectStorageBuckets) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
+}
+
+func (r *objectStorageBuckets) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: map[string]schema.Attribute{
+					"bucket":     schema.StringAttribute{Required: true},
+					"versioning": schema.BoolAttribute{Optional: true, Computed: true},
+					"lock":       schema.BoolAttribute{Optional: true, Computed: true},
+					"policy":     schema.StringAttribute{Optional: true, Computed: true},
+					"cors": schema.SingleNestedAttribute{
+						Optional: true,
+						Computed: true,
+						Attributes: map[string]schema.Attribute{
+							"allowed_headers": schema.ListAttribute{ElementType: types.StringType, Optional: true, Computed: true},
+							"allowed_methods": schema.ListAttribute{ElementType: types.StringType, Required: true},
+							"allowed_origins": schema.ListAttribute{ElementType: types.StringType, Required: true},
+							"expose_headers":  schema.ListAttribute{ElementType: types.StringType, Optional: true, Computed: true},
+							"max_age_seconds": schema.Int64Attribute{Optional: true, Computed: true},
+						},
+					},
+					"region": schema.StringAttribute{Computed: true},
+					"url":    schema.StringAttribute{Computed: true},
+				},
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorState objectStorageBucketV0
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				policy := jsontypes.NewNormalizedNull()
+				if !priorState.Policy.IsNull() && priorState.Policy.ValueString() != "" {
+					policy = jsontypes.NewNormalizedValue(priorState.Policy.ValueString())
+				}
+
+				upgradedState := ObjectStorageBucketV1{
+					Bucket:     priorState.Bucket,
+					Versioning: priorState.Versioning,
+					Lock:       priorState.Lock,
+					Policy:     policy,
+					CORS:       priorState.CORS,
+					Region:     priorState.Region,
+					URL:        priorState.URL,
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedState)...)
+			},
+		},
+	}
 }
 
 func dropServerInejction(fetchedObj *objSdk.Policy, statePolicy string) {

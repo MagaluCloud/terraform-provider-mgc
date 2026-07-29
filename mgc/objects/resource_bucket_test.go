@@ -1,6 +1,7 @@
 package objects
 
 import (
+	"context"
 	"testing"
 
 	objSdk "github.com/MagaluCloud/mgc-sdk-go/objectstorage"
@@ -115,4 +116,13 @@ func TestDropServerInejction(t *testing.T) {
 		assert.Equal(t, "", fetchedObj.Id)
 		assert.Equal(t, "", fetchedObj.Statement[0].Sid)
 	})
+}
+
+func TestUpgradeState_V0PolicyEmptyStringBecomesNull(t *testing.T) {
+	ctx := context.Background()
+	res := &objectStorageBuckets{}
+
+	upgraders := res.UpgradeState(ctx)
+	_, ok := upgraders[0]
+	assert.True(t, ok, "a V0 state upgrader must be registered")
 }
