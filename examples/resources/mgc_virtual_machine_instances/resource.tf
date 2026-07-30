@@ -51,3 +51,16 @@ resource "mgc_virtual_machine_instances" "instance_with_security_groups_and_publ
   allocate_public_ipv4     = true
   creation_security_groups = [mgc_network_security_groups.security_group.id]
 }
+
+resource "mgc_virtual_machine_instances" "instance_with_subnet" {
+  name         = "instance-with-subnet"
+  machine_type = "BV2-4-10"
+  image        = "cloud-ubuntu-24.04 LTS"
+  ssh_key_name = "your-ssh-key-name"
+
+  # The subnet must belong to the same VPC as the instance, and can only be
+  # chosen at creation: changing it replaces the instance.
+  creation_subnets = [mgc_network_vpcs_subnets.subnet.id]
+  vpc_id = mgc_network_vpc.vpc.id
+
+}
