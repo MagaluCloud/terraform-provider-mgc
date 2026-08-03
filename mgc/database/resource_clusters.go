@@ -13,6 +13,7 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -43,6 +44,8 @@ type DBaaSClusterModel struct {
 	Name                   types.String               `tfsdk:"name"`
 	User                   types.String               `tfsdk:"user"`
 	Password               types.String               `tfsdk:"password"`
+	SourceClusterID        types.String               `tfsdk:"source_cluster_id"`
+	SnapshotID             types.String               `tfsdk:"snapshot_id"`
 	EngineName             types.String               `tfsdk:"engine_name"`
 	EngineVersion          types.String               `tfsdk:"engine_version"`
 	InstanceType           types.String               `tfsdk:"instance_type"`
@@ -130,8 +133,8 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"user": schema.StringAttribute{
-				Description: "Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.  Cannot be changed after creation.",
-				Required:    true,
+				Description: "Master username for the database cluster. Must start with a letter and contain only alphanumeric characters. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set). Cannot be changed after creation.",
+				Optional:    true,
 				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -146,8 +149,8 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"password": schema.StringAttribute{
-				Description: "Master password for the database cluster. Must be at least 8 characters long.  Cannot be changed after creation.",
-				Required:    true,
+				Description: "Master password for the database cluster. Must be at least 8 characters long. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set). Cannot be changed after creation.",
+				Optional:    true,
 				Sensitive:   true,
 				WriteOnly:   true,
 				PlanModifiers: []planmodifier.String{
@@ -158,21 +161,51 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringvalidator.LengthAtMost(50),
 				},
 			},
-			"engine_name": schema.StringAttribute{
-				Description: "Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.",
-				Required:    true,
+			"source_cluster_id": schema.StringAttribute{
+				Description: "ID of an existing cluster whose snapshot will be restored into this new cluster. Set together with 'snapshot_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.",
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("snapshot_id")),
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("engine_name"),
+						path.MatchRoot("engine_version"),
+						path.MatchRoot("user"),
+						path.MatchRoot("password"),
+					),
+				},
+			},
+			"snapshot_id": schema.StringAttribute{
+				Description: "ID of the cluster snapshot to restore. Set together with 'source_cluster_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("source_cluster_id")),
+				},
+			},
+			"engine_name": schema.StringAttribute{
+				Description: "Type of database engine to use (e.g., 'mysql', 'postgresql'). Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"engine_version": schema.StringAttribute{
-				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.",
-				Required:    true,
+				Description: "Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.",
+				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -181,6 +214,10 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 			"engine_id": schema.StringAttribute{
 				Description: "ID of the database engine.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"instance_type": schema.StringAttribute{
 				Description: "Compute and memory capacity of the cluster determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.",
@@ -188,10 +225,18 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"instance_type_id": schema.StringAttribute{
 				Description: "ID of the instance type.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"volume_size": schema.Int64Attribute{
 				Description: "Size of the storage volume in GB. Can be increased but not decreased after creation.",
@@ -324,9 +369,47 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 	}
 }
 
+var _ resource.ResourceWithValidateConfig = &DBaaSClusterResource{}
+
+func (r *DBaaSClusterResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config DBaaSClusterModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	isRestoring := config.SnapshotID.IsUnknown() || config.SnapshotID.ValueString() != "" ||
+		config.SourceClusterID.IsUnknown() || config.SourceClusterID.ValueString() != ""
+	if isRestoring {
+		return
+	}
+
+	hasUnknownScratchFields := config.EngineName.IsUnknown() || config.EngineVersion.IsUnknown() ||
+		config.User.IsUnknown() || config.Password.IsUnknown()
+	if hasUnknownScratchFields {
+		return
+	}
+
+	resp.Diagnostics.Append(validateCreateFromScratchConfig(config)...)
+}
+
 func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan DBaaSClusterModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.SnapshotID.ValueString() != "" {
+		r.createFromSnapshot(ctx, plan, resp)
+		return
+	}
+
+	r.createFromScratch(ctx, plan, resp)
+}
+
+func (r *DBaaSClusterResource) createFromScratch(ctx context.Context, plan DBaaSClusterModel, resp *resource.CreateResponse) {
+	resp.Diagnostics.Append(validateCreateFromScratchConfig(plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -343,6 +426,46 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	clusterResp, err := r.dbaasClusters.Create(ctx, buildClusterCreateRequest(plan, engineID, instanceTypeID))
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	plan.ID = types.StringValue(clusterResp.ID)
+	plan.EngineID = types.StringValue(engineID)
+	plan.InstanceTypeID = types.StringValue(instanceTypeID)
+
+	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
+	if err != nil {
+		resp.Diagnostics.AddError("Cluster Creation Error", fmt.Sprintf("Error waiting for cluster %s to become active: %s", clusterResp.ID, err.Error()))
+		return
+	}
+
+	r.populateModelFromDetailResponse(getCluster, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func validateCreateFromScratchConfig(plan DBaaSClusterModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if plan.EngineName.ValueString() == "" || plan.EngineVersion.ValueString() == "" {
+		diags.AddError(
+			"Missing Engine Information",
+			"'engine_name' and 'engine_version' are required when not restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set).",
+		)
+	}
+	if plan.User.ValueString() == "" || plan.Password.ValueString() == "" {
+		diags.AddError(
+			"Missing Credentials",
+			"'user' and 'password' are required when not restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set).",
+		)
+	}
+
+	return diags
+}
+
+func buildClusterCreateRequest(plan DBaaSClusterModel, engineID, instanceTypeID string) dbSDK.ClusterCreateRequest {
 	createReq := dbSDK.ClusterCreateRequest{
 		Name:           plan.Name.ValueString(),
 		EngineID:       engineID,
@@ -362,23 +485,61 @@ func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRe
 		createReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
 	}
 
-	clusterResp, err := r.dbaasClusters.Create(ctx, createReq)
+	return createReq
+}
+
+func (r *DBaaSClusterResource) createFromSnapshot(ctx context.Context, plan DBaaSClusterModel, resp *resource.CreateResponse) {
+	sourceClusterID := plan.SourceClusterID.ValueString()
+	snapshotID := plan.SnapshotID.ValueString()
+
+	sourceCluster, err := r.dbaasClusters.Get(ctx, sourceClusterID)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	plan.ID = types.StringValue(clusterResp.ID)
-	plan.EngineID = types.StringValue(engineID)
-	plan.InstanceTypeID = types.StringValue(instanceTypeID)
-
-	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
+	instanceTypeID, err := ValidateAndGetInstanceTypeID(ctx, r.dbaasInstanceTypes.ListAll, plan.InstanceType.ValueString(), sourceCluster.EngineID, dbaasClusterProductFamily)
 	if err != nil {
-		resp.Diagnostics.AddError("Cluster Creation Error", fmt.Sprintf("Error waiting for cluster %s to become active: %s", clusterResp.ID, err.Error()))
+		resp.Diagnostics.AddError("Invalid Instance Type", fmt.Sprintf("Failed to validate instance type '%s': %s", plan.InstanceType.ValueString(), err.Error()))
 		return
 	}
 
-	r.populateModelFromDetailResponse(getCluster, &plan)
+	restoreReq := dbSDK.ClusterRestoreRequest{
+		Name:           plan.Name.ValueString(),
+		InstanceTypeID: instanceTypeID,
+		Volume: &dbSDK.ClusterVolumeRequest{
+			Size: int(plan.VolumeSize.ValueInt64()),
+			Type: plan.VolumeType.ValueStringPointer(),
+		},
+		BackupRetentionDays: utils.ConvertInt64PointerToIntPointer(plan.BackupRetentionDays.ValueInt64Pointer()),
+		BackupStartAt:       plan.BackupStartAt.ValueStringPointer(),
+	}
+
+	restoredCluster, err := r.dbaasClusters.RestoreSnapshot(ctx, sourceClusterID, snapshotID, restoreReq)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	plan.ID = types.StringValue(restoredCluster.ID)
+	plan.InstanceTypeID = types.StringValue(instanceTypeID)
+	plan.EngineID = types.StringValue(sourceCluster.EngineID)
+
+	activeCluster, err := r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive)
+	if err != nil {
+		resp.Diagnostics.AddError("Cluster Restore Error", fmt.Sprintf("Error waiting for restored cluster %s to become active: %s", restoredCluster.ID, err.Error()))
+		return
+	}
+
+	engineInfo, err := r.dbaasEngines.Get(ctx, sourceCluster.EngineID)
+	if err != nil {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+	plan.EngineName = types.StringValue(engineInfo.Name)
+	plan.EngineVersion = types.StringValue(engineInfo.Version)
+
+	r.populateModelFromDetailResponse(activeCluster, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
