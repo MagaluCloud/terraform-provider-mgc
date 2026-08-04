@@ -32,6 +32,8 @@ func (s DBaaSClusterSnapshotStatus) String() string {
 	return string(s)
 }
 
+const clusterSnapshotStatusTimeout = 90 * time.Minute
+
 var snapshotStatusPollInterval = 10 * time.Second
 
 type DBaaSClusterSnapshotModel struct {
@@ -203,7 +205,7 @@ func (r *DBaaSClusterSnapshotResource) ImportState(ctx context.Context, req reso
 }
 
 func (r *DBaaSClusterSnapshotResource) waitUntilSnapshotStatusMatches(ctx context.Context, clusterID string, snapshotID string, status DBaaSClusterSnapshotStatus) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, clusterStatusTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, clusterSnapshotStatusTimeout)
 	defer cancel()
 
 	for {
