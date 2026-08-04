@@ -48,34 +48,34 @@ func (r *DBaaSClusterSnapshotDataSource) Configure(ctx context.Context, req data
 
 func (r *DBaaSClusterSnapshotDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Get a database cluster snapshot by ID.",
+		Description: "Retrieves information about a specific DBaaS (Database-as-a-Service) cluster snapshot.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "ID of the snapshot",
+				Description: "ID of the snapshot to retrieve.",
 				Required:    true,
 			},
 			"cluster_id": schema.StringAttribute{
-				Description: "ID of the cluster",
+				Description: "ID of the DBaaS cluster the snapshot belongs to.",
 				Required:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the snapshot",
+				Description: "Name of the snapshot.",
 				Computed:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the snapshot",
+				Description: "Description of the snapshot.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
-				Description: "Creation timestamp",
+				Description: "Timestamp of when the snapshot was created.",
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "Status of the snapshot",
+				Description: "Current status of the snapshot ([PENDING, CREATING, AVAILABLE, RESTORING, ERROR, DELETING, DELETED]).",
 				Computed:    true,
 			},
 			"size": schema.Int64Attribute{
-				Description: "Size of the snapshot in bytes",
+				Description: "Size of the snapshot in GB.",
 				Computed:    true,
 			},
 		},

@@ -68,28 +68,28 @@ func (r *DBaaSClusterSnapshotResource) Configure(ctx context.Context, req resour
 
 func (r *DBaaSClusterSnapshotResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a DBaaS cluster snapshot",
+		Description: "Manages a DBaaS (Database-as-a-Service) cluster snapshot. A snapshot is a point-in-time backup of a cluster's data and can later be used to restore a new cluster via the 'source_cluster_id'/'snapshot_id' arguments of the 'mgc_dbaas_clusters' resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Unique identifier for the snapshot",
+				Description: "Unique identifier for the snapshot. Generated automatically on creation.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"cluster_id": schema.StringAttribute{
-				Description: "ID of the DBaaS cluster to snapshot",
+				Description: "ID of the DBaaS cluster to snapshot. Cannot be changed after creation.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the snapshot",
+				Description: "Name of the snapshot. Can be changed after creation.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the snapshot",
+				Description: "Description of the snapshot. Can be changed after creation.",
 				Required:    true,
 			},
 		},
