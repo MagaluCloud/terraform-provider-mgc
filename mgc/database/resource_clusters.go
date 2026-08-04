@@ -225,16 +225,11 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"instance_type_id": schema.StringAttribute{
 				Description: "ID of the instance type.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -488,6 +483,32 @@ func buildClusterCreateRequest(plan DBaaSClusterModel, engineID, instanceTypeID 
 	return createReq
 }
 
+// buildClusterPostRestoreUpdateRequest builds the follow-up update applied right after a
+// snapshot restore. dbSDK.ClusterRestoreRequest has no fields for parameter_group/deletion_protected,
+// so these are applied via a regular cluster Update once the restored cluster is active.
+// The actual cluster returned by the API is compared against the plan so no Update call is
+// made when the restored cluster already matches what was requested.
+func buildClusterPostRestoreUpdateRequest(plan DBaaSClusterModel, actual *dbSDK.ClusterDetailResponse) (dbSDK.ClusterUpdateRequest, bool) {
+	var updateReq dbSDK.ClusterUpdateRequest
+	needsUpdate := false
+
+	needUpdateParameterGroup := !plan.ParameterGroup.IsNull() && !plan.ParameterGroup.IsUnknown() &&
+		plan.ParameterGroup.ValueString() != actual.ParameterGroupID
+	if needUpdateParameterGroup {
+		updateReq.ParameterGroupID = plan.ParameterGroup.ValueStringPointer()
+		needsUpdate = true
+	}
+
+	needUpdateDeletionProtected := !plan.DeletionProtected.IsNull() && !plan.DeletionProtected.IsUnknown() &&
+		plan.DeletionProtected.ValueBool() != actual.DeletionProtected
+	if needUpdateDeletionProtected {
+		updateReq.DeletionProtected = plan.DeletionProtected.ValueBoolPointer()
+		needsUpdate = true
+	}
+
+	return updateReq, needsUpdate
+}
+
 func (r *DBaaSClusterResource) createFromSnapshot(ctx context.Context, plan DBaaSClusterModel, resp *resource.CreateResponse) {
 	sourceClusterID := plan.SourceClusterID.ValueString()
 	snapshotID := plan.SnapshotID.ValueString()
@@ -529,6 +550,19 @@ func (r *DBaaSClusterResource) createFromSnapshot(ctx context.Context, plan DBaa
 	if err != nil {
 		resp.Diagnostics.AddError("Cluster Restore Error", fmt.Sprintf("Error waiting for restored cluster %s to become active: %s", restoredCluster.ID, err.Error()))
 		return
+	}
+
+	if postRestoreReq, needsUpdate := buildClusterPostRestoreUpdateRequest(plan, activeCluster); needsUpdate {
+		if _, err := r.dbaasClusters.Update(ctx, restoredCluster.ID, postRestoreReq); err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+
+		activeCluster, err = r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive)
+		if err != nil {
+			resp.Diagnostics.AddError("Cluster Restore Error", fmt.Sprintf("Error waiting for restored cluster %s to become active after applying deletion_protected/parameter_group: %s", restoredCluster.ID, err.Error()))
+			return
+		}
 	}
 
 	engineInfo, err := r.dbaasEngines.Get(ctx, sourceCluster.EngineID)
