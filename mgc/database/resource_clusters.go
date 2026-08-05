@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	clusterStatusTimeout      = 90 * time.Minute
-	dbaasClusterProductFamily = "CLUSTER"
+	clusterStatusTimeout        = 90 * time.Minute
+	clusterRestoreStatusTimeout = 180 * time.Minute
+	dbaasClusterProductFamily   = "CLUSTER"
 )
 
 type DBaaSClusterAddressModel struct {
@@ -431,7 +432,7 @@ func (r *DBaaSClusterResource) createFromScratch(ctx context.Context, plan DBaaS
 	plan.EngineID = types.StringValue(engineID)
 	plan.InstanceTypeID = types.StringValue(instanceTypeID)
 
-	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive)
+	getCluster, err := r.waitUntilClusterStatusMatches(ctx, clusterResp.ID, dbSDK.ClusterStatusActive, clusterStatusTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError("Cluster Creation Error", fmt.Sprintf("Error waiting for cluster %s to become active: %s", clusterResp.ID, err.Error()))
 		return
@@ -546,7 +547,7 @@ func (r *DBaaSClusterResource) createFromSnapshot(ctx context.Context, plan DBaa
 	plan.InstanceTypeID = types.StringValue(instanceTypeID)
 	plan.EngineID = types.StringValue(sourceCluster.EngineID)
 
-	activeCluster, err := r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive)
+	activeCluster, err := r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive, clusterRestoreStatusTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError("Cluster Restore Error", fmt.Sprintf("Error waiting for restored cluster %s to become active: %s", restoredCluster.ID, err.Error()))
 		return
@@ -558,7 +559,7 @@ func (r *DBaaSClusterResource) createFromSnapshot(ctx context.Context, plan DBaa
 			return
 		}
 
-		activeCluster, err = r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive)
+		activeCluster, err = r.waitUntilClusterStatusMatches(ctx, restoredCluster.ID, dbSDK.ClusterStatusActive, clusterRestoreStatusTimeout)
 		if err != nil {
 			resp.Diagnostics.AddError("Cluster Restore Error", fmt.Sprintf("Error waiting for restored cluster %s to become active after applying deletion_protected/parameter_group: %s", restoredCluster.ID, err.Error()))
 			return
@@ -655,7 +656,7 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		if _, err := r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive); err != nil {
+		if _, err := r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive, clusterStatusTimeout); err != nil {
 			resp.Diagnostics.AddError("Error waiting for cluster to be active", err.Error())
 			return
 		}
@@ -691,7 +692,7 @@ func (r *DBaaSClusterResource) Update(ctx context.Context, req resource.UpdateRe
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		_, err = r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive)
+		_, err = r.waitUntilClusterStatusMatches(ctx, clusterID, dbSDK.ClusterStatusActive, clusterStatusTimeout)
 		if err != nil {
 			resp.Diagnostics.AddError("Cluster Update Error", fmt.Sprintf("Error waiting for cluster %s to become stable after update: %s", clusterID, err.Error()))
 			return
@@ -771,8 +772,8 @@ func (r *DBaaSClusterResource) populateModelFromDetailResponse(detail *dbSDK.Clu
 	model.DeletionProtected = types.BoolValue(detail.DeletionProtected)
 }
 
-func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus) (*dbSDK.ClusterDetailResponse, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, clusterStatusTimeout)
+func (r *DBaaSClusterResource) waitUntilClusterStatusMatches(ctx context.Context, clusterID string, targetStatus dbSDK.ClusterStatus, timeout time.Duration) (*dbSDK.ClusterDetailResponse, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
 		select {
