@@ -8,5 +8,6 @@
   "Object Storage": ["object_storage_*"],
   "SSH Keys": ["ssh_keys.md"],
   "Availability Zones": ["availability_zones.md"],
-  "Load Balancer": ["lbaas_*"]
+  "Load Balancer": ["lbaas_*"],
+  "Tags": ["tag*"]
 }
