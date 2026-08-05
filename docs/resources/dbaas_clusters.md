@@ -59,7 +59,7 @@ resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
 - `deletion_protected` (Boolean) Deletion protected.
 - `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.
 - `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.
-- `parameter_group` (String) ID of the parameter group to associate with the cluster.  Cannot be changed after creation.
+- `parameter_group` (String) ID of the parameter group to associate with the cluster. Can be changed after creation.
 - `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database cluster. Must be at least 8 characters long. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set). Cannot be changed after creation.
 - `snapshot_id` (String) ID of the cluster snapshot to restore. Set together with 'source_cluster_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.
 - `source_cluster_id` (String) ID of an existing cluster whose snapshot will be restored into this new cluster. Set together with 'snapshot_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.

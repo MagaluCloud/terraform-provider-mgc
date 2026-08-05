@@ -250,7 +250,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"parameter_group": schema.StringAttribute{
-				Description: "ID of the parameter group to associate with the cluster.  Cannot be changed after creation.",
+				Description: "ID of the parameter group to associate with the cluster. Can be changed after creation.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
