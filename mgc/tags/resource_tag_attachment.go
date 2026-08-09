@@ -8,7 +8,6 @@ import (
 
 	tagSDK "github.com/MagaluCloud/mgc-sdk-go/tag"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
-	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -81,9 +79,6 @@ func (r *tagAttachmentResource) Schema(_ context.Context, _ resource.SchemaReque
 					"`(mgc_tag.env.name) = mgc_tag_value.prod.name` (the parentheses make the key an expression).",
 				Required:    true,
 				ElementType: types.StringType,
-				Validators: []validator.Map{
-					mapvalidator.SizeAtLeast(1),
-				},
 			},
 			"resource_type": schema.StringAttribute{
 				Description: "Type of the tagged resource, as classified by the API, such as `k8s.cluster`.",

@@ -17,7 +17,15 @@ func GetResources() []func() resource.Resource {
 }
 
 func GetDataSources() []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewTagDataSource,
+		NewTagsDataSource,
+		NewTagValueDataSource,
+		NewTagValuesDataSource,
+		NewTagAttachmentDataSource,
+		NewTagAttachmentsDataSource,
+		NewTagResourceTypesDataSource,
+	}
 }
 
 // newTagClient builds the tags client. Tags are a global service, and the client

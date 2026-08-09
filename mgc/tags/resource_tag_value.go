@@ -72,7 +72,7 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"tag_name": schema.StringAttribute{
-				Description: "Name of the tag that owns this value.",
+				Description: "Name of the tag that owns this value. Renaming the tag replaces its values as well.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -84,7 +84,8 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the value, unique within the tag. Names are case sensitive, and the API has no rename, " +
-					"so changing this creates a new value.",
+					"so changing this replaces the value. While the value is attached to a resource that replacement fails with a " +
+					"conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag`.",
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

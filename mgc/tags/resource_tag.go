@@ -79,7 +79,8 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. " +
-					"The API has no rename, so changing this creates a new tag.",
+					"The API has no rename, so changing this replaces the tag. While the tag is attached to a resource that replacement " +
+					"fails with a conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag_value` resources.",
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
