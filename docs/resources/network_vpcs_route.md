@@ -13,11 +13,28 @@ Network VPC Route
 ## Example Usage
 
 ```terraform
-resource "mgc_network_vpcs_route" "example" {
+# A route points to exactly one target: either a port or a VPC peering.
+
+# Route through a port.
+resource "mgc_network_vpcs_route" "through_port" {
   vpc_id           = "your-vpc-id"
   port_id          = "your-port-id"
   cidr_destination = "xxx.xxx.xxx.xxx/xx"
   description      = "Route example"
+}
+
+# Route through a VPC peering.
+resource "mgc_network_vpcs_peering" "example" {
+  name             = "peering-example"
+  requester_vpc_id = "your-requester-vpc-id"
+  accepter_vpc_id  = "your-accepter-vpc-id"
+}
+
+resource "mgc_network_vpcs_route" "through_peering" {
+  vpc_id           = mgc_network_vpcs_peering.example.requester_vpc_id
+  vpc_peering_id   = mgc_network_vpcs_peering.example.id
+  cidr_destination = "xxx.xxx.xxx.xxx/xx"
+  description      = "Route to the peered VPC"
 }
 ```
 
@@ -27,17 +44,18 @@ resource "mgc_network_vpcs_route" "example" {
 ### Required
 
 - `cidr_destination` (String) Destination CIDR block that defines the traffic matched by this route.
-- `port_id` (String) ID of the port used as the next hop for this route.
 - `vpc_id` (String) ID of the VPC where this route is associated.
 
 ### Optional
 
 - `description` (String) The description to help identify the route.
+- `port_id` (String) ID of the port used as the next hop for this route. Exactly one of `port_id` or `vpc_peering_id` must be set.
+- `vpc_peering_id` (String) ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `vpc_peering_id` must be set.
 
 ### Read-Only
 
 - `id` (String) The ID of the route.
-- `next_hop` (String) Resolved next hop for the route, derived from the associated port.
+- `next_hop` (String) Resolved next hop for the route, derived from the target.
 - `status` (String) Current status of the route.
 - `type` (String) Type of the route, as defined by the networking service.
 
