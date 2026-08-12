@@ -3,12 +3,12 @@
 page_title: "mgc_network_vpcs_peering Resource - terraform-provider-mgc"
 subcategory: "Network"
 description: |-
-  Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource. Import is not supported yet.
+  Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource.
 ---
 
 # mgc_network_vpcs_peering (Resource)
 
-Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource. Import is not supported yet.
+Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource.
 
 ## Example Usage
 
@@ -36,5 +36,17 @@ resource "mgc_network_vpcs_peering" "example" {
 
 ### Read-Only
 
-- `id` (String) The ID of the peering.
+- `created_at` (String) Timestamp of the peering creation.
+- `id` (String) The ID of the peering. Also the ID used to import the resource.
 - `status` (String) Current status of the peering.
+- `updated_at` (String) Timestamp of the last peering update.
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import mgc_network_vpcs_peering.example ac9709ae-b298-41c6-bc58-92a6b8b92d8b
+```

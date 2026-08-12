@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"testing"
@@ -132,7 +133,7 @@ func TestNetworkVpcsPeeringResource_SchemaRequiresReplace(t *testing.T) {
 
 	attrs := peeringTestSchema().Attributes
 
-	for _, name := range []string{"id", "name", "description", "requester_vpc_id", "accepter_vpc_id", "status"} {
+	for _, name := range []string{"id", "name", "description", "requester_vpc_id", "accepter_vpc_id", "status", "created_at", "updated_at"} {
 		require.Contains(t, attrs, name)
 	}
 
@@ -142,10 +143,14 @@ func TestNetworkVpcsPeeringResource_SchemaRequiresReplace(t *testing.T) {
 		require.Len(t, attr.PlanModifiers, 1, "%s must require replace", name)
 	}
 
-	// The timestamps stay out of the resource schema for now; the data sources
-	// expose them.
-	assert.NotContains(t, attrs, "created_at")
-	assert.NotContains(t, attrs, "updated_at")
+	// created_at holds its known value across plans; updated_at must refresh from the API.
+	createdAt, ok := attrs["created_at"].(schema.StringAttribute)
+	require.True(t, ok)
+	assert.Len(t, createdAt.PlanModifiers, 1, "created_at should keep its known value")
+
+	updatedAt, ok := attrs["updated_at"].(schema.StringAttribute)
+	require.True(t, ok)
+	assert.Empty(t, updatedAt.PlanModifiers, "updated_at must not use the prior state")
 }
 
 func TestNetworkVpcsPeeringResource_Create(t *testing.T) {
@@ -158,14 +163,14 @@ func TestNetworkVpcsPeeringResource_Create(t *testing.T) {
 		expectedStatus string
 	}{
 		{
-			name: "waits until pending_route_table",
+			name: "waits until pending_route",
 			mockSetup: func(m *mockVpcsPeeringsService) {
 				m.On("Create", mock.Anything, mock.Anything).Return(
 					&netSDK.VpcsPeeringsCreateResponse{ID: "peering-123", Status: netSDK.VpcsPeeringStatusPending}, nil)
 				m.On("Get", mock.Anything, "peering-123").Return(
 					sdkPeering(netSDK.VpcsPeeringStatusPendingRouteTable), nil)
 			},
-			expectedStatus: "pending_route_table",
+			expectedStatus: "pending_route",
 		},
 		{
 			name: "created is also a terminal status",
@@ -260,6 +265,63 @@ func TestNetworkVpcsPeeringResource_CreatePersistsStateBeforePolling(t *testing.
 	var state NetworkVpcsPeeringModel
 	resp.State.Get(context.Background(), &state)
 	assert.Equal(t, "peering-123", state.ID.ValueString())
+}
+
+// A peering on a just-created VPC can fail until the VPC is ready, so createWithRetry
+// retries after each backoff. Zero backoffs keep the test instant.
+func TestNetworkVpcsPeeringResource_CreateWithRetry(t *testing.T) {
+	t.Parallel()
+
+	req := netSDK.VpcsPeeringsCreateRequest{Name: "my-peering"}
+
+	t.Run("succeeds once the vpc is ready", func(t *testing.T) {
+		t.Parallel()
+
+		mockSvc := &mockVpcsPeeringsService{}
+		mockSvc.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("vpc not ready")).Twice()
+		mockSvc.On("Create", mock.Anything, mock.Anything).Return(
+			&netSDK.VpcsPeeringsCreateResponse{ID: "peering-123", Status: netSDK.VpcsPeeringStatusPending}, nil).Once()
+
+		r := &NetworkVpcsPeeringResource{networkPeering: mockSvc, createBackoffs: []time.Duration{0, 0, 0}}
+
+		got, err := r.createWithRetry(context.Background(), req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "peering-123", got.ID)
+		mockSvc.AssertNumberOfCalls(t, "Create", 3)
+	})
+
+	t.Run("gives up after the initial attempt plus every retry", func(t *testing.T) {
+		t.Parallel()
+
+		mockSvc := &mockVpcsPeeringsService{}
+		mockSvc.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("vpc not ready"))
+
+		r := &NetworkVpcsPeeringResource{networkPeering: mockSvc, createBackoffs: []time.Duration{0, 0, 0}}
+
+		_, err := r.createWithRetry(context.Background(), req)
+
+		require.Error(t, err)
+		// One immediate attempt plus one per backoff.
+		mockSvc.AssertNumberOfCalls(t, "Create", 4)
+	})
+
+	t.Run("a cancelled context stops the backoff", func(t *testing.T) {
+		t.Parallel()
+
+		mockSvc := &mockVpcsPeeringsService{}
+		mockSvc.On("Create", mock.Anything, mock.Anything).Return(nil, errors.New("vpc not ready"))
+
+		r := &NetworkVpcsPeeringResource{networkPeering: mockSvc, createBackoffs: []time.Duration{time.Hour}}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := r.createWithRetry(ctx, req)
+
+		require.ErrorIs(t, err, context.Canceled)
+		mockSvc.AssertNumberOfCalls(t, "Create", 1)
+	})
 }
 
 // Right after the create the peering may not be visible yet. A 404 while waiting for it to
@@ -482,6 +544,76 @@ func TestNetworkVpcsPeeringResource_UpdateIsNotSupported(t *testing.T) {
 	require.True(t, resp.Diagnostics.HasError())
 }
 
+func TestNetworkVpcsPeeringResource_ImportState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("the peering id comes straight from the import command", func(t *testing.T) {
+		t.Parallel()
+
+		resp := &resource.ImportStateResponse{State: emptyPeeringState(t)}
+		(&NetworkVpcsPeeringResource{}).ImportState(context.Background(),
+			resource.ImportStateRequest{ID: "b0bd2376-42a1-433a-bc01-d3d5ab1bb143"}, resp)
+
+		require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
+
+		var imported NetworkVpcsPeeringModel
+		resp.State.Get(context.Background(), &imported)
+
+		assert.Equal(t, "b0bd2376-42a1-433a-bc01-d3d5ab1bb143", imported.ID.ValueString())
+	})
+
+	t.Run("empty id is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		resp := &resource.ImportStateResponse{State: emptyPeeringState(t)}
+		(&NetworkVpcsPeeringResource{}).ImportState(context.Background(),
+			resource.ImportStateRequest{ID: ""}, resp)
+
+		require.True(t, resp.Diagnostics.HasError())
+	})
+}
+
+// The import only carries the id; every other attribute has to come from the Read
+// the framework runs right after it.
+func TestNetworkVpcsPeeringResource_ReadAfterImportFillsEveryAttribute(t *testing.T) {
+	t.Parallel()
+
+	mockSvc := &mockVpcsPeeringsService{}
+	mockSvc.On("Get", mock.Anything, "peering-123").Return(
+		sdkPeering(netSDK.VpcsPeeringStatusPendingRouteTable), nil)
+
+	r := &NetworkVpcsPeeringResource{networkPeering: mockSvc}
+
+	importResp := &resource.ImportStateResponse{State: emptyPeeringState(t)}
+	r.ImportState(context.Background(), resource.ImportStateRequest{ID: "peering-123"}, importResp)
+	require.False(t, importResp.Diagnostics.HasError(), importResp.Diagnostics)
+
+	readResp := &resource.ReadResponse{State: importResp.State}
+	r.Read(context.Background(), resource.ReadRequest{State: importResp.State}, readResp)
+	require.False(t, readResp.Diagnostics.HasError(), readResp.Diagnostics)
+
+	var got NetworkVpcsPeeringModel
+	readResp.State.Get(context.Background(), &got)
+
+	assert.Equal(t, "peering-123", got.ID.ValueString())
+	assert.Equal(t, "my-peering", got.Name.ValueString())
+	assert.Equal(t, "a description", got.Description.ValueString())
+	assert.Equal(t, "pending_route", got.Status.ValueString())
+	assert.Equal(t, "vpc-requester", got.RequesterVpcID.ValueString())
+	assert.Equal(t, "vpc-accepter", got.AccepterVpcID.ValueString())
+	mockSvc.AssertExpectations(t)
+}
+
+// emptyPeeringState is what the framework hands ImportState: the schema with every
+// attribute null.
+func emptyPeeringState(t *testing.T) tfsdk.State {
+	t.Helper()
+
+	state := tfsdk.State{Schema: peeringTestSchema()}
+	require.False(t, state.Set(context.Background(), NetworkVpcsPeeringModel{}).HasError())
+	return state
+}
+
 func TestFlattenVpcsPeering(t *testing.T) {
 	t.Parallel()
 
@@ -495,6 +627,22 @@ func TestFlattenVpcsPeering(t *testing.T) {
 	t.Run("nil response keeps the model untouched", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t, base, flattenVpcsPeering(base, nil))
+	})
+
+	// Regression: a response without the id must not wipe the one the create or the
+	// import already put in the state — a state without id can never be read again.
+	t.Run("id absent from the response keeps the known one", func(t *testing.T) {
+		t.Parallel()
+
+		known := base
+		known.ID = types.StringValue("peering-123")
+
+		got := flattenVpcsPeering(known, &netSDK.VpcsPeering{
+			Name:   "my-peering",
+			Status: netSDK.VpcsPeeringStatusCreated,
+		})
+
+		assert.Equal(t, "peering-123", got.ID.ValueString())
 	})
 
 	t.Run("mirrors the full peering, members mapped onto requester and accepter", func(t *testing.T) {
@@ -543,5 +691,34 @@ func TestFlattenVpcsPeering(t *testing.T) {
 
 		assert.Equal(t, "vpc-requester", got.RequesterVpcID.ValueString())
 		assert.Equal(t, "vpc-accepter", got.AccepterVpcID.ValueString())
+	})
+
+	// The SDK timestamps use an internal type, so build the peering through JSON — the
+	// only way to populate them from outside the SDK module.
+	t.Run("maps the api timestamps to rfc3339", func(t *testing.T) {
+		t.Parallel()
+
+		var peering netSDK.VpcsPeering
+		require.NoError(t, json.Unmarshal([]byte(
+			`{"id":"peering-123","name":"my-peering","status":"created",`+
+				`"created_at":"2024-01-01T00:00:00.000000","updated":"2024-02-02T12:30:00.000000"}`), &peering))
+
+		got := flattenVpcsPeering(base, &peering)
+
+		assert.Equal(t, "2024-01-01T00:00:00Z", got.CreatedAt.ValueString())
+		assert.Equal(t, "2024-02-02T12:30:00Z", got.UpdatedAt.ValueString())
+	})
+
+	t.Run("absent timestamps become null", func(t *testing.T) {
+		t.Parallel()
+
+		got := flattenVpcsPeering(base, &netSDK.VpcsPeering{
+			ID:     "peering-123",
+			Name:   "my-peering",
+			Status: netSDK.VpcsPeeringStatusPending,
+		})
+
+		assert.True(t, got.CreatedAt.IsNull())
+		assert.True(t, got.UpdatedAt.IsNull())
 	})
 }

@@ -12,6 +12,7 @@ import (
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -25,6 +26,8 @@ const (
 	peeringPollingInterval = 10 * time.Second
 )
 
+var defaultPeeringCreateBackoffs = []time.Duration{1 * time.Minute, 3 * time.Minute, 10 * time.Minute}
+
 type NetworkVpcsPeeringModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
@@ -32,14 +35,17 @@ type NetworkVpcsPeeringModel struct {
 	RequesterVpcID types.String `tfsdk:"requester_vpc_id"`
 	AccepterVpcID  types.String `tfsdk:"accepter_vpc_id"`
 	Status         types.String `tfsdk:"status"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
 
 type NetworkVpcsPeeringResource struct {
 	networkPeering netSDK.VpcsPeeringsService
+	createBackoffs []time.Duration
 }
 
 func NewNetworkVpcsPeeringResource() resource.Resource {
-	return &NetworkVpcsPeeringResource{}
+	return &NetworkVpcsPeeringResource{createBackoffs: defaultPeeringCreateBackoffs}
 }
 
 func (r *NetworkVpcsPeeringResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -62,10 +68,10 @@ func (r *NetworkVpcsPeeringResource) Configure(ctx context.Context, req resource
 func (r *NetworkVpcsPeeringResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Network VPC Peering. The peering API has no update endpoint, so every " +
-			"attribute change replaces the resource. Import is not supported yet.",
+			"attribute change replaces the resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The ID of the peering.",
+				Description: "The ID of the peering. Also the ID used to import the resource.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
@@ -100,6 +106,19 @@ func (r *NetworkVpcsPeeringResource) Schema(_ context.Context, _ resource.Schema
 				Description: "Current status of the peering.",
 				Computed:    true,
 			},
+			// created_at is immutable, so it keeps its value across plans. updated_at can
+			// change server-side, so it must refresh from the API instead of the state.
+			"created_at": schema.StringAttribute{
+				Description: "Timestamp of the peering creation.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"updated_at": schema.StringAttribute{
+				Description: "Timestamp of the last peering update.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -111,7 +130,7 @@ func (r *NetworkVpcsPeeringResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	created, err := r.networkPeering.Create(ctx, netSDK.VpcsPeeringsCreateRequest{
+	created, err := r.createWithRetry(ctx, netSDK.VpcsPeeringsCreateRequest{
 		Name:        data.Name.ValueString(),
 		Description: data.Description.ValueStringPointer(),
 		VPCs: netSDK.VpcsPeeringsCreateVpcs{
@@ -202,8 +221,39 @@ func (r *NetworkVpcsPeeringResource) Delete(ctx context.Context, req resource.De
 	}
 
 	if _, err := r.waitUntilPeeringStatusMatches(ctx, peeringID, netSDK.VpcsPeeringStatusDeleted); err != nil {
+		if isPeeringNotFound(err) {
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 	}
+}
+
+// ImportState takes the peering ID; the Read the framework runs next fills every
+// other attribute.
+func (r *NetworkVpcsPeeringResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if req.ID == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Use the peering ID, as in `terraform import mgc_network_vpcs_peering.example <peering_id>`.",
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+}
+
+func (r *NetworkVpcsPeeringResource) createWithRetry(ctx context.Context, req netSDK.VpcsPeeringsCreateRequest) (*netSDK.VpcsPeeringsCreateResponse, error) {
+	created, err := r.networkPeering.Create(ctx, req)
+	for i := 0; err != nil && i < len(r.createBackoffs); i++ {
+		tflog.Debug(ctx, fmt.Sprintf("vpc peering create failed, retrying in %s: %s", r.createBackoffs[i], err))
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(r.createBackoffs[i]):
+		}
+		created, err = r.networkPeering.Create(ctx, req)
+	}
+	return created, err
 }
 
 // waitUntilPeeringStatusMatches polls the peering until it reaches one of the expected
@@ -249,13 +299,18 @@ func flattenVpcsPeering(tfData NetworkVpcsPeeringModel, peering *netSDK.VpcsPeer
 		return tfData
 	}
 
-	tfData.ID = types.StringValue(peering.ID)
+	if peering.ID != "" {
+		tfData.ID = types.StringValue(peering.ID)
+	}
 	tfData.Name = types.StringValue(peering.Name)
-	tfData.Description = types.StringPointerValue(peering.Description)
-	tfData.Status = types.StringValue(string(peering.Status))
 
-	// The API describes the two sides as members with a role; the schema exposes them as
-	// the two ids the user wrote. A member the API omits keeps the configured value.
+	if tfData.Description.ValueString() != "" && *peering.Description != "" {
+		tfData.Description = types.StringPointerValue(peering.Description)
+	}
+	tfData.Status = types.StringValue(string(peering.Status))
+	tfData.CreatedAt = types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(peering.CreatedAt)))
+	tfData.UpdatedAt = types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(peering.Updated)))
+
 	for _, member := range peering.Members {
 		switch member.DirectRole {
 		case netSDK.VpcsPeeringDirectRoleRequester:
