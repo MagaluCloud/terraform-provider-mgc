@@ -13,7 +13,7 @@ import (
 type NetworkListVpcsRouteModel struct {
 	ID              types.String `tfsdk:"id"`
 	PortID          types.String `tfsdk:"port_id"`
-	PeeringID    types.String `tfsdk:"peering_id"`
+	PeeringID       types.String `tfsdk:"peering_id"`
 	CIDRDestination types.String `tfsdk:"cidr_destination"`
 	Description     types.String `tfsdk:"description"`
 	NextHop         types.String `tfsdk:"next_hop"`
@@ -127,7 +127,7 @@ func convertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(sdkResult *ne
 	tfModel := &NetworkListVpcsRouteModel{
 		ID:              types.StringValue(sdkResult.ID),
 		PortID:          routeTargetOrNull(sdkResult.PortID),
-		PeeringID:    routeTargetOrNull(sdkResult.VPCPeeringID),
+		PeeringID:       routeTargetOrNull(sdkResult.VPCPeeringID),
 		CIDRDestination: types.StringValue(sdkResult.CIDRDestination),
 		NextHop:         types.StringValue(sdkResult.NextHop),
 		Type:            types.StringValue(sdkResult.Type),

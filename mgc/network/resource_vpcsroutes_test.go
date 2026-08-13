@@ -117,7 +117,7 @@ func TestNetworkVpcsRouteResource_Create(t *testing.T) {
 			name: "vpc peering target",
 			plan: NetworkVpcsRouteModel{
 				VpcID:           types.StringValue("vpc-1"),
-				PeeringID:    types.StringValue("peering-1"),
+				PeeringID:       types.StringValue("peering-1"),
 				CIDRDestination: types.StringValue("10.0.0.0/16"),
 				Description:     types.StringValue(description),
 			},
