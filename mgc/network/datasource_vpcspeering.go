@@ -110,16 +110,6 @@ func (r *NetworkVpcsPeeringDatasource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	// The API keeps answering deleted peerings for a while; the resource treats
-	// those as gone and the data source has to agree.
-	if peering.Status == netSDK.VpcsPeeringStatusDeleted {
-		resp.Diagnostics.AddError(
-			"VPC peering not found",
-			fmt.Sprintf("The VPC peering %s was deleted.", peeringID),
-		)
-		return
-	}
-
 	tfModel := convertSDKVpcsPeeringToDataSourceModel(*peering)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &tfModel)...)
 }
