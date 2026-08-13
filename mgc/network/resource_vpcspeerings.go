@@ -152,7 +152,7 @@ func (r *NetworkVpcsPeeringResource) Create(ctx context.Context, req resource.Cr
 
 	peering, err := r.waitUntilPeeringStatusMatches(ctx, created.ID,
 		netSDK.VpcsPeeringStatusPendingRouteTable,
-		netSDK.VpcsPeeringStatusCreated,
+		netSDK.VpcsPeeringStatusCompleted,
 	)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
