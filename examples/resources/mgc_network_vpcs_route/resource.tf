@@ -9,15 +9,23 @@ resource "mgc_network_vpcs_route" "through_port" {
 }
 
 # Route through a VPC peering.
-resource "mgc_network_vpcs_peering" "example" {
-  name             = "peering-example"
-  requester_vpc_id = "your-requester-vpc-id"
-  accepter_vpc_id  = "your-accepter-vpc-id"
+resource "mgc_network_vpcs_peering" "peering" {
+  name             = "peering_name"
+  description      = "peering_description"
+  requester_vpc_id = mgc_network_vpcs.requester.id
+  accepter_vpc_id  = mgc_network_vpcs.accepter.id
 }
 
-resource "mgc_network_vpcs_route" "through_peering" {
-  vpc_id           = mgc_network_vpcs_peering.example.requester_vpc_id
-  peering_id   = mgc_network_vpcs_peering.example.id
-  cidr_destination = "xxx.xxx.xxx.xxx/xx"
-  description      = "Route to the peered VPC"
+resource "mgc_network_vpcs_route" "route_r" {
+  vpc_id           = mgc_network_vpcs.requester.id
+  peering_id   = mgc_network_vpcs_peering.peering.id
+  cidr_destination = mgc_network_vpcs_subnets.subnet_accepter.cidr_block
+  description      = "Route vpcs peering requester"
+}
+
+resource "mgc_network_vpcs_route" "route_a" {
+  vpc_id           = mgc_network_vpcs.accepter.id
+  peering_id   = mgc_network_vpcs_peering.peering.id
+  cidr_destination = mgc_network_vpcs_subnets.subnet_requester.cidr_block
+  description      = "Route vpcs peering accepter"
 }
