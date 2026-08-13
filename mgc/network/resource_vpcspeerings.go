@@ -112,8 +112,6 @@ func (r *NetworkVpcsPeeringResource) Schema(_ context.Context, _ resource.Schema
 				Description: "Current status of the peering. Reaches `completed` once fully provisioned; routes that target this peering only work after that.",
 				Computed:    true,
 			},
-			// created_at is immutable, so it keeps its value across plans. updated_at can
-			// change server-side, so it must refresh from the API instead of the state.
 			"created_at": schema.StringAttribute{
 				Description: "Timestamp of the peering creation.",
 				Computed:    true,
@@ -234,8 +232,6 @@ func (r *NetworkVpcsPeeringResource) Delete(ctx context.Context, req resource.De
 	}
 }
 
-// ImportState takes the peering ID; the Read the framework runs next fills every
-// other attribute.
 func (r *NetworkVpcsPeeringResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if req.ID == "" {
 		resp.Diagnostics.AddError(

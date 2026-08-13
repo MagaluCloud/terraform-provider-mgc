@@ -18,14 +18,14 @@ resource "mgc_network_vpcs_peering" "peering" {
 
 resource "mgc_network_vpcs_route" "route_r" {
   vpc_id           = mgc_network_vpcs.requester.id
-  peering_id   = mgc_network_vpcs_peering.peering.id
+  peering_id       = mgc_network_vpcs_peering.peering.id
   cidr_destination = mgc_network_vpcs_subnets.subnet_accepter.cidr_block
   description      = "Route vpcs peering requester"
 }
 
 resource "mgc_network_vpcs_route" "route_a" {
   vpc_id           = mgc_network_vpcs.accepter.id
-  peering_id   = mgc_network_vpcs_peering.peering.id
+  peering_id       = mgc_network_vpcs_peering.peering.id
   cidr_destination = mgc_network_vpcs_subnets.subnet_requester.cidr_block
   description      = "Route vpcs peering accepter"
 }
