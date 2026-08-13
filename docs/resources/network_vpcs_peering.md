@@ -3,12 +3,21 @@
 page_title: "mgc_network_vpcs_peering Resource - terraform-provider-mgc"
 subcategory: "Network"
 description: |-
-  Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource.
+  Creates a peering connection between two VPCs of your tenant.
+  There is no invitation to accept — requester and accepter are only labels for the two sides (they reappear as each member's direct_role). The connection is bidirectional and is provisioned as soon as it is created; nothing has to be approved. Both VPCs must belong to your tenant.
+  To enable traffic, add one mgc_network_vpcs_route on each VPC, each pointing to the CIDR of a subnet in the other VPC.
+  The peering API has no update endpoint, so every attribute change replaces the resource.
 ---
 
 # mgc_network_vpcs_peering (Resource)
 
-Network VPC Peering. The peering API has no update endpoint, so every attribute change replaces the resource.
+Creates a peering connection between two VPCs of your tenant.
+
+There is no invitation to accept — `requester` and `accepter` are only labels for the two sides (they reappear as each member's `direct_role`). The connection is bidirectional and is provisioned as soon as it is created; nothing has to be approved. Both VPCs must belong to your tenant.
+
+To enable traffic, add one `mgc_network_vpcs_route` on each VPC, each pointing to the CIDR of a subnet in the other VPC.
+
+The peering API has no update endpoint, so every attribute change replaces the resource.
 
 ## Example Usage
 
@@ -26,9 +35,9 @@ resource "mgc_network_vpcs_peering" "example" {
 
 ### Required
 
-- `accepter_vpc_id` (String) ID of the VPC receiving the peering invitation.
+- `accepter_vpc_id` (String) ID of the VPC on the accepter side. `requester` and `accepter` are only labels; there is no invitation to accept.
 - `name` (String) The name of the peering. Alphanumeric characters and hyphens, up to 50 characters.
-- `requester_vpc_id` (String) ID of the VPC requesting the peering.
+- `requester_vpc_id` (String) ID of the VPC on the requester side. `requester` and `accepter` are only labels for the two sides; the peering is bidirectional and needs no approval.
 
 ### Optional
 
@@ -38,7 +47,7 @@ resource "mgc_network_vpcs_peering" "example" {
 
 - `created_at` (String) Timestamp of the peering creation.
 - `id` (String) The ID of the peering. Also the ID used to import the resource.
-- `status` (String) Current status of the peering.
+- `status` (String) Current status of the peering. Reaches `completed` once fully provisioned; routes that target this peering only work after that.
 - `updated_at` (String) Timestamp of the last peering update.
 
 ## Import

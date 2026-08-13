@@ -17,7 +17,7 @@ resource "mgc_network_vpcs_peering" "example" {
 
 resource "mgc_network_vpcs_route" "through_peering" {
   vpc_id           = mgc_network_vpcs_peering.example.requester_vpc_id
-  vpc_peering_id   = mgc_network_vpcs_peering.example.id
+  peering_id   = mgc_network_vpcs_peering.example.id
   cidr_destination = "xxx.xxx.xxx.xxx/xx"
   description      = "Route to the peered VPC"
 }

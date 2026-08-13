@@ -163,14 +163,14 @@ func TestNetworkVpcsPeeringResource_Create(t *testing.T) {
 		expectedStatus string
 	}{
 		{
-			name: "waits until pending_route",
+			name: "waits until completed",
 			mockSetup: func(m *mockVpcsPeeringsService) {
 				m.On("Create", mock.Anything, mock.Anything).Return(
 					&netSDK.VpcsPeeringsCreateResponse{ID: "peering-123", Status: netSDK.VpcsPeeringStatusPending}, nil)
 				m.On("Get", mock.Anything, "peering-123").Return(
-					sdkPeering(netSDK.VpcsPeeringStatusPendingRouteTable), nil)
+					sdkPeering(netSDK.VpcsPeeringStatusCompleted), nil)
 			},
-			expectedStatus: "pending_route",
+			expectedStatus: "completed",
 		},
 		{
 			name: "created is also a terminal status",
@@ -339,8 +339,8 @@ func TestNetworkVpcsPeeringResource_WaiterRetriesNotFoundOnCreate(t *testing.T) 
 	defer cancel()
 
 	_, err := r.waitUntilPeeringStatusMatches(ctx, "peering-123",
-		netSDK.VpcsPeeringStatusPendingRouteTable,
 		netSDK.VpcsPeeringStatusCreated,
+		netSDK.VpcsPeeringStatusCompleted,
 	)
 
 	require.Error(t, err)
@@ -444,9 +444,9 @@ func TestNetworkVpcsPeeringResource_Read(t *testing.T) {
 	}
 }
 
-// Get returns the full peering, so a rename or description change made outside
-// Terraform must land in the state as drift instead of being papered over.
-func TestNetworkVpcsPeeringResource_ReadRefreshesNameAndDescription(t *testing.T) {
+// A rename outside Terraform must land in the state as drift, but a description the API
+// omits is kept: flatten only overwrites the description with a non-empty value.
+func TestNetworkVpcsPeeringResource_ReadRefreshesNameKeepsDescription(t *testing.T) {
 	t.Parallel()
 
 	renamed := sdkPeering(netSDK.VpcsPeeringStatusCreated)
@@ -473,7 +473,7 @@ func TestNetworkVpcsPeeringResource_ReadRefreshesNameAndDescription(t *testing.T
 	var got NetworkVpcsPeeringModel
 	resp.State.Get(context.Background(), &got)
 	assert.Equal(t, "renamed-outside-terraform", got.Name.ValueString())
-	assert.True(t, got.Description.IsNull())
+	assert.Equal(t, "a description", got.Description.ValueString())
 }
 
 func TestNetworkVpcsPeeringResource_Delete(t *testing.T) {
@@ -668,7 +668,7 @@ func TestFlattenVpcsPeering(t *testing.T) {
 		assert.Equal(t, "another description", got.Description.ValueString())
 	})
 
-	t.Run("absent description becomes null", func(t *testing.T) {
+	t.Run("absent description keeps the known one", func(t *testing.T) {
 		t.Parallel()
 
 		got := flattenVpcsPeering(base, &netSDK.VpcsPeering{
@@ -677,7 +677,7 @@ func TestFlattenVpcsPeering(t *testing.T) {
 			Status: netSDK.VpcsPeeringStatusPending,
 		})
 
-		assert.True(t, got.Description.IsNull())
+		assert.Equal(t, "a description", got.Description.ValueString())
 	})
 
 	t.Run("empty members keep the configured vpc ids", func(t *testing.T) {

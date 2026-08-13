@@ -54,7 +54,7 @@ func (r *NetworkVpcsRouteDatasource) Schema(_ context.Context, _ datasource.Sche
 				Description: "ID of the port used as the next hop for the route, when the target is a port.",
 				Computed:    true,
 			},
-			"vpc_peering_id": schema.StringAttribute{
+			"peering_id": schema.StringAttribute{
 				Description: "ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.",
 				Computed:    true,
 			},

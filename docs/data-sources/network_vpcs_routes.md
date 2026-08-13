@@ -42,7 +42,7 @@ Read-Only:
 - `description` (String) The description to help identify the route.
 - `id` (String) The ID of the route.
 - `next_hop` (String) Resolved next hop for the route, derived from the target.
+- `peering_id` (String) ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.
 - `port_id` (String) ID of the port used as the next hop for the route, when the target is a port.
 - `status` (String) Current status of the route.
 - `type` (String) Type of the route, as defined by the networking service.
-- `vpc_peering_id` (String) ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.

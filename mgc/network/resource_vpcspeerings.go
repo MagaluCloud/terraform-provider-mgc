@@ -67,8 +67,14 @@ func (r *NetworkVpcsPeeringResource) Configure(ctx context.Context, req resource
 
 func (r *NetworkVpcsPeeringResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network VPC Peering. The peering API has no update endpoint, so every " +
-			"attribute change replaces the resource.",
+		Description: "Creates a peering connection between two VPCs of your tenant.\n\n" +
+			"There is no invitation to accept — `requester` and `accepter` are only labels for the " +
+			"two sides (they reappear as each member's `direct_role`). The connection is bidirectional " +
+			"and is provisioned as soon as it is created; nothing has to be approved. Both VPCs must " +
+			"belong to your tenant.\n\n" +
+			"To enable traffic, add one `mgc_network_vpcs_route` on each VPC, each pointing to the CIDR " +
+			"of a subnet in the other VPC.\n\n" +
+			"The peering API has no update endpoint, so every attribute change replaces the resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the peering. Also the ID used to import the resource.",
@@ -89,21 +95,21 @@ func (r *NetworkVpcsPeeringResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"requester_vpc_id": schema.StringAttribute{
-				Description: "ID of the VPC requesting the peering.",
+				Description: "ID of the VPC on the requester side. `requester` and `accepter` are only labels for the two sides; the peering is bidirectional and needs no approval.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"accepter_vpc_id": schema.StringAttribute{
-				Description: "ID of the VPC receiving the peering invitation.",
+				Description: "ID of the VPC on the accepter side. `requester` and `accepter` are only labels; there is no invitation to accept.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"status": schema.StringAttribute{
-				Description: "Current status of the peering.",
+				Description: "Current status of the peering. Reaches `completed` once fully provisioned; routes that target this peering only work after that.",
 				Computed:    true,
 			},
 			// created_at is immutable, so it keeps its value across plans. updated_at can
@@ -151,7 +157,7 @@ func (r *NetworkVpcsPeeringResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	peering, err := r.waitUntilPeeringStatusMatches(ctx, created.ID,
-		netSDK.VpcsPeeringStatusPendingRouteTable,
+		netSDK.VpcsPeeringStatusCreated,
 		netSDK.VpcsPeeringStatusCompleted,
 	)
 	if err != nil {
@@ -304,7 +310,10 @@ func flattenVpcsPeering(tfData NetworkVpcsPeeringModel, peering *netSDK.VpcsPeer
 	}
 	tfData.Name = types.StringValue(peering.Name)
 
-	if tfData.Description.ValueString() != "" && *peering.Description != "" {
+	// Only overwrite the description with a non-empty value the API returns; when it omits
+	// the description, keep the user's configured value. This avoids a post-apply
+	// inconsistency when config holds "" (or null) and the API echoes back the other.
+	if peering.Description != nil && *peering.Description != "" {
 		tfData.Description = types.StringPointerValue(peering.Description)
 	}
 	tfData.Status = types.StringValue(string(peering.Status))

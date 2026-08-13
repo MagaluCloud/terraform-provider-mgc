@@ -41,7 +41,7 @@ func TestConvertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(t *testin
 
 			require.NotNil(t, tfModel)
 			assert.Equal(t, tt.expectedPort, tfModel.PortID)
-			assert.Equal(t, tt.expectedPeering, tfModel.VpcPeeringID)
+			assert.Equal(t, tt.expectedPeering, tfModel.PeeringID)
 		})
 	}
 

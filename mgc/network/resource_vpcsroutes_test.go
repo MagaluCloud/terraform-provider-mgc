@@ -72,7 +72,7 @@ func TestNetworkVpcsRouteResource_SchemaNextHopAttributes(t *testing.T) {
 
 	attrs := routeTestSchema().Attributes
 
-	for _, name := range []string{"port_id", "vpc_peering_id"} {
+	for _, name := range []string{"port_id", "peering_id"} {
 		attr, ok := attrs[name].(schema.StringAttribute)
 		require.True(t, ok, name)
 
@@ -83,7 +83,7 @@ func TestNetworkVpcsRouteResource_SchemaNextHopAttributes(t *testing.T) {
 		require.Len(t, attr.Validators, 1, "%s must carry the exclusivity validator", name)
 		description := attr.Validators[0].MarkdownDescription(context.Background())
 		assert.Contains(t, description, "port_id", name)
-		assert.Contains(t, description, "vpc_peering_id", name)
+		assert.Contains(t, description, "peering_id", name)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestNetworkVpcsRouteResource_Create(t *testing.T) {
 			name: "vpc peering target",
 			plan: NetworkVpcsRouteModel{
 				VpcID:           types.StringValue("vpc-1"),
-				VpcPeeringID:    types.StringValue("peering-1"),
+				PeeringID:    types.StringValue("peering-1"),
 				CIDRDestination: types.StringValue("10.0.0.0/16"),
 				Description:     types.StringValue(description),
 			},
@@ -153,7 +153,7 @@ func TestNetworkVpcsRouteResource_Create(t *testing.T) {
 			resp.State.Get(context.Background(), &state)
 			assert.Equal(t, "route-123", state.ID.ValueString())
 			assert.Equal(t, tt.plan.PortID, state.PortID)
-			assert.Equal(t, tt.plan.VpcPeeringID, state.VpcPeeringID)
+			assert.Equal(t, tt.plan.PeeringID, state.PeeringID)
 			assert.Equal(t, "created", state.Status.ValueString())
 			mockSvc.AssertExpectations(t)
 		})
@@ -194,7 +194,7 @@ func TestNetworkVpcsRouteResource_Read(t *testing.T) {
 		expectedPeering types.String
 	}{
 		{
-			name:            "port route keeps vpc_peering_id null",
+			name:            "port route keeps peering_id null",
 			routeFromAPI:    sdkRoute("port-1", ""),
 			expectedPort:    types.StringValue("port-1"),
 			expectedPeering: types.StringNull(),
@@ -230,7 +230,7 @@ func TestNetworkVpcsRouteResource_Read(t *testing.T) {
 			var read NetworkVpcsRouteModel
 			resp.State.Get(context.Background(), &read)
 			assert.Equal(t, tt.expectedPort, read.PortID)
-			assert.Equal(t, tt.expectedPeering, read.VpcPeeringID)
+			assert.Equal(t, tt.expectedPeering, read.PeeringID)
 		})
 	}
 }
@@ -294,7 +294,7 @@ func TestConvertSDKRouteResultToTerraformNetworkVpcsRouteModel(t *testing.T) {
 
 			require.NotNil(t, tfModel)
 			assert.Equal(t, tt.expectedPort, tfModel.PortID)
-			assert.Equal(t, tt.expectedPeering, tfModel.VpcPeeringID)
+			assert.Equal(t, tt.expectedPeering, tfModel.PeeringID)
 			assert.Equal(t, "route-123", tfModel.ID.ValueString())
 			assert.Equal(t, "vpc-1", tfModel.VpcID.ValueString())
 		})

@@ -3,12 +3,18 @@
 page_title: "mgc_network_vpcs_route Resource - terraform-provider-mgc"
 subcategory: "Network"
 description: |-
-  Network VPC Route
+  Adds a route to a VPC's route table.
+  To let two peered VPCs reach each other, create one route on each VPC with the destinations crossed: on each side set peering_id to the VPC peering and cidr_destination to the CIDR of a subnet in the other VPC.
+  The peering must be in status completed before its routes take effect, and after a route is created it can take a few minutes before connectivity is actually available.
 ---
 
 # mgc_network_vpcs_route (Resource)
 
-Network VPC Route
+Adds a route to a VPC's route table.
+
+To let two peered VPCs reach each other, create one route on each VPC with the destinations crossed: on each side set `peering_id` to the VPC peering and `cidr_destination` to the CIDR of a subnet in the other VPC.
+
+The peering must be in status `completed` before its routes take effect, and after a route is created it can take a few minutes before connectivity is actually available.
 
 ## Example Usage
 
@@ -32,7 +38,7 @@ resource "mgc_network_vpcs_peering" "example" {
 
 resource "mgc_network_vpcs_route" "through_peering" {
   vpc_id           = mgc_network_vpcs_peering.example.requester_vpc_id
-  vpc_peering_id   = mgc_network_vpcs_peering.example.id
+  peering_id   = mgc_network_vpcs_peering.example.id
   cidr_destination = "xxx.xxx.xxx.xxx/xx"
   description      = "Route to the peered VPC"
 }
@@ -43,14 +49,14 @@ resource "mgc_network_vpcs_route" "through_peering" {
 
 ### Required
 
-- `cidr_destination` (String) Destination CIDR block that defines the traffic matched by this route.
-- `vpc_id` (String) ID of the VPC where this route is associated.
+- `cidr_destination` (String) Destination CIDR block matched by this route. For a peering route, use the CIDR of a subnet in the other VPC.
+- `vpc_id` (String) ID of the VPC being configured (the source side) whose route table receives this route.
 
 ### Optional
 
 - `description` (String) The description to help identify the route.
-- `port_id` (String) ID of the port used as the next hop for this route. Exactly one of `port_id` or `vpc_peering_id` must be set.
-- `vpc_peering_id` (String) ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `vpc_peering_id` must be set.
+- `peering_id` (String) ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
+- `port_id` (String) ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
 
 ### Read-Only
 
