@@ -10,6 +10,20 @@ To run only unit tests (excluding acceptance tests):
 go test ./mgc/... -short
 ```
 
+For the Terraform lifecycle itself (plan, apply, import, in-place update,
+refresh, destroy) the project uses acceptance tests built on
+`terraform-plugin-testing` — see "Acceptance tests" in the README. They follow
+an endpoint-agnostic pattern: the shared harness in `mgc/internal/acctest`
+injects `MGC_ENDPOINT` (a fake API or production) into the provider's
+`endpoints` block, and the test never knows which one it is talking to.
+`mgc/kubernetes/resource_cluster_acc_test.go` is the reference implementation
+to copy when covering a new service: an external test package
+(`<service>_test`), a config builder on top of `acctest.ProviderConfig`, the
+five lifecycle steps (create with plan checks, import with verify, in-place
+update with plan checks, refresh expecting an empty plan, destroy with
+`CheckDestroy`), and `utils.PollingInterval` instead of fixed sleeps for any
+status polling.
+
 ## 1. General Approach
 
 Instead of testing Terraform's complete lifecycle, we **instantiate the Resource/Data Source directly**, **inject a "Mocked" SDK (fake)** and manually invoke the `Create`, `Read`, `Update`, and `Delete` methods, passing and inspecting the `tfsdk.State` and `tfsdk.Plan` structures.

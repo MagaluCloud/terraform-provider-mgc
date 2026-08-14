@@ -44,6 +44,9 @@ cli-dump-tree.json
 spec_stats_dump.yml
 mgc/spec_manipulator/cli_specs/specs.go.tmp
 
+.env
+env/*.env
+
 .terraform
 .terraform.lock.hcl
 terraform.tfstate
