@@ -3,6 +3,7 @@ package virtualmachines
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -23,6 +25,7 @@ import (
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -107,8 +110,9 @@ func NewVirtualMachineInstancesResource() resource.Resource {
 }
 
 type vmInstances struct {
-	vmInstances computeSdk.InstanceService
-	vmSnapshots computeSdk.SnapshotService
+	vmInstances  computeSdk.InstanceService
+	vmSnapshots  computeSdk.SnapshotService
+	networkPorts netSDK.PortService
 }
 
 func (r *vmInstances) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -128,6 +132,27 @@ func (r *vmInstances) Configure(ctx context.Context, req resource.ConfigureReque
 
 	r.vmInstances = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Instances()
 	r.vmSnapshots = computeSdk.New(dataConfig.CoreFor(utils.ServiceVirtualMachine)).Snapshots()
+	r.networkPorts = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).Ports()
+}
+
+// toNetworkInterfaceIDs converts a list of resource IDs into the shape the SDK
+// uses to reference them. A nil result leaves the field out of the request.
+func toNetworkInterfaceIDs(ctx context.Context, list types.List) (*[]computeSdk.CreateParametersNetworkInterfaceWithID, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+
+	var ids []string
+	diags := list.ElementsAs(ctx, &ids, false)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	items := make([]computeSdk.CreateParametersNetworkInterfaceWithID, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, computeSdk.CreateParametersNetworkInterfaceWithID{ID: id})
+	}
+	return &items, diags
 }
 
 type vmInstancesResourceModel struct {
@@ -144,6 +169,7 @@ type vmInstancesResourceModel struct {
 	NetworkInterfaceId     types.String `tfsdk:"network_interface_id"`
 	AllocatePublicIpv4     types.Bool   `tfsdk:"allocate_public_ipv4"`
 	CreationSecurityGroups types.List   `tfsdk:"creation_security_groups"`
+	CreationSubnets        types.List   `tfsdk:"creation_subnets"`
 	LocalIPv4              types.String `tfsdk:"local_ipv4"`
 	IPv6                   types.String `tfsdk:"ipv6"`
 	IPv4                   types.String `tfsdk:"ipv4"`
@@ -284,6 +310,25 @@ This attribute can only be used when "network_interface_id" is not set.`,
 					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 				},
 			},
+			"creation_subnets": schema.ListAttribute{
+				Description: `The subnet in which the primary network interface will be created, given as a list with a single subnet ID.
+The subnet must belong to the same VPC as the instance; this is only validated when the instance is created.
+If not specified, the subnet is chosen by the platform and reported back here.
+Changing this value replaces the instance, since a subnet can only be chosen at creation.
+This attribute can only be used when "network_interface_id" is not set.`,
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.List{
+					listvalidator.ConflictsWith(path.MatchRoot("network_interface_id")),
+					listvalidator.SizeBetween(1, 1),
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
+				},
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+					listplanmodifier.RequiresReplace(),
+				},
+			},
 			"local_ipv4": schema.StringAttribute{
 				Description: "The primary network interface IPv4 address of the virtual machine instance.",
 				Computed:    true,
@@ -365,7 +410,7 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	convertedData := r.toTerraformModel(ctx, getResult)
+	convertedData := r.toTerraformModel(ctx, getResult, data)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedData)...)
 }
 
@@ -380,20 +425,16 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		state.AllocatePublicIpv4 = types.BoolValue(false)
 	}
 
-	var sg *[]computeSdk.CreateParametersNetworkInterfaceWithID
-	if !state.CreationSecurityGroups.IsNull() {
-		var sgIDs []string
-		resp.Diagnostics.Append(state.CreationSecurityGroups.ElementsAs(ctx, &sgIDs, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		items := make([]computeSdk.CreateParametersNetworkInterfaceWithID, 0, len(sgIDs))
-		for _, id := range sgIDs {
-			items = append(items, computeSdk.CreateParametersNetworkInterfaceWithID{
-				ID: id,
-			})
-		}
-		sg = &items
+	sg, diags := toNetworkInterfaceIDs(ctx, state.CreationSecurityGroups)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	subnets, diags := toNetworkInterfaceIDs(ctx, state.CreationSubnets)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	createNetwork := computeSdk.CreateParametersNetwork{
@@ -405,6 +446,9 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 
 	if sg != nil {
 		createNetwork.Interface.SecurityGroups = sg
+	}
+	if subnets != nil {
+		createNetwork.Interface.Subnets = subnets
 	}
 	if state.VpcID.ValueString() != "" {
 		createNetwork.Vpc = &computeSdk.IDOrName{
@@ -464,7 +508,7 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, getResponse)
+	convertedResult := r.toTerraformModel(ctx, getResponse, state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -503,7 +547,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	convertedResult := r.toTerraformModel(ctx, getResult)
+	convertedResult := r.toTerraformModel(ctx, getResult, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -551,6 +595,7 @@ func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateR
 		NetworkInterfaceId:     types.StringUnknown(),
 		AllocatePublicIpv4:     types.BoolNull(),
 		CreationSecurityGroups: types.ListNull(types.StringType),
+		CreationSubnets:        types.ListNull(types.StringType),
 		LocalIPv4:              types.StringUnknown(),
 		IPv6:                   types.StringUnknown(),
 		IPv4:                   types.StringUnknown(),
@@ -559,7 +604,7 @@ func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateR
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
 
-func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance) *vmInstancesResourceModel {
+func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance, tfData vmInstancesResourceModel) *vmInstancesResourceModel {
 	interfaces := []VmInstancesNetworkInterfaceModel{}
 	if server.Network.Interfaces != nil {
 		for _, port := range *server.Network.Interfaces {
@@ -606,9 +651,61 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 
 	data.AllocatePublicIpv4 = types.BoolNull()
 	data.CreationSecurityGroups = types.ListNull(types.StringType)
+	data.CreationSubnets = r.resolveCreationSubnets(ctx, server, tfData.CreationSubnets)
 	data.SnapshotID = types.StringNull()
 
 	return &data
+}
+
+func (r *vmInstances) resolveCreationSubnets(ctx context.Context, server *computeSdk.Instance, fallback types.List) types.List {
+	if r.networkPorts == nil || server.Network == nil || server.Network.Interfaces == nil {
+		return fallback
+	}
+
+	var primaryPortID string
+	for _, ni := range *server.Network.Interfaces {
+		if ni.Primary != nil && *ni.Primary {
+			primaryPortID = ni.ID
+			break
+		}
+	}
+	if primaryPortID == "" {
+		return fallback
+	}
+
+	port, err := r.networkPorts.Get(ctx, primaryPortID)
+	if err != nil || port == nil || port.IPAddress == nil {
+		return fallback
+	}
+
+	subnets := distinctSubnetIDs(*port.IPAddress)
+	if len(subnets) != 1 {
+		return fallback
+	}
+	return types.ListValueMust(types.StringType, []attr.Value{types.StringValue(subnets[0])})
+}
+
+// distinctSubnetIDs returns the unique, non-empty subnet IDs backing the port's
+// IPv4 addresses, preserving first-seen order.
+func distinctSubnetIDs(addresses []netSDK.IpAddress) []string {
+	seen := make(map[string]struct{}, len(addresses))
+	ids := make([]string, 0, len(addresses))
+	for _, addr := range addresses {
+		if addr.SubnetID == "" || !isIPv4(addr.IPAddress) {
+			continue
+		}
+		if _, ok := seen[addr.SubnetID]; ok {
+			continue
+		}
+		seen[addr.SubnetID] = struct{}{}
+		ids = append(ids, addr.SubnetID)
+	}
+	return ids
+}
+
+func isIPv4(addr string) bool {
+	ip := net.ParseIP(addr)
+	return ip != nil && ip.To4() != nil
 }
 
 func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {

@@ -119,7 +119,7 @@ func (r *VolumeAttach) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *VolumeAttach) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Update not suported", "Update not suported for this resource")
+	resp.Diagnostics.AddError("Update not supported", "Update not supported for this resource")
 }
 
 func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -142,14 +142,14 @@ func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 }
 
-func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, volumeID string, expetedStatus string) (err error) {
+func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, volumeID string, expectedStatus string) (err error) {
 	for startTime := time.Now(); time.Since(startTime) < AttachVolumeTimeout; {
 		time.Sleep(10 * time.Second)
 		getResult, err := r.blockStorageVolumes.Get(ctx, volumeID, []string{})
 		if err != nil {
 			return err
 		}
-		if getResult.Status == expetedStatus {
+		if getResult.Status == expectedStatus {
 			break
 		}
 	}
