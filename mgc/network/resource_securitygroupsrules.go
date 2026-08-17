@@ -179,7 +179,7 @@ func (r *NetworkSecurityGroupsRulesResource) Read(ctx context.Context, req resou
 		return
 	}
 
-	//Fix for network API retorning empty description for null values
+	//Fix for network API returning empty description for null values
 	if data.Description.ValueStringPointer() != nil || *rule.Description != "" {
 		data.Description = types.StringPointerValue(rule.Description)
 	}
