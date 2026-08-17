@@ -24,6 +24,7 @@ nodepools
 nopg
 nordeste
 nvme
+peerings
 Remmina
 ssword
 subnetpool
