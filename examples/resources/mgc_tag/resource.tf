@@ -1,6 +1,6 @@
-resource "mgc_tag" "ambiente" {
-  name        = "ambiente"
-  description = "Separa os recursos por ambiente"
+resource "mgc_tag" "environment" {
+  name        = "environment"
+  description = "Group resources by environment"
   color       = "0086ff"
   kinds       = ["finops"]
 }

@@ -16,6 +16,6 @@ output "tagged_vpc_ids" {
 output "production_resources" {
   value = [
     for attachment in data.mgc_tag_attachments.all.attachments :
-    attachment.resource_id if lookup(attachment.tags, "ambiente", "") == "producao"
+    attachment.resource_id if lookup(attachment.tags, "environment", "") == "production"
   ]
 }

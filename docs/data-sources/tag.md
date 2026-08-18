@@ -13,17 +13,17 @@ Reads a tag of the tenant by name, along with the values defined for it.
 ## Example Usage
 
 ```terraform
-data "mgc_tag" "ambiente" {
-  name = "ambiente"
+data "mgc_tag" "environment" {
+  name = "environment"
 }
 
-output "ambiente_color" {
-  value = data.mgc_tag.ambiente.color
+output "environment_color" {
+  value = data.mgc_tag.environment.color
 }
 
 # The answer already embeds the values defined for the tag.
-output "ambiente_values" {
-  value = [for value in data.mgc_tag.ambiente.values : value.name]
+output "environment_values" {
+  value = [for value in data.mgc_tag.environment.values : value.name]
 }
 ```
 

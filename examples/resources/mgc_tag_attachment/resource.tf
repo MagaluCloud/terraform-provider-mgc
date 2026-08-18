@@ -1,15 +1,15 @@
-resource "mgc_tag" "ambiente" {
-  name  = "ambiente"
+resource "mgc_tag" "environment" {
+  name  = "environment"
   kinds = ["finops"]
 }
 
-resource "mgc_tag_value" "producao" {
-  tag_name = mgc_tag.ambiente.name
-  name     = "producao"
+resource "mgc_tag_value" "production" {
+  tag_name = mgc_tag.environment.name
+  name     = "production"
 }
 
 resource "mgc_network_vpcs" "main" {
-  name = "vpc-exemplo"
+  name = "vpc-example"
 }
 
 # This resource owns every tag of the target: a tag attached outside Terraform is
@@ -21,6 +21,6 @@ resource "mgc_tag_attachment" "vpc" {
   # value (instead of writing them as literal strings) is also what makes
   # Terraform create both before attaching them.
   tags = {
-    (mgc_tag.ambiente.name) = mgc_tag_value.producao.name
+    (mgc_tag.environment.name) = mgc_tag_value.production.name
   }
 }

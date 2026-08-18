@@ -1,10 +1,10 @@
-resource "mgc_tag" "ambiente" {
-  name  = "ambiente"
+resource "mgc_tag" "environment" {
+  name  = "environment"
   kinds = ["finops"]
 }
 
-resource "mgc_tag_value" "producao" {
-  tag_name    = mgc_tag.ambiente.name
-  name        = "producao"
-  description = "Recursos do ambiente produtivo"
+resource "mgc_tag_value" "production" {
+  tag_name    = mgc_tag.environment.name
+  name        = "production"
+  description = "Resources of the production environment"
 }

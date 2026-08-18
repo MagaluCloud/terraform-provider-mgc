@@ -13,13 +13,13 @@ Reads a single value of a tag by name.
 ## Example Usage
 
 ```terraform
-data "mgc_tag_value" "producao" {
-  tag_name = "ambiente"
-  name     = "producao"
+data "mgc_tag_value" "production" {
+  tag_name = "environment"
+  name     = "production"
 }
 
-output "producao_description" {
-  value = data.mgc_tag_value.producao.description
+output "production_description" {
+  value = data.mgc_tag_value.production.description
 }
 ```
 

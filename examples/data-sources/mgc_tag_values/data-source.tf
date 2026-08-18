@@ -1,7 +1,7 @@
-data "mgc_tag_values" "ambiente" {
-  tag_name = "ambiente"
+data "mgc_tag_values" "environment" {
+  tag_name = "environment"
 }
 
-output "ambiente_values" {
-  value = [for value in data.mgc_tag_values.ambiente.values : value.name]
+output "environment_values" {
+  value = [for value in data.mgc_tag_values.environment.values : value.name]
 }

@@ -5,7 +5,7 @@ data "mgc_tag_attachment" "vpc" {
 }
 
 output "vpc_environment" {
-  value = data.mgc_tag_attachment.vpc.tags["ambiente"]
+  value = data.mgc_tag_attachment.vpc.tags["environment"]
 }
 
 output "vpc_resource_type" {

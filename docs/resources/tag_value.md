@@ -13,37 +13,15 @@ A value of a tag. A resource carries a single value per tag, and both the tag an
 ## Example Usage
 
 ```terraform
-resource "mgc_tag" "ambiente" {
-  name  = "ambiente"
+resource "mgc_tag" "environment" {
+  name  = "environment"
   kinds = ["finops"]
 }
 
-resource "mgc_tag_value" "producao" {
-  tag_name    = mgc_tag.ambiente.name
-  name        = "producao"
-  description = "Recursos do ambiente produtivo"
-}
-```
-
-## Renaming or Deleting a Value in Use
-
-The API has no rename. Changing `name` or `tag_name` makes Terraform destroy the
-value and create a new one, and destroying a value that is still attached to a
-resource fails with a `409 Conflict`.
-
-Renaming a `mgc_tag` replaces its values as well, so the same conflict happens
-there. Both cases are the same problem and have the same remedies, described in
-[Renaming or Deleting a Tag in Use](https://registry.terraform.io/providers/MagaluCloud/mgc/latest/docs/resources/tag#renaming-or-deleting-a-tag-in-use).
-Whichever remedy is chosen, apply it to the tag and to its values together:
-
-```terraform
-resource "mgc_tag_value" "producao" {
-  tag_name = mgc_tag.ambiente.name
-  name     = "producao"
-
-  lifecycle {
-    create_before_destroy = true
-  }
+resource "mgc_tag_value" "production" {
+  tag_name    = mgc_tag.environment.name
+  name        = "production"
+  description = "Resources of the production environment"
 }
 ```
 
@@ -73,5 +51,5 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Tag values are imported as <tag_name>,<value_name>.
-terraform import mgc_tag_value.producao ambiente,producao
+terraform import mgc_tag_value.production environment,production
 ```
