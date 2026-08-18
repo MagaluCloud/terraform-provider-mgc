@@ -51,7 +51,11 @@ func (r *NetworkVpcsRouteDatasource) Schema(_ context.Context, _ datasource.Sche
 				Required:    true,
 			},
 			"port_id": schema.StringAttribute{
-				Description: "ID of the port used as the next hop for the route.",
+				Description: "ID of the port used as the next hop for the route, when the target is a port.",
+				Computed:    true,
+			},
+			"peering_id": schema.StringAttribute{
+				Description: "ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.",
 				Computed:    true,
 			},
 			"cidr_destination": schema.StringAttribute{
@@ -63,7 +67,7 @@ func (r *NetworkVpcsRouteDatasource) Schema(_ context.Context, _ datasource.Sche
 				Computed:    true,
 			},
 			"next_hop": schema.StringAttribute{
-				Description: "Resolved next hop for the route, derived from the associated port.",
+				Description: "Resolved next hop for the route, derived from the target.",
 				Computed:    true,
 			},
 			"type": schema.StringAttribute{

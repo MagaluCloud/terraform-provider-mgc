@@ -19,6 +19,8 @@ func GetDataSources() []func() datasource.DataSource {
 		NewDataSourceNetworkVPCInterface,
 		NewDataSourceNetworkVPCInterfaces,
 		NewDataSourceNetworkVpcsSubnet,
+		NewDataSourceNetworkVpcsPeering,
+		NewDataSourceNetworkVpcsPeerings,
 		NewDataSourceNetworkVpcsRoute,
 		NewDataSourceNetworkVpcsRoutes,
 	}
@@ -38,5 +40,6 @@ func GetResources() []func() resource.Resource {
 		NewNetworkVPCInterfaceResource,
 		NewNetworkVpcsSubnetsResource,
 		NewNetworkVpcsRouteResource,
+		NewNetworkVpcsPeeringResource,
 	}
 }

@@ -3,21 +3,52 @@
 page_title: "mgc_network_vpcs_route Resource - terraform-provider-mgc"
 subcategory: "Network"
 description: |-
-  Network VPC Route
+  Adds a route to a VPC's route table.
+  To let two peered VPCs reach each other, create one route on each VPC with the destinations crossed: on each side set peering_id to the VPC peering and cidr_destination to the CIDR of a subnet in the other VPC.
+  The peering must be in status completed before its routes take effect, and after a route is created it can take a few minutes before connectivity is actually available.
 ---
 
 # mgc_network_vpcs_route (Resource)
 
-Network VPC Route
+Adds a route to a VPC's route table.
+
+To let two peered VPCs reach each other, create one route on each VPC with the destinations crossed: on each side set `peering_id` to the VPC peering and `cidr_destination` to the CIDR of a subnet in the other VPC.
+
+The peering must be in status `completed` before its routes take effect, and after a route is created it can take a few minutes before connectivity is actually available.
 
 ## Example Usage
 
 ```terraform
-resource "mgc_network_vpcs_route" "example" {
+# A route points to exactly one target: either a port or a VPC peering.
+
+# Route through a port.
+resource "mgc_network_vpcs_route" "through_port" {
   vpc_id           = "your-vpc-id"
   port_id          = "your-port-id"
   cidr_destination = "xxx.xxx.xxx.xxx/xx"
   description      = "Route example"
+}
+
+# Route through a VPC peering.
+resource "mgc_network_vpcs_peering" "peering" {
+  name             = "peering_name"
+  description      = "peering_description"
+  requester_vpc_id = mgc_network_vpcs.requester.id
+  accepter_vpc_id  = mgc_network_vpcs.accepter.id
+}
+
+resource "mgc_network_vpcs_route" "route_r" {
+  vpc_id           = mgc_network_vpcs.requester.id
+  peering_id       = mgc_network_vpcs_peering.peering.id
+  cidr_destination = mgc_network_vpcs_subnets.subnet_accepter.cidr_block
+  description      = "Route vpcs peering requester"
+}
+
+resource "mgc_network_vpcs_route" "route_a" {
+  vpc_id           = mgc_network_vpcs.accepter.id
+  peering_id       = mgc_network_vpcs_peering.peering.id
+  cidr_destination = mgc_network_vpcs_subnets.subnet_requester.cidr_block
+  description      = "Route vpcs peering accepter"
 }
 ```
 
@@ -26,18 +57,19 @@ resource "mgc_network_vpcs_route" "example" {
 
 ### Required
 
-- `cidr_destination` (String) Destination CIDR block that defines the traffic matched by this route.
-- `port_id` (String) ID of the port used as the next hop for this route.
-- `vpc_id` (String) ID of the VPC where this route is associated.
+- `cidr_destination` (String) Destination CIDR block matched by this route. For a peering route, use the CIDR of a subnet in the other VPC.
+- `vpc_id` (String) ID of the VPC being configured (the source side) whose route table receives this route.
 
 ### Optional
 
 - `description` (String) The description to help identify the route.
+- `peering_id` (String) ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
+- `port_id` (String) ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
 
 ### Read-Only
 
 - `id` (String) The ID of the route.
-- `next_hop` (String) Resolved next hop for the route, derived from the associated port.
+- `next_hop` (String) Resolved next hop for the route, derived from the target.
 - `status` (String) Current status of the route.
 - `type` (String) Type of the route, as defined by the networking service.
 
