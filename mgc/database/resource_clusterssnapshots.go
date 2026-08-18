@@ -9,10 +9,12 @@ import (
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -92,7 +94,10 @@ func (r *DBaaSClusterSnapshotResource) Schema(_ context.Context, _ resource.Sche
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the snapshot. Can be changed after creation.",
-				Required:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 		},
 	}
@@ -139,7 +144,11 @@ func (r *DBaaSClusterSnapshotResource) Read(ctx context.Context, req resource.Re
 	}
 
 	data.Name = types.StringValue(snapshot.Name)
-	data.Description = types.StringValue(snapshot.Description)
+	if snapshot.Description == "" {
+		data.Description = types.StringNull()
+	} else {
+		data.Description = types.StringValue(snapshot.Description)
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
