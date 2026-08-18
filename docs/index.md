@@ -90,6 +90,7 @@ Optional:
 - `network` (String) Custom endpoint for the Network service.
 - `object_storage` (String) Custom endpoint for the Object Storage (S3-compatible) service. Unlike the other services, this value is used as the full S3 endpoint, not as a base URL with an appended service path.
 - `ssh` (String) Custom endpoint for the SSH Keys service.
+- `tags` (String) Custom endpoint for the Tags service. Tags are global, so this endpoint is not region specific.
 - `virtual_machine` (String) Custom endpoint for the Virtual Machines service.
 
 #### Example Usage
