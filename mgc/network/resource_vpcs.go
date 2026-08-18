@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const NetworkPoolingTimeout = 5 * time.Minute
+const NetworkPoolingTimeout = 15 * time.Minute
 
 type NetworkVPCModel struct {
 	Id          types.String `tfsdk:"id"`

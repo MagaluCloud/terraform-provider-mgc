@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	completedBsSttus      = "completed"
+	completedBsStatus     = "completed"
 	BsVolumeStatusTimeout = 60 * time.Minute
 )
 
