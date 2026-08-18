@@ -3,7 +3,7 @@ module github.com/MagaluCloud/terraform-provider-mgc
 go 1.26.3
 
 require (
-	github.com/MagaluCloud/mgc-sdk-go v1.19.0
+	github.com/MagaluCloud/mgc-sdk-go v1.20.0-rc.1
 	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
@@ -56,5 +56,3 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/MagaluCloud/mgc-sdk-go => /home/onofre.matheus/mgc_development/mgc-sdk-go
