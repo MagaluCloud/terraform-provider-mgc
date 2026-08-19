@@ -3,9 +3,11 @@ package database
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -139,6 +141,10 @@ func (r *DBaaSClusterSnapshotResource) Read(ctx context.Context, req resource.Re
 
 	snapshot, err := r.dbaasClusters.GetSnapshot(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
+		if httpErr, ok := err.(*clientSDK.HTTPError); ok && httpErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
