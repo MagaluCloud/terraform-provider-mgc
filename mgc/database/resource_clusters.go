@@ -166,7 +166,13 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "ID of an existing cluster whose snapshot will be restored into this new cluster. Set together with 'snapshot_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !req.StateValue.IsNull()
+						},
+						"Recreates the resource when the restore source changes, except when the state has no prior value (e.g. right after an import).",
+						"Recreates the resource when the restore source changes, except when the state has no prior value (e.g. right after an import).",
+					),
 				},
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(path.MatchRoot("snapshot_id")),
@@ -182,7 +188,13 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 				Description: "ID of the cluster snapshot to restore. Set together with 'source_cluster_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !req.StateValue.IsNull()
+						},
+						"Recreates the resource when the restore snapshot changes, except when the state has no prior value (e.g. right after an import).",
+						"Recreates the resource when the restore snapshot changes, except when the state has no prior value (e.g. right after an import).",
+					),
 				},
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(path.MatchRoot("source_cluster_id")),
