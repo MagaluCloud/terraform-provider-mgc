@@ -631,7 +631,7 @@ func (r *LoadBalancerResource) replaceACLsIfChanged(ctx context.Context, plan, s
 		if err != nil {
 			return err
 		}
-		_, err = r.waitLoadBalancerState(ctx, state.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
 			return err
 		}
@@ -643,7 +643,7 @@ func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, sta
 	if hasChange, updatedHealthChecks := plan.healthChecksToUpdate(*state); hasChange {
 		state.HealthChecks = plan.HealthChecks
 		for _, hc := range updatedHealthChecks {
-			err := r.lbNetworkHealthCheck.Update(ctx, state.ID.ValueString(), hc.ID.ValueString(), lbSDK.UpdateNetworkHealthCheckRequest{
+			err := r.lbNetworkHealthCheck.Update(ctx, plan.ID.ValueString(), hc.ID.ValueString(), lbSDK.UpdateNetworkHealthCheckRequest{
 				Protocol:                lbSDK.HealthCheckProtocol(hc.Protocol.ValueString()),
 				Port:                    int(hc.Port.ValueInt64()),
 				Path:                    hc.Path.ValueStringPointer(),
@@ -680,7 +680,7 @@ func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, s
 			state.Backends[backendIdx].PanicThreshold = b.PanicThreshold
 			state.Backends[backendIdx].CloseConnectionsOnHostHealthFailure = b.CloseConnectionsOnHostHealthFailure
 		}
-		_, err := r.lbNetworkBackend.Update(ctx, state.ID.ValueString(), b.ID.ValueString(), lbSDK.UpdateNetworkBackendRequest{
+		_, err := r.lbNetworkBackend.Update(ctx, plan.ID.ValueString(), b.ID.ValueString(), lbSDK.UpdateNetworkBackendRequest{
 			PanicThreshold:                      b.PanicThreshold.ValueFloat64Pointer(),
 			CloseConnectionsOnHostHealthFailure: b.CloseConnectionsOnHostHealthFailure.ValueBoolPointer(),
 		})
@@ -734,7 +734,7 @@ func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, 
 			})
 		}
 
-		_, err := r.lbNetworkTarget.Replace(ctx, state.ID.ValueString(), bu.ID.ValueString(), lbSDK.CreateNetworkBackendTargetRequest{
+		_, err := r.lbNetworkTarget.Replace(ctx, plan.ID.ValueString(), bu.ID.ValueString(), lbSDK.CreateNetworkBackendTargetRequest{
 			HealthCheckID: healthCheckID,
 			TargetsType:   lbSDK.BackendType(bu.TargetsType.ValueString()),
 			Targets:       targets,
