@@ -416,7 +416,7 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	state := vmInstancesResourceModel{}
-	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

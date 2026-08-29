@@ -326,7 +326,7 @@ func (r *DBaaSClusterResource) Schema(_ context.Context, _ resource.SchemaReques
 
 func (r *DBaaSClusterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan DBaaSClusterModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

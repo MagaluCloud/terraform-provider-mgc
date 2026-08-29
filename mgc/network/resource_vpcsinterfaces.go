@@ -138,7 +138,7 @@ func (r *NetworkVPCInterfaceResource) Read(ctx context.Context, req resource.Rea
 
 func (r *NetworkVPCInterfaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var model NetworkVPCInterfaceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &model)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

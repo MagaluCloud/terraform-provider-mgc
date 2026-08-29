@@ -95,7 +95,7 @@ func (r *DBaaSParameterGroupsResource) Schema(_ context.Context, _ resource.Sche
 
 func (r *DBaaSParameterGroupsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data DBaaSParametersModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
