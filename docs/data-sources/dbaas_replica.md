@@ -28,6 +28,7 @@ data "mgc_dbaas_replica" "replica" {
 ### Read-Only
 
 - `addresses` (Attributes List) List of replica network addresses (see [below for nested schema](#nestedatt--addresses))
+- `availability_zone` (String) Availability zone where the replica is placed
 - `created_at` (String) Creation timestamp in RFC3339 format
 - `engine_id` (String) Engine ID of the replica
 - `finished_at` (String) Stop timestamp in RFC3339 format
