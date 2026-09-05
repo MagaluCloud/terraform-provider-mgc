@@ -130,9 +130,20 @@ Before submitting contributions, please run:
 # Run pre-commit checks
 make before-commit
 
-# Run all tests
+# Run unit tests and schema checks
 make go-test
 ```
+
+Run the Terraform contract suite before changing resource lifecycle or planning
+behavior. It uses a real Terraform CLI with local HTTPS API fixtures and needs
+no cloud credentials:
+
+```sh
+make test-regression
+```
+
+See [regression testing](REGRESSION_TESTING.md) for prerequisites, covered
+scenarios, schema compatibility checks, and how to add a regression test.
 
 ## Contributing
 

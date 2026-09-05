@@ -241,27 +241,41 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId, expectedVersion string, states ...string) (k8sSDK.Cluster, error) {
-	var result *k8sSDK.Cluster
-	var err error
-	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
-		time.Sleep(1 * time.Minute)
-		result, err = r.k8sCluster.Get(ctx, clusterId)
-		if err != nil {
-			return k8sSDK.Cluster{}, err
-		}
-		state := strings.ToLower(result.Status.State)
+	return r.pollCluster(ctx, clusterId, expectedVersion, time.Minute, states...)
+}
 
-		if slices.Contains(states, state) && (expectedVersion == "" || result.Version == expectedVersion) {
-			return *result, nil
+func (r *k8sClusterResource) pollCluster(ctx context.Context, clusterId, expectedVersion string, interval time.Duration, states ...string) (k8sSDK.Cluster, error) {
+	return r.pollClusterUntil(ctx, clusterId, expectedVersion, interval, nil, states...)
+}
+
+func (r *k8sClusterResource) pollClusterUntil(ctx context.Context, clusterId, expectedVersion string, interval time.Duration, matches func(k8sSDK.Cluster) bool, states ...string) (k8sSDK.Cluster, error) {
+	var result k8sSDK.Cluster
+	err := utils.Poll(ctx, ClusterPoolingTimeout, interval, func(ctx context.Context) (bool, error) {
+		cluster, err := r.k8sCluster.Get(ctx, clusterId)
+		if err != nil {
+			// A newly accepted create may not be readable yet. For deletion,
+			// preserve the 404 so the caller can treat absence as completion.
+			var httpErr *clientSDK.HTTPError
+			if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound && !slices.Contains(states, "deleted") {
+				return false, nil
+			}
+			return false, err
+		}
+		if cluster == nil || cluster.Status == nil {
+			return false, errors.New("cluster response is missing status")
+		}
+		result = *cluster
+		state := strings.ToLower(result.Status.State)
+		if slices.Contains(states, state) && (expectedVersion == "" || result.Version == expectedVersion) && (matches == nil || matches(result)) {
+			return true, nil
 		}
 		if state == "failed" {
-			return *result, errors.New("cluster failed to provision")
+			return false, errors.New("cluster failed to provision")
 		}
-
 		tflog.Debug(ctx, fmt.Sprintf("current cluster state: [%s]", state))
-	}
-
-	return *result, errors.New("timeout waiting for cluster to provision")
+		return false, nil
+	})
+	return result, err
 }
 
 func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -293,7 +307,11 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		expectedVersion = plan.Version.ValueString()
 	}
 
-	upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), expectedVersion, "running")
+	// A running cluster may still expose the pre-PATCH values. Only persist
+	// the response after all requested mutable fields have converged.
+	upgraded, err := r.pollClusterUntil(ctx, state.ID.ValueString(), expectedVersion, time.Minute, func(cluster k8sSDK.Cluster) bool {
+		return clusterMatchesPatch(cluster, patch)
+	}, "running")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -316,15 +334,11 @@ func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	if _, err := r.GetClusterPooling(ctx, data.ID.ValueString(), "", "deleted"); err != nil {
-		switch e := err.(type) {
-		case *clientSDK.HTTPError:
-			if e.StatusCode == http.StatusNotFound {
-				return
-			}
-		default:
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return
 		}
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 	}
 }
 
@@ -426,4 +440,21 @@ func convertStringSliceToTypesStringSlice(input []string) []types.String {
 		result[i] = types.StringValue(v)
 	}
 	return result
+}
+
+// Lists retain their order because allowed_cidrs is a Terraform list, not a set.
+func clusterMatchesPatch(cluster k8sSDK.Cluster, patch k8sSDK.PatchClusterRequest) bool {
+	if patch.Description != nil && (cluster.Description == nil || *cluster.Description != *patch.Description) {
+		return false
+	}
+	if patch.AllowedCIDRs != nil {
+		var got []string
+		if cluster.AllowedCIDRs != nil {
+			got = *cluster.AllowedCIDRs
+		}
+		if !slices.Equal(got, *patch.AllowedCIDRs) {
+			return false
+		}
+	}
+	return patch.Version == nil || cluster.Version == *patch.Version
 }

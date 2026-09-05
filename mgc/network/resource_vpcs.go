@@ -2,9 +2,13 @@ package network
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -95,28 +99,33 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	for startTime := time.Now(); time.Since(startTime) < NetworkPoolingTimeout; {
-		res, err := r.networkVPC.Get(ctx, createdVPC)
-		if err != nil {
-			resp.Diagnostics.AddError(utils.ParseSDKError(err))
-			return
-		}
-		if res.Status == "created" {
-			break
-		}
-		if strings.Contains(res.Status, "error") {
-			resp.Diagnostics.AddError(
-				"Error in VPC creation",
-				"VPC creation failed with status: ["+res.Status+"] \nVPC ID: "+createdVPC+" \nPlease check the VPC status in the Magalu Cloud CLI or contact support")
-			return
-		}
-		tflog.Info(ctx, "VPC is not yet created, waiting for 10 seconds",
-			map[string]any{"status": res.Status})
-		time.Sleep(10 * time.Second)
-	}
-
+	// Keep the ID when creation succeeds but waiting fails, so Terraform can
+	// recover or destroy the partially provisioned resource.
 	data.Id = types.StringValue(createdVPC)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	err = utils.Poll(ctx, NetworkPoolingTimeout, 10*time.Second, func(ctx context.Context) (bool, error) {
+		res, err := r.networkVPC.Get(ctx, createdVPC)
+		if err != nil {
+			return false, err
+		}
+		if res.Status == "created" {
+			return true, nil
+		}
+		if strings.Contains(res.Status, "error") {
+			return false, fmt.Errorf("VPC %s creation failed with status %s", createdVPC, res.Status)
+		}
+		tflog.Info(ctx, "Waiting for VPC creation", map[string]any{"status": res.Status})
+		return false, nil
+	})
+	if err != nil {
+		_, detail := utils.ParseSDKError(err)
+		resp.Diagnostics.AddError("Error waiting for VPC creation", detail)
+		return
+	}
+
 }
 
 func (r *NetworkVPCResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -128,6 +137,11 @@ func (r *NetworkVPCResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	vpc, err := r.networkVPC.Get(ctx, data.Id.ValueString())
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}

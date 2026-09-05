@@ -130,6 +130,14 @@ go-test: ## Run Go tests
 	@echo -e "$(GREEN)Running tests...$(NC)"
 	@$(GOTEST) -v ./...
 
+.PHONY: test-contract test-regression
+test-contract: ## Run real Terraform contract tests against local APIs (requires Terraform 1.11+)
+	@CHECKPOINT_DISABLE=1 TF_IN_AUTOMATION=1 $(GOTEST) -tags=contract -race -count=1 -timeout=10m -v ./mgc/internal/contracttest ./mgc/contract/...
+
+test-regression: ## Run unit, schema and Terraform contract tests with the race detector
+	@$(GOTEST) -race -count=1 ./...
+	@$(MAKE) test-contract
+
 build: ## Build the provider
 	@echo -e "$(GREEN)Building the provider...$(NC)"
 	@goreleaser release --snapshot --clean --config "release.yaml" --skip "sign"
