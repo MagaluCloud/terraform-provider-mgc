@@ -1,0 +1,2 @@
+# Keep the schema contract stable across Windows and Unix checkouts.
+mgc/testdata/schema-contract.golden text eol=lf

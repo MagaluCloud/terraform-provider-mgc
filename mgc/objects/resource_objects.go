@@ -166,6 +166,9 @@ func (r *objectStorageObjects) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if plan.ObjectLockRetainUntilDate.IsUnknown() {
+		plan.ObjectLockRetainUntilDate = types.StringNull()
+	}
 
 	data, contentType, err := r.getContent(&plan)
 	if err != nil {
@@ -268,6 +271,11 @@ func (r *objectStorageObjects) contentChanged(ctx context.Context, plan, state *
 	if err != nil {
 		return false, err
 	}
+	// Equal byte counts do not imply equal content. Respect changes in the
+	// configured inputs before consulting remote metadata.
+	if !plan.Content.Equal(state.Content) || !plan.Source.Equal(state.Source) {
+		return true, nil
+	}
 
 	meta, err := r.objects.Metadata(ctx, plan.Bucket.ValueString(), plan.Key.ValueString(), nil)
 	if err != nil {
@@ -296,6 +304,9 @@ func (r *objectStorageObjects) Update(ctx context.Context, req resource.UpdateRe
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if plan.ObjectLockRetainUntilDate.IsUnknown() {
+		plan.ObjectLockRetainUntilDate = state.ObjectLockRetainUntilDate
 	}
 
 	changed, err := r.contentChanged(ctx, &plan, &state)

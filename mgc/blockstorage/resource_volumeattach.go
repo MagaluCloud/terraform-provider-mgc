@@ -85,6 +85,12 @@ func (r *VolumeAttach) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	// The API accepted the attachment. Preserve its identity even if waiting fails.
+	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -143,15 +149,11 @@ func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, r
 }
 
 func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, volumeID string, expectedStatus string) (err error) {
-	for startTime := time.Now(); time.Since(startTime) < AttachVolumeTimeout; {
-		time.Sleep(10 * time.Second)
-		getResult, err := r.blockStorageVolumes.Get(ctx, volumeID, []string{})
+	return utils.PollAfter(ctx, AttachVolumeTimeout, 10*time.Second, func(ctx context.Context) (bool, error) {
+		result, err := r.blockStorageVolumes.Get(ctx, volumeID, []string{})
 		if err != nil {
-			return err
+			return false, err
 		}
-		if getResult.Status == expectedStatus {
-			break
-		}
-	}
-	return nil
+		return result.Status == expectedStatus, nil
+	})
 }
