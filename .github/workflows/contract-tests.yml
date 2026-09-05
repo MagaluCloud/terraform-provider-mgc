@@ -1,0 +1,39 @@
+name: Terraform Contract Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Terraform contract (${{ matrix.terraform }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.11 supports the provider's write-only attributes. Keep a second
+        # pinned CLI baseline; update deliberately after validating both.
+        terraform: ['1.11.4', '1.12.2']
+    env:
+      CHECKPOINT_DISABLE: '1'
+      TF_IN_AUTOMATION: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+      - name: Check published schema compatibility
+        run: go test ./mgc -run '^TestProviderSchemaContract$' -count=1
+      - name: Exercise Terraform against local APIs
+        run: make test-contract

@@ -94,10 +94,7 @@ func TestValidateAndGetInstanceTypeID(t *testing.T) {
 		{ID: "it-3", Label: "small", CompatibleProduct: "mysql"},
 	}
 
-	var capturedFilter dbSDK.InstanceTypeFilterOptions
 	listOK := func(ctx context.Context, filter dbSDK.InstanceTypeFilterOptions) ([]dbSDK.InstanceType, error) {
-		// Capture filter for assertion
-		capturedFilter = filter
 		// Simulate naive filtering by engineID if provided
 		if filter.EngineID != nil && *filter.EngineID == "eng-postgres" {
 			return []dbSDK.InstanceType{instanceTypes[0]}, nil
@@ -161,7 +158,13 @@ func TestValidateAndGetInstanceTypeID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			id, err := ValidateAndGetInstanceTypeID(ctx, tt.fn, tt.instanceLabel, tt.engineID, tt.compatible)
+			// Capture per subtest: the cases run in parallel.
+			var capturedFilter dbSDK.InstanceTypeFilterOptions
+			list := func(ctx context.Context, filter dbSDK.InstanceTypeFilterOptions) ([]dbSDK.InstanceType, error) {
+				capturedFilter = filter
+				return tt.fn(ctx, filter)
+			}
+			id, err := ValidateAndGetInstanceTypeID(ctx, list, tt.instanceLabel, tt.engineID, tt.compatible)
 			if tt.expectErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
