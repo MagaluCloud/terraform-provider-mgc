@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -23,9 +24,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -74,6 +75,7 @@ func (r *LoadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "Manages network load balancers in Magalu Cloud.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the load balancer.",
 				Computed:    true,
@@ -502,7 +504,8 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	createdLB, err := r.lbNetworkLB.Create(ctx, lbSDK.CreateNetworkLoadBalancerRequest{
+	callOpts := project.CallOptions(data.ProjectID)
+	createdLB, err := r.lbNetworkLB.Create(ctx, callOpts, lbSDK.CreateNetworkLoadBalancerRequest{
 		Description:     data.Description.ValueStringPointer(),
 		Name:            data.Name.ValueString(),
 		PublicIPID:      data.PublicIPID.ValueStringPointer(),
@@ -522,7 +525,7 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	data.ID = types.StringValue(createdLB)
-	getLB, err := r.waitLoadBalancerState(ctx, createdLB, lbSDK.LoadBalancerStatusRunning)
+	getLB, err := r.waitLoadBalancerState(ctx, callOpts, createdLB, lbSDK.LoadBalancerStatusRunning)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -534,6 +537,7 @@ func (r *LoadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 
 	data = data.ToTerraformNetworkResource(ctx, *getLB)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, data.ID, data.ProjectID)...)
 }
 
 func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -543,14 +547,15 @@ func (r *LoadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	lb, err := r.lbNetworkLB.Get(ctx, data.ID.ValueString())
+	lb, err := r.lbNetworkLB.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
 	data = data.ToTerraformNetworkResource(ctx, lb)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, data.ID, data.ProjectID)...)
 }
 
 func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -600,17 +605,18 @@ func (r *LoadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *LoadBalancerResource) updateLBNameDescription(ctx context.Context, plan, state *LoadBalancerModel) error {
+	callOpts := project.CallOptions(state.ProjectID)
 	if !plan.Description.Equal(state.Description) || !plan.Name.Equal(state.Name) {
 		state.Description = plan.Description
 		state.Name = plan.Name
-		_, err := r.lbNetworkLB.Update(ctx, plan.ID.ValueString(), lbSDK.UpdateNetworkLoadBalancerRequest{
+		_, err := r.lbNetworkLB.Update(ctx, callOpts, plan.ID.ValueString(), lbSDK.UpdateNetworkLoadBalancerRequest{
 			Description: plan.Description.ValueStringPointer(),
 			Name:        plan.Name.ValueStringPointer(),
 		})
 		if err != nil {
 			return err
 		}
-		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, callOpts, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
 			return err
 		}
@@ -619,19 +625,20 @@ func (r *LoadBalancerResource) updateLBNameDescription(ctx context.Context, plan
 }
 
 func (r *LoadBalancerResource) replaceACLsIfChanged(ctx context.Context, plan, state *LoadBalancerModel) error {
+	callOpts := project.CallOptions(state.ProjectID)
 	if plan.hasACLChanges(*state) {
 		state.ACLs = plan.ACLs
 		updatedACL := plan.ConvertACLsToSDK()
 		if updatedACL == nil {
 			updatedACL = []lbSDK.CreateNetworkACLRequest{}
 		}
-		err := r.lbNetworkACL.Replace(ctx, plan.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
+		err := r.lbNetworkACL.Replace(ctx, callOpts, plan.ID.ValueString(), lbSDK.UpdateNetworkACLRequest{
 			Acls: updatedACL,
 		})
 		if err != nil {
 			return err
 		}
-		_, err = r.waitLoadBalancerState(ctx, state.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, callOpts, state.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
 			return err
 		}
@@ -640,10 +647,11 @@ func (r *LoadBalancerResource) replaceACLsIfChanged(ctx context.Context, plan, s
 }
 
 func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, state *LoadBalancerModel) error {
+	callOpts := project.CallOptions(state.ProjectID)
 	if hasChange, updatedHealthChecks := plan.healthChecksToUpdate(*state); hasChange {
 		state.HealthChecks = plan.HealthChecks
 		for _, hc := range updatedHealthChecks {
-			err := r.lbNetworkHealthCheck.Update(ctx, state.ID.ValueString(), hc.ID.ValueString(), lbSDK.UpdateNetworkHealthCheckRequest{
+			err := r.lbNetworkHealthCheck.Update(ctx, callOpts, state.ID.ValueString(), hc.ID.ValueString(), lbSDK.UpdateNetworkHealthCheckRequest{
 				Protocol:                lbSDK.HealthCheckProtocol(hc.Protocol.ValueString()),
 				Port:                    int(hc.Port.ValueInt64()),
 				Path:                    hc.Path.ValueStringPointer(),
@@ -658,7 +666,7 @@ func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, sta
 				return err
 			}
 
-			_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+			_, err = r.waitLoadBalancerState(ctx, callOpts, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 			if err != nil {
 				return err
 			}
@@ -668,6 +676,7 @@ func (r *LoadBalancerResource) updateHealthChecks(ctx context.Context, plan, sta
 }
 
 func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, state *LoadBalancerModel) error {
+	callOpts := project.CallOptions(state.ProjectID)
 	backendFieldUpdates, _ := plan.backendsToUpdate(*state)
 	if len(backendFieldUpdates) == 0 {
 		return nil
@@ -680,14 +689,14 @@ func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, s
 			state.Backends[backendIdx].PanicThreshold = b.PanicThreshold
 			state.Backends[backendIdx].CloseConnectionsOnHostHealthFailure = b.CloseConnectionsOnHostHealthFailure
 		}
-		_, err := r.lbNetworkBackend.Update(ctx, state.ID.ValueString(), b.ID.ValueString(), lbSDK.UpdateNetworkBackendRequest{
+		_, err := r.lbNetworkBackend.Update(ctx, callOpts, state.ID.ValueString(), b.ID.ValueString(), lbSDK.UpdateNetworkBackendRequest{
 			PanicThreshold:                      b.PanicThreshold.ValueFloat64Pointer(),
 			CloseConnectionsOnHostHealthFailure: b.CloseConnectionsOnHostHealthFailure.ValueBoolPointer(),
 		})
 		if err != nil {
 			return err
 		}
-		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, callOpts, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
 			return err
 		}
@@ -696,6 +705,7 @@ func (r *LoadBalancerResource) updateBackendsFields(ctx context.Context, plan, s
 }
 
 func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, state *LoadBalancerModel) error {
+	callOpts := project.CallOptions(state.ProjectID)
 	_, backendTargetUpdates := plan.backendsToUpdate(*state)
 	if len(backendTargetUpdates) == 0 {
 		return nil
@@ -734,7 +744,7 @@ func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, 
 			})
 		}
 
-		_, err := r.lbNetworkTarget.Replace(ctx, state.ID.ValueString(), bu.ID.ValueString(), lbSDK.CreateNetworkBackendTargetRequest{
+		_, err := r.lbNetworkTarget.Replace(ctx, callOpts, state.ID.ValueString(), bu.ID.ValueString(), lbSDK.CreateNetworkBackendTargetRequest{
 			HealthCheckID: healthCheckID,
 			TargetsType:   lbSDK.BackendType(bu.TargetsType.ValueString()),
 			Targets:       targets,
@@ -742,7 +752,7 @@ func (r *LoadBalancerResource) replaceBackendTargets(ctx context.Context, plan, 
 		if err != nil {
 			return err
 		}
-		_, err = r.waitLoadBalancerState(ctx, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
+		_, err = r.waitLoadBalancerState(ctx, callOpts, plan.ID.ValueString(), lbSDK.LoadBalancerStatusRunning)
 		if err != nil {
 			return err
 		}
@@ -759,14 +769,15 @@ func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	deletePublicIP := false
-	err := r.lbNetworkLB.Delete(ctx, data.ID.ValueString(), lbSDK.DeleteNetworkLoadBalancerRequest{
+	callOpts := project.CallOptions(data.ProjectID)
+	err := r.lbNetworkLB.Delete(ctx, callOpts, data.ID.ValueString(), lbSDK.DeleteNetworkLoadBalancerRequest{
 		DeletePublicIP: &deletePublicIP,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	_, err = r.waitLoadBalancerState(ctx, data.ID.ValueString(), lbSDK.LoadBalancerStatusDeleted)
+	_, err = r.waitLoadBalancerState(ctx, callOpts, data.ID.ValueString(), lbSDK.LoadBalancerStatusDeleted)
 	if err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
@@ -781,11 +792,23 @@ func (r *LoadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 
 }
 
-func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+func (r *LoadBalancerResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = project.IdentitySchema()
 }
 
-func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID string, desiredState lbSDK.LoadBalancerStatus) (*lbSDK.NetworkLoadBalancerResponse, error) {
+func (r *LoadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	target, diags := project.ResolveImport(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), target.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), target.ProjectID)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, target.ID, target.ProjectID)...)
+}
+
+func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, callOpts clientSDK.CallOptions, lbID string, desiredState lbSDK.LoadBalancerStatus) (*lbSDK.NetworkLoadBalancerResponse, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, LoadBalancerTimeout)
 	defer cancel()
 	for {
@@ -793,7 +816,7 @@ func (r *LoadBalancerResource) waitLoadBalancerState(ctx context.Context, lbID s
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for load balancer %s to reach status %s", lbID, desiredState)
 		case <-time.After(10 * time.Second):
-			lb, err := r.lbNetworkLB.Get(ctx, lbID)
+			lb, err := r.lbNetworkLB.Get(ctx, callOpts, lbID)
 			if err != nil {
 				return nil, err
 			}

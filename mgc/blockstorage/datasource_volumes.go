@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -40,7 +41,8 @@ func (r *DataSourceBsVolumes) Metadata(_ context.Context, req datasource.Metadat
 }
 
 type bsVolumesDataSourceModel struct {
-	Volumes []bsVolumesDataSourceItemModel `tfsdk:"volumes"`
+	Volumes   []bsVolumesDataSourceItemModel `tfsdk:"volumes"`
+	ProjectID types.String                   `tfsdk:"project_id"`
 }
 
 func (r *DataSourceBsVolumes) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -60,6 +62,7 @@ func (r *DataSourceBsVolumes) Configure(ctx context.Context, req datasource.Conf
 func (r *DataSourceBsVolumes) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"volumes": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available Block Storage Volumes.",
@@ -120,9 +123,9 @@ func (r *DataSourceBsVolumes) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	sdkOutputList, err := r.bsVolumes.ListAll(ctx, bsSDK.VolumeFilterOptions{})
+	sdkOutputList, err := r.bsVolumes.ListAll(ctx, project.CallOptions(data.ProjectID), bsSDK.VolumeFilterOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

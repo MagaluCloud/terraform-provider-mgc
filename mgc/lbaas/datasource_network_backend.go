@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -39,6 +40,7 @@ func (r *DataSourceLbaasNetworkBackend) Schema(_ context.Context, _ datasource.S
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "Get a specific Network Load Balancer Backend by Load Balancer ID and Backend ID. Includes targets.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"lb_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The Network Load Balancer ID.",
@@ -106,13 +108,14 @@ func (r *DataSourceLbaasNetworkBackend) Read(ctx context.Context, req datasource
 		return
 	}
 
-	lb, err := r.lbNetworkBackend.Get(ctx, data.LBID.ValueString(), data.ID.ValueString())
+	lb, err := r.lbNetworkBackend.Get(ctx, project.CallOptions(data.ProjectID), data.LBID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
 	result := networkBackendItemModel{
+		ProjectID:        data.ProjectID,
 		LBID:             data.LBID,
 		backendItemModel: backendItemModel{}.fromSDKBackend(lb),
 	}

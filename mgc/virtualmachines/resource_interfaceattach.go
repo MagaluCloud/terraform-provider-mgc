@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -24,6 +25,7 @@ type vmInterfaceAttach struct {
 type vmInterfaceAttachResourceModel struct {
 	InterfaceID types.String `tfsdk:"interface_id"`
 	InstanceID  types.String `tfsdk:"instance_id"`
+	ProjectID   types.String `tfsdk:"project_id"`
 }
 
 func (r *vmInterfaceAttach) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -48,6 +50,7 @@ func (r *vmInterfaceAttach) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Description: "Attaches a network interface to a VM instance.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"interface_id": schema.StringAttribute{
 				Description: "ID of the network interface to attach.",
 				Required:    true,
@@ -73,7 +76,7 @@ func (r *vmInterfaceAttach) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	err := r.vmInstance.AttachNetworkInterface(ctx, computeSdk.NICRequest{
+	err := r.vmInstance.AttachNetworkInterface(ctx, project.CallOptions(data.ProjectID), computeSdk.NICRequest{
 		Instance: computeSdk.IDOrName{
 			ID: data.InstanceID.ValueStringPointer(),
 		},
@@ -98,9 +101,9 @@ func (r *vmInterfaceAttach) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	getInstance, err := r.vmInstance.Get(ctx, data.InstanceID.ValueString(), []computeSdk.InstanceExpand{computeSdk.InstanceNetworkExpand})
+	getInstance, err := r.vmInstance.Get(ctx, project.CallOptions(data.ProjectID), data.InstanceID.ValueString(), []computeSdk.InstanceExpand{computeSdk.InstanceNetworkExpand})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
@@ -137,7 +140,7 @@ func (r *vmInterfaceAttach) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.vmInstance.DetachNetworkInterface(ctx, computeSdk.NICRequest{
+	err := r.vmInstance.DetachNetworkInterface(ctx, project.CallOptions(data.ProjectID), computeSdk.NICRequest{
 		Instance: computeSdk.IDOrName{
 			ID: data.InstanceID.ValueStringPointer(),
 		},

@@ -22,6 +22,16 @@ func GetResourceTestSchema(t *testing.T, r resource.Resource) resource.SchemaRes
 	return *schemaResp
 }
 
+func GetResourceTestIdentitySchema(t *testing.T, r resource.ResourceWithIdentity) resource.IdentitySchemaResponse {
+	schemaResp := &resource.IdentitySchemaResponse{}
+
+	r.IdentitySchema(context.Background(), resource.IdentitySchemaRequest{}, schemaResp)
+
+	require.False(t, schemaResp.Diagnostics.HasError(), "Resource identity schema generation returned errors: %v", schemaResp.Diagnostics)
+
+	return *schemaResp
+}
+
 // GetDataSourceTestSchema is a generic helper to retrieve the schema of a DataSource for unit testing.
 func GetDataSourceTestSchema(t *testing.T, d datasource.DataSource) datasource.SchemaResponse {
 	ctx := context.Background()

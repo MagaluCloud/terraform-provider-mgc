@@ -5,6 +5,7 @@ import (
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -38,6 +39,7 @@ type FlattenedGetResult struct {
 	AvailabilityZones          types.Set      `tfsdk:"availability_zones"`
 	SubnetIDs                  types.Set      `tfsdk:"subnet_ids"`
 	Version                    types.String   `tfsdk:"version"`
+	ProjectID                  types.String   `tfsdk:"project_id"`
 }
 
 type DataSourceKubernetesNodepool struct {
@@ -73,6 +75,7 @@ func (d *DataSourceKubernetesNodepool) Schema(ctx context.Context, req datasourc
 	resp.Schema = schema.Schema{
 		Description: "Data source for Kubernetes Nodepool",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "Nodepool UUID.",
 				Required:    true,
@@ -199,9 +202,9 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := r.sdkClient.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	sdkOutput, err := r.sdkClient.Get(ctx, project.CallOptions(data.ProjectID), data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
@@ -210,6 +213,7 @@ func (r *DataSourceKubernetesNodepool) Read(ctx context.Context, req datasource.
 		resp.Diagnostics.AddError("Failed to convert nodepool", err.Error())
 		return
 	}
+	flattened.ProjectID = data.ProjectID
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &flattened)...)
 }

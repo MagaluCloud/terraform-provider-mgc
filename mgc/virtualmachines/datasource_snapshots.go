@@ -5,6 +5,7 @@ import (
 	"time"
 
 	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -40,12 +41,14 @@ type vmSnapshotsModel struct {
 
 type vmSnapshotsListModel struct {
 	Snapshots []vmSnapshotsModel `tfsdk:"snapshots"`
+	ProjectID types.String       `tfsdk:"project_id"`
 }
 
 func (r *DataSourceVmSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "This data source provides a list of virtual machine snapshots.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"snapshots": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available VM machine-types.",
@@ -116,9 +119,9 @@ func (r *DataSourceVmSnapshots) Read(ctx context.Context, req datasource.ReadReq
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	snapList, err := r.vmSnapshot.ListAll(ctx, vmSDK.SnapshotFilterOptions{})
+	snapList, err := r.vmSnapshot.ListAll(ctx, project.CallOptions(data.ProjectID), vmSDK.SnapshotFilterOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

@@ -26,3 +26,7 @@ resource "mgc_block_storage_volume_attachment" "attach_example" {
 
 - `block_storage_id` (String) The ID of the block storage volume to attach.
 - `virtual_machine_id` (String) The ID of the virtual machine to attach the volume to.
+
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.

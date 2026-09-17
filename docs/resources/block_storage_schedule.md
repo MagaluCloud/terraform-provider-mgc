@@ -56,6 +56,7 @@ resource "mgc_block_storage_schedule" "minimal_schedule" {
 ### Optional
 
 - `description` (String) The description of the snapshot schedule.
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
 
 ### Read-Only
 
@@ -74,4 +75,7 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 ```shell
 # Example: Import an existing schedule
 terraform import mgc_block_storage_schedule.daily_backup "schedule-123"
+
+# Schedule in a project
+terraform import mgc_block_storage_schedule.daily_backup "project/550e8400-e29b-41d4-a716-446655440000/schedule-123"
 ```

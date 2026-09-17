@@ -82,6 +82,7 @@ resource "mgc_lbaas_network" "basic_http_lb" {
 - `acls` (Attributes Set) Access Control Lists for the load balancer. (see [below for nested schema](#nestedatt--acls))
 - `description` (String) The description of the load balancer.
 - `health_checks` (Attributes Set) Health check configurations for the load balancer. (see [below for nested schema](#nestedatt--health_checks))
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
 - `public_ip_id` (String) The ID of the public IP associated with the load balancer. Required for external load balancers, must be omitted for internal load balancers.
 - `subnetpool_id` (String) The ID of the subnet pool for the load balancer.
 - `tls_certificates` (Attributes List) TLS certificate configurations for the load balancer. (see [below for nested schema](#nestedatt--tls_certificates))
@@ -210,5 +211,9 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
+# Load balancer in the default project
 terraform import mgc_lbaas_network.http_proxy my_lbaas_id
+
+# Load balancer in a project
+terraform import mgc_lbaas_network.http_proxy project/550e8400-e29b-41d4-a716-446655440000/my_lbaas_id
 ```

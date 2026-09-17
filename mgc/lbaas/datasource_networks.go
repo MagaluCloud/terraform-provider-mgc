@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -41,6 +42,7 @@ func (r *DataSourceLbaasNetworks) Schema(_ context.Context, _ datasource.SchemaR
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "List network load balancers.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"load_balancers": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of network load balancers.",
@@ -140,9 +142,9 @@ func (r *DataSourceLbaasNetworks) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	sdkList, err := r.lbNetworkLB.ListAll(ctx)
+	sdkList, err := r.lbNetworkLB.ListAll(ctx, project.CallOptions(data.ProjectID))
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

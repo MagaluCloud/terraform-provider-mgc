@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -40,6 +41,7 @@ func (r *DataSourceLbaasNetworkBackends) Schema(_ context.Context, _ datasource.
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "List Network Load Balancer Backends. Includes targets for each backend.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"lb_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The Network Load Balancer ID.",
@@ -109,8 +111,9 @@ func (r *DataSourceLbaasNetworkBackends) Schema(_ context.Context, _ datasource.
 }
 
 type backendListState struct {
-	LBID     types.String       `tfsdk:"lb_id"`
-	Backends []backendItemModel `tfsdk:"backends"`
+	LBID      types.String       `tfsdk:"lb_id"`
+	Backends  []backendItemModel `tfsdk:"backends"`
+	ProjectID types.String       `tfsdk:"project_id"`
 }
 
 func (r *DataSourceLbaasNetworkBackends) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -120,9 +123,9 @@ func (r *DataSourceLbaasNetworkBackends) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	lb, err := r.lbNetworkBackend.ListAll(ctx, backendList.LBID.ValueString())
+	lb, err := r.lbNetworkBackend.ListAll(ctx, project.CallOptions(backendList.ProjectID), backendList.LBID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, backendList.ProjectID))
 		return
 	}
 

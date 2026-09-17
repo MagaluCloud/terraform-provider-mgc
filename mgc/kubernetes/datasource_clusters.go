@@ -4,6 +4,7 @@ import (
 	"context"
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -20,7 +21,8 @@ type KubernetesClusterReducedModel struct {
 }
 
 type KubernetesClusterReducedModelList struct {
-	Clusters []KubernetesClusterReducedModel `tfsdk:"clusters"`
+	Clusters  []KubernetesClusterReducedModel `tfsdk:"clusters"`
+	ProjectID types.String                    `tfsdk:"project_id"`
 }
 
 func NewDataSourceKubernetesClusterList() datasource.DataSource {
@@ -55,6 +57,7 @@ func (d *DataSourceKubernetesClusters) Schema(ctx context.Context, req datasourc
 	resp.Schema = schema.Schema{
 		Description: "This data source provides a list of cluster.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"clusters": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available VM machine-types.",
@@ -99,9 +102,9 @@ func (d *DataSourceKubernetesClusters) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	cluster, err := d.sdkClient.List(ctx, sdkK8s.ListOptions{})
+	cluster, err := d.sdkClient.List(ctx, project.CallOptions(data.ProjectID), sdkK8s.ListOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

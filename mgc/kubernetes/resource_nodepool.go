@@ -11,13 +11,17 @@ import (
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/importid"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
@@ -26,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -42,7 +47,14 @@ var (
 
 type NodePoolResourceModel struct {
 	ClusterID types.String `tfsdk:"cluster_id"`
+	ProjectID types.String `tfsdk:"project_id"`
 	NodePool
+}
+
+type nodePoolIdentityModel struct {
+	ClusterID types.String `tfsdk:"cluster_id"`
+	ID        types.String `tfsdk:"id"`
+	ProjectID types.String `tfsdk:"project_id"`
 }
 
 type NewNodePoolResource struct {
@@ -90,6 +102,7 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 				Description: "Definition of the CPU, RAM, and storage capacity of the nodes.",
 				Required:    true,
 			},
+			"project_id": project.ResourceAttribute(),
 			"cluster_id": schema.StringAttribute{
 				Description: "UUID of the Kubernetes cluster.",
 				Required:    true,
@@ -252,14 +265,15 @@ func (r *NewNodePoolResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	nodepool, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	nodepool, err := r.sdkNodepool.Get(ctx, project.CallOptions(data.ProjectID), data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
 	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(setNodePoolIdentity(ctx, resp.Identity, data)...)
 }
 
 func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -311,7 +325,8 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
-	nodepool, err := r.sdkNodepool.Create(ctx, data.ClusterID.ValueString(), createParams)
+	callOpts := project.CallOptions(data.ProjectID)
+	nodepool, err := r.sdkNodepool.Create(ctx, callOpts, data.ClusterID.ValueString(), createParams)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -319,11 +334,12 @@ func (r *NewNodePoolResource) Create(ctx context.Context, req resource.CreateReq
 
 	data.NodePool = ConvertToNodePoolToTFModel(nodepool, r.region)
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
+	resp.Diagnostics.Append(setNodePoolIdentity(ctx, resp.Identity, data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err = r.waitNodePoolState(ctx, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, "", NodepoolTimeout, NodepoolInterval)
+	err = r.waitNodePoolState(ctx, callOpts, nodepool.ID, data.ClusterID.ValueString(), NodepoolRunningState, "", NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -345,7 +361,8 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 
 	updateParam := buildPatchNodePoolRequest(state, data)
 
-	if _, err := r.sdkNodepool.Update(ctx, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam); err != nil {
+	callOpts := project.CallOptions(state.ProjectID)
+	if _, err := r.sdkNodepool.Update(ctx, callOpts, data.ClusterID.ValueString(), data.ID.ValueString(), updateParam); err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
@@ -355,13 +372,13 @@ func (r *NewNodePoolResource) Update(ctx context.Context, req resource.UpdateReq
 		expectedVersion = data.Version.ValueString()
 	}
 
-	err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, expectedVersion, NodepoolTimeout, NodepoolInterval)
+	err := r.waitNodePoolState(ctx, callOpts, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolRunningState, expectedVersion, NodepoolTimeout, NodepoolInterval)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	upgraded, err := r.sdkNodepool.Get(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	upgraded, err := r.sdkNodepool.Get(ctx, callOpts, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -401,13 +418,14 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	err := r.sdkNodepool.Delete(ctx, data.ClusterID.ValueString(), data.ID.ValueString())
+	callOpts := project.CallOptions(data.ProjectID)
+	err := r.sdkNodepool.Delete(ctx, callOpts, data.ClusterID.ValueString(), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	if err := r.waitNodePoolState(ctx, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, "", NodepoolTimeout, NodepoolInterval); err != nil {
+	if err := r.waitNodePoolState(ctx, callOpts, data.ID.ValueString(), data.ClusterID.ValueString(), NodepoolDeletedState, "", NodepoolTimeout, NodepoolInterval); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -420,20 +438,65 @@ func (r *NewNodePoolResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 }
 
+func (r *NewNodePoolResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"cluster_id": identityschema.StringAttribute{
+				Description:       "UUID of the Kubernetes cluster.",
+				RequiredForImport: true,
+			},
+			"id": identityschema.StringAttribute{
+				Description:       "UUID of the node pool.",
+				RequiredForImport: true,
+			},
+			"project_id": project.IdentityAttribute(),
+		},
+	}
+}
+
 func (r *NewNodePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	ids := strings.Split(req.ID, ",")
-	if len(ids) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected format: cluster_id,node_pool_id")
+	var identity nodePoolIdentityModel
+
+	switch {
+	case req.ID != "":
+		parsed, err := importid.Parse(req.ID, project.Namespace)
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid import ID", err.Error())
+			return
+		}
+		ids := strings.Split(parsed.ID, ",")
+		if len(ids) != 2 {
+			resp.Diagnostics.AddError("Invalid import ID", "Expected format: [project/{project_id}/]cluster_id,node_pool_id")
+			return
+		}
+		identity = nodePoolIdentityModel{
+			ClusterID: types.StringValue(ids[0]),
+			ID:        types.StringValue(ids[1]),
+			ProjectID: parsed.Value(project.Namespace),
+		}
+	case req.Identity != nil:
+		resp.Diagnostics.Append(req.Identity.Get(ctx, &identity)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	default:
+		resp.Diagnostics.AddError("Invalid import ID", "An import ID or an identity must be provided.")
 		return
 	}
 
-	resp.Diagnostics.Append(
-		resp.State.SetAttribute(ctx, path.Root("cluster_id"), ids[0])...,
-	)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("cluster_id"), identity.ClusterID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), identity.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), identity.ProjectID)...)
+	if resp.Identity != nil {
+		resp.Diagnostics.Append(resp.Identity.Set(ctx, identity)...)
+	}
+}
 
-	resp.Diagnostics.Append(
-		resp.State.SetAttribute(ctx, path.Root("id"), ids[1])...,
-	)
+func setNodePoolIdentity(ctx context.Context, identity *tfsdk.ResourceIdentity, data NodePoolResourceModel) diag.Diagnostics {
+	if identity == nil {
+		return nil
+	}
+	return identity.Set(ctx, nodePoolIdentityModel{ClusterID: data.ClusterID, ID: data.ID, ProjectID: data.ProjectID})
 }
 
 func convertTaintsNP(taints *[]Taint) *[]k8sSDK.Taint {
@@ -484,11 +547,11 @@ func convertStringSetTFToSliceString(ctx context.Context, set types.Set) (*[]str
 	return &result, nil
 }
 
-func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, nodepoolid, clusterId, state, expectedVersion string, timeout, interval time.Duration) error {
+func (r *NewNodePoolResource) waitNodePoolState(ctx context.Context, callOpts clientSDK.CallOptions, nodepoolid, clusterId, state, expectedVersion string, timeout, interval time.Duration) error {
 	for startTime := time.Now(); time.Since(startTime) < timeout; {
 		time.Sleep(interval)
 
-		nodepool, err := r.sdkNodepool.Get(ctx, clusterId, nodepoolid)
+		nodepool, err := r.sdkNodepool.Get(ctx, callOpts, clusterId, nodepoolid)
 		if err != nil {
 			return err
 		}

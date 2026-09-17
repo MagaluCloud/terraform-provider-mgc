@@ -29,6 +29,10 @@ output "vm_instance" {
 
 - `id` (String) ID of machine-type.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `availability_zone` (String) Availability zone of instance.

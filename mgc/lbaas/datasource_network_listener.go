@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -41,6 +42,7 @@ func (r *DataSourceLbaasNetworkListener) Schema(_ context.Context, _ datasource.
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "Get a specific Network Load Balancer Listener by Load Balancer ID and Listener ID.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"lb_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The Network Load Balancer ID.",
@@ -90,24 +92,27 @@ type listenerItemModel struct {
 type networkListenerItemModel struct {
 	LBID types.String `tfsdk:"lb_id"`
 	listenerItemModel
+	ProjectID types.String `tfsdk:"project_id"`
 }
 
 func (r *DataSourceLbaasNetworkListener) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var lbID, listenerID types.String
+	var lbID, listenerID, projectID types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("lb_id"), &lbID)...)
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("id"), &listenerID)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("project_id"), &projectID)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	lb, err := r.lbNetworkListener.Get(ctx, lbID.ValueString(), listenerID.ValueString())
+	lb, err := r.lbNetworkListener.Get(ctx, project.CallOptions(projectID), lbID.ValueString(), listenerID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, projectID))
 		return
 	}
 
 	item := networkListenerItemModel{
-		LBID: lbID,
+		ProjectID: projectID,
+		LBID:      lbID,
 		listenerItemModel: listenerItemModel{
 			ID:               types.StringValue(lb.ID),
 			Name:             types.StringValue(lb.Name),

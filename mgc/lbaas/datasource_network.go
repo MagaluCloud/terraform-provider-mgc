@@ -9,8 +9,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
+
+// lbNetworkState keeps project_id off lbNetworkItemModel, which is also the item
+// type of the load balancers list.
+type lbNetworkState struct {
+	lbNetworkItemModel
+	ProjectID types.String `tfsdk:"project_id"`
+}
 
 type DataSourceLbaasNetwork struct {
 	lbNetworkLB lbSDK.NetworkLoadBalancerService
@@ -42,6 +50,7 @@ func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRe
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "Get the details of a network load balancer.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"id": schema.StringAttribute{
 				Required:    true,
 				Description: "The unique identifier of the load balancer.",
@@ -127,15 +136,16 @@ func (r *DataSourceLbaasNetwork) Schema(_ context.Context, _ datasource.SchemaRe
 }
 
 func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var id types.String
+	var id, projectID types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("id"), &id)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("project_id"), &projectID)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	lb, err := r.lbNetworkLB.Get(ctx, id.ValueString())
+	lb, err := r.lbNetworkLB.Get(ctx, project.CallOptions(projectID), id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, projectID))
 		return
 	}
 
@@ -201,5 +211,5 @@ func (r *DataSourceLbaasNetwork) Read(ctx context.Context, req datasource.ReadRe
 		TLSCertificates: certsList,
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &lbNetworkState{lbNetworkItemModel: state, ProjectID: projectID})...)
 }

@@ -25,6 +25,7 @@ type LoadBalancerModel struct {
 	HealthChecks    *[]HealthCheckModel    `tfsdk:"health_checks"`
 	Listeners       []ListenerModel        `tfsdk:"listeners"`
 	TLSCertificates *[]TLSCertificateModel `tfsdk:"tls_certificates"`
+	ProjectID       types.String           `tfsdk:"project_id"`
 }
 
 type ACLModel struct {
@@ -304,6 +305,7 @@ func (lb *LoadBalancerModel) ToTerraformNetworkResource(ctx context.Context, lbR
 	}
 
 	loadBalancer := LoadBalancerModel{
+		ProjectID:       lb.ProjectID,
 		ID:              types.StringValue(lbResponse.ID),
 		Name:            types.StringValue(lbResponse.Name),
 		Description:     types.StringPointerValue(lbResponse.Description),
@@ -380,6 +382,7 @@ func (plan *LoadBalancerModel) hasACLChanges(state LoadBalancerModel) bool {
 
 type LbaasNetworksListModel struct {
 	LoadBalancers []lbNetworkItemModel `tfsdk:"load_balancers"`
+	ProjectID     types.String         `tfsdk:"project_id"`
 }
 
 type lbNetworkItemModel struct {
@@ -413,6 +416,7 @@ type backendItemModel struct {
 type networkBackendItemModel struct {
 	LBID types.String `tfsdk:"lb_id"`
 	backendItemModel
+	ProjectID types.String `tfsdk:"project_id"`
 }
 
 func (b backendItemModel) fromSDKBackend(lb *lbSDK.NetworkBackendResponse) backendItemModel {

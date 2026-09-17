@@ -115,6 +115,7 @@ This attribute can only be used when "network_interface_id" is not set.
 - `network_interface_id` (String) The primary network interface ID is the primary interface used for network traffic that will be associated with the instance.
 If not specified, a new network interface will be created in the specified VPC or in the default VPC if no VPC is specified.
 Read the documentation guides for more details.
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
 - `snapshot_id` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The snapshot ID used to create the virtual machine instance. If set, the snapshot will be used instead of an image.
 - `ssh_key_name` (String) The name of the SSH key associated with the virtual machine instance. Not required for Windows instances.
 - `user_data` (String) User data for instance initialization (encoded in base64).
@@ -148,5 +149,9 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
+# Instance in the default project
 terraform import mgc_virtual_machine_instances.basic_instance 123
+
+# Instance in a project
+terraform import mgc_virtual_machine_instances.basic_instance project/550e8400-e29b-41d4-a716-446655440000/123
 ```

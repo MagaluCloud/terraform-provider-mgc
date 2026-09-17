@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/stretchr/testify/assert"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
@@ -17,14 +18,14 @@ type mockLBService struct {
 	GetFunc    func(ctx context.Context, id string) (lbSDK.NetworkLoadBalancerResponse, error)
 }
 
-func (m *mockLBService) Update(ctx context.Context, id string, req lbSDK.UpdateNetworkLoadBalancerRequest) (string, error) {
+func (m *mockLBService) Update(ctx context.Context, _ clientSDK.CallOptions, id string, req lbSDK.UpdateNetworkLoadBalancerRequest) (string, error) {
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(ctx, id, req)
 	}
 	return "", errors.New("UpdateFunc not implemented")
 }
 
-func (m *mockLBService) Get(ctx context.Context, id string) (lbSDK.NetworkLoadBalancerResponse, error) {
+func (m *mockLBService) Get(ctx context.Context, _ clientSDK.CallOptions, id string) (lbSDK.NetworkLoadBalancerResponse, error) {
 	if m.GetFunc != nil {
 		return m.GetFunc(ctx, id)
 	}
@@ -36,7 +37,7 @@ type mockACLService struct {
 	ReplaceFunc func(ctx context.Context, id string, req lbSDK.UpdateNetworkACLRequest) error
 }
 
-func (m *mockACLService) Replace(ctx context.Context, id string, req lbSDK.UpdateNetworkACLRequest) error {
+func (m *mockACLService) Replace(ctx context.Context, _ clientSDK.CallOptions, id string, req lbSDK.UpdateNetworkACLRequest) error {
 	if m.ReplaceFunc != nil {
 		return m.ReplaceFunc(ctx, id, req)
 	}
@@ -48,7 +49,7 @@ type mockHealthCheckService struct {
 	UpdateFunc func(ctx context.Context, lbID string, hcID string, req lbSDK.UpdateNetworkHealthCheckRequest) error
 }
 
-func (m *mockHealthCheckService) Update(ctx context.Context, lbID string, hcID string, req lbSDK.UpdateNetworkHealthCheckRequest) error {
+func (m *mockHealthCheckService) Update(ctx context.Context, _ clientSDK.CallOptions, lbID string, hcID string, req lbSDK.UpdateNetworkHealthCheckRequest) error {
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(ctx, lbID, hcID, req)
 	}
@@ -60,7 +61,7 @@ type mockBackendService struct {
 	UpdateFunc func(ctx context.Context, lbID string, backendID string, req lbSDK.UpdateNetworkBackendRequest) (string, error)
 }
 
-func (m *mockBackendService) Update(ctx context.Context, lbID string, backendID string, req lbSDK.UpdateNetworkBackendRequest) (string, error) {
+func (m *mockBackendService) Update(ctx context.Context, _ clientSDK.CallOptions, lbID string, backendID string, req lbSDK.UpdateNetworkBackendRequest) (string, error) {
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(ctx, lbID, backendID, req)
 	}
@@ -72,7 +73,7 @@ type mockTargetService struct {
 	ReplaceFunc func(ctx context.Context, lbID string, backendID string, req lbSDK.CreateNetworkBackendTargetRequest) (string, error)
 }
 
-func (m *mockTargetService) Replace(ctx context.Context, lbID string, backendID string, req lbSDK.CreateNetworkBackendTargetRequest) (string, error) {
+func (m *mockTargetService) Replace(ctx context.Context, _ clientSDK.CallOptions, lbID string, backendID string, req lbSDK.CreateNetworkBackendTargetRequest) (string, error) {
 	if m.ReplaceFunc != nil {
 		return m.ReplaceFunc(ctx, lbID, backendID, req)
 	}

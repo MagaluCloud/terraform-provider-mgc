@@ -33,6 +33,10 @@ output "lbs_network_backend" {
 
 - `lb_id` (String) The Network Load Balancer ID.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `backends` (Attributes List) List of backends. (see [below for nested schema](#nestedatt--backends))

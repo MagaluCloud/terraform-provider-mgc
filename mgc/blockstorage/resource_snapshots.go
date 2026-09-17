@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,6 +18,7 @@ import (
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -82,12 +84,14 @@ type bsSnapshotsResourceModel struct {
 	VolumeId         types.String `tfsdk:"volume_id"`
 	SnapshotSourceID types.String `tfsdk:"snapshot_source_id"`
 	Type             types.String `tfsdk:"type"`
+	ProjectID        types.String `tfsdk:"project_id"`
 }
 
 func (r *bsSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "The block storage snapshots resource allows you to manage block storage snapshots in the Magalu Cloud.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the volume snapshot.",
 				PlanModifiers: []planmodifier.String{
@@ -158,13 +162,13 @@ func (r *bsSnapshots) Read(ctx context.Context, req resource.ReadRequest, resp *
 	data := &bsSnapshotsResourceModel{}
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	result, err := r.bsSnapshots.Get(ctx, data.ID.ValueString(), []string{})
+	result, err := r.bsSnapshots.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
-	convertedResult := r.toTerraformModel(*result, data.SnapshotSourceID.ValueStringPointer())
+	convertedResult := r.toTerraformModel(*result, data.SnapshotSourceID.ValueStringPointer(), data.ProjectID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
 }
 
@@ -190,7 +194,8 @@ func (r *bsSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
-	createID, err := r.bsSnapshots.Create(ctx, createRequest)
+	callOpts := project.CallOptions(plan.ProjectID)
+	createID, err := r.bsSnapshots.Create(ctx, callOpts, createRequest)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -198,13 +203,13 @@ func (r *bsSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 	plan.ID = types.StringValue(createID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
-	getResult, err := r.waitUntilSnapshotStatusMatches(ctx, createID, SnapshotCompleted)
+	getResult, err := r.waitUntilSnapshotStatusMatches(ctx, callOpts, createID, SnapshotCompleted)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	convertedGet := r.toTerraformModel(*getResult, plan.SnapshotSourceID.ValueStringPointer())
+	convertedGet := r.toTerraformModel(*getResult, plan.SnapshotSourceID.ValueStringPointer(), plan.ProjectID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedGet)...)
 }
 
@@ -218,12 +223,13 @@ func (r *bsSnapshots) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if state.Name != plan.Name {
-		err := r.bsSnapshots.Rename(ctx, state.ID.ValueString(), plan.Name.ValueString())
+		callOpts := project.CallOptions(state.ProjectID)
+		err := r.bsSnapshots.Rename(ctx, callOpts, state.ID.ValueString(), plan.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		_, err = r.waitUntilSnapshotStatusMatches(ctx, state.ID.ValueString(), SnapshotCompleted)
+		_, err = r.waitUntilSnapshotStatusMatches(ctx, callOpts, state.ID.ValueString(), SnapshotCompleted)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		}
@@ -236,13 +242,13 @@ func (r *bsSnapshots) Delete(ctx context.Context, req resource.DeleteRequest, re
 	var data bsSnapshotsResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	err := r.bsSnapshots.Delete(ctx, data.ID.ValueString())
+	err := r.bsSnapshots.Delete(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 	}
 }
 
-func (r *bsSnapshots) toTerraformModel(snapshot storageSDK.Snapshot, sourceSnapshotId *string) bsSnapshotsResourceModel {
+func (r *bsSnapshots) toTerraformModel(snapshot storageSDK.Snapshot, sourceSnapshotId *string, projectID types.String) bsSnapshotsResourceModel {
 	return bsSnapshotsResourceModel{
 		ID:               types.StringValue(snapshot.ID),
 		Name:             types.StringValue(snapshot.Name),
@@ -251,10 +257,11 @@ func (r *bsSnapshots) toTerraformModel(snapshot storageSDK.Snapshot, sourceSnaps
 		VolumeId:         types.StringPointerValue(snapshot.Volume.ID),
 		SnapshotSourceID: types.StringPointerValue(sourceSnapshotId),
 		Type:             types.StringValue(snapshot.Type),
+		ProjectID:        projectID,
 	}
 }
 
-func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, snapshotID string, status SnapshotStatus) (*storageSDK.Snapshot, error) {
+func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, callOpts clientSDK.CallOptions, snapshotID string, status SnapshotStatus) (*storageSDK.Snapshot, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, volumeSnapshotStatusTimeout)
 	defer cancel()
 
@@ -263,7 +270,7 @@ func (r *bsSnapshots) waitUntilSnapshotStatusMatches(ctx context.Context, snapsh
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for snapshot %s to reach status %s", snapshotID, status)
 		case <-time.After(10 * time.Second):
-			snapshot, err := r.bsSnapshots.Get(ctx, snapshotID, []string{})
+			snapshot, err := r.bsSnapshots.Get(ctx, callOpts, snapshotID, []string{})
 			if err != nil {
 				return nil, err
 			}

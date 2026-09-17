@@ -34,6 +34,10 @@ output "lbs_network_listener" {
 - `id` (String) The Listener ID.
 - `lb_id` (String) The Network Load Balancer ID.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `backend_id` (String) The associated backend ID.

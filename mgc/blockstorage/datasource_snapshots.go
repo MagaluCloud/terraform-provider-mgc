@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -28,6 +29,7 @@ func (r *DataSourceBsSnapshots) Metadata(_ context.Context, req datasource.Metad
 
 type bsSnapshotsListDataSourceModel struct {
 	Snapshots []bsSnapshotsDataSourceItemModel `tfsdk:"snapshots"`
+	ProjectID types.String                     `tfsdk:"project_id"`
 }
 
 type bsSnapshotsDataSourceItemModel struct {
@@ -62,6 +64,7 @@ func (r *DataSourceBsSnapshots) Configure(ctx context.Context, req datasource.Co
 func (r *DataSourceBsSnapshots) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"snapshots": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available Block Storage Snapshots.",
@@ -81,9 +84,9 @@ func (r *DataSourceBsSnapshots) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	sdkOutputList, err := r.bsSnapshotService.ListAll(ctx, bsSDK.SnapshotFilterOptions{})
+	sdkOutputList, err := r.bsSnapshotService.ListAll(ctx, project.CallOptions(data.ProjectID), bsSDK.SnapshotFilterOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
