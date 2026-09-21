@@ -38,7 +38,7 @@ resource "mgc_object_storage_objects" "inline" {
 
 - `content` (String, Sensitive) Literal content to upload as the object.
 - `content_type` (String) Content type of the object (MIME type).
-- `object_lock_retain_until_date` (String) The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z). Object locks created through terraform and mgccli are applied in COMPLIANCE mode. Therefore, once configured, they cannot be removed or reverted.
+- `object_lock_retain_until_date` (String) The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z). Object locks created through Terraform and MGC CLI are applied in COMPLIANCE mode. Therefore, once configured, they cannot be removed or reverted.
 - `source` (String) Path to a file to upload as the object content.
 
 ### Read-Only

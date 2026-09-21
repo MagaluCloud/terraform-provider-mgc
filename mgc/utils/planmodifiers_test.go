@@ -729,3 +729,128 @@ func TestStringNullIfEmpty_Description(t *testing.T) {
 func TestStringNullIfEmpty_IntegrationWithFramework(t *testing.T) {
 	var _ planmodifier.String = StringNullIfEmptyModifier()
 }
+
+func TestStringNullIfUnconfigured(t *testing.T) {
+	tests := []struct {
+		name              string
+		configValue       types.String
+		planValue         types.String
+		expectedPlanValue types.String
+	}{
+		{
+			name:              "unconfigured with prior state value becomes null",
+			configValue:       types.StringNull(),
+			planValue:         types.StringValue("previous-policy"),
+			expectedPlanValue: types.StringNull(),
+		},
+		{
+			name:              "configured value unchanged",
+			configValue:       types.StringValue("new-policy"),
+			planValue:         types.StringValue("new-policy"),
+			expectedPlanValue: types.StringValue("new-policy"),
+		},
+		{
+			name:              "unknown config unchanged",
+			configValue:       types.StringUnknown(),
+			planValue:         types.StringUnknown(),
+			expectedPlanValue: types.StringUnknown(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			modifier := StringNullIfUnconfiguredModifier()
+			req := planmodifier.StringRequest{
+				ConfigValue: tt.configValue,
+				PlanValue:   tt.planValue,
+			}
+			resp := &planmodifier.StringResponse{
+				PlanValue: tt.planValue,
+			}
+
+			modifier.PlanModifyString(context.Background(), req, resp)
+
+			assert.True(t, resp.PlanValue.Equal(tt.expectedPlanValue),
+				"PlanValue = %v, want %v", resp.PlanValue, tt.expectedPlanValue)
+		})
+	}
+}
+
+func TestStringNullIfUnconfigured_Description(t *testing.T) {
+	modifier := StringNullIfUnconfiguredModifier()
+	expected := "Sets the planned value to null when the attribute is absent from configuration, overriding the default Optional+Computed behavior of carrying forward the prior state value."
+	assert.Equal(t, expected, modifier.Description(context.Background()))
+	assert.Equal(t, expected, modifier.MarkdownDescription(context.Background()))
+}
+
+func TestStringNullIfUnconfigured_IntegrationWithFramework(t *testing.T) {
+	var _ planmodifier.String = StringNullIfUnconfiguredModifier()
+}
+
+func TestObjectNullIfUnconfigured(t *testing.T) {
+	attrTypes := map[string]attr.Type{
+		"allowed_origins": types.ListType{ElemType: types.StringType},
+	}
+
+	priorState := types.ObjectValueMust(attrTypes, map[string]attr.Value{
+		"allowed_origins": types.ListValueMust(types.StringType, []attr.Value{types.StringValue("*")}),
+	})
+	configured := types.ObjectValueMust(attrTypes, map[string]attr.Value{
+		"allowed_origins": types.ListValueMust(types.StringType, []attr.Value{types.StringValue("example.com")}),
+	})
+
+	tests := []struct {
+		name              string
+		configValue       types.Object
+		planValue         types.Object
+		expectedPlanValue types.Object
+	}{
+		{
+			name:              "unconfigured with prior state value becomes null",
+			configValue:       types.ObjectNull(attrTypes),
+			planValue:         priorState,
+			expectedPlanValue: types.ObjectNull(attrTypes),
+		},
+		{
+			name:              "configured value unchanged",
+			configValue:       configured,
+			planValue:         configured,
+			expectedPlanValue: configured,
+		},
+		{
+			name:              "unknown config unchanged",
+			configValue:       types.ObjectUnknown(attrTypes),
+			planValue:         types.ObjectUnknown(attrTypes),
+			expectedPlanValue: types.ObjectUnknown(attrTypes),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			modifier := ObjectNullIfUnconfiguredModifier()
+			req := planmodifier.ObjectRequest{
+				ConfigValue: tt.configValue,
+				PlanValue:   tt.planValue,
+			}
+			resp := &planmodifier.ObjectResponse{
+				PlanValue: tt.planValue,
+			}
+
+			modifier.PlanModifyObject(context.Background(), req, resp)
+
+			assert.True(t, resp.PlanValue.Equal(tt.expectedPlanValue),
+				"PlanValue = %v, want %v", resp.PlanValue, tt.expectedPlanValue)
+		})
+	}
+}
+
+func TestObjectNullIfUnconfigured_Description(t *testing.T) {
+	modifier := ObjectNullIfUnconfiguredModifier()
+	expected := "Sets the planned value to null when the attribute is absent from configuration, overriding the default Optional+Computed behavior of carrying forward the prior state value."
+	assert.Equal(t, expected, modifier.Description(context.Background()))
+	assert.Equal(t, expected, modifier.MarkdownDescription(context.Background()))
+}
+
+func TestObjectNullIfUnconfigured_IntegrationWithFramework(t *testing.T) {
+	var _ planmodifier.Object = ObjectNullIfUnconfiguredModifier()
+}
