@@ -1,7 +1,7 @@
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
-github.com/MagaluCloud/mgc-sdk-go v1.18.0 h1:jAPyCFFbFUHXR6wQQ4pMXLdtq+mqO7tfWXUYp8abXvE=
-github.com/MagaluCloud/mgc-sdk-go v1.18.0/go.mod h1:xGSeJPKh1vpU3CCrGyvlzr0rsqZrncfxc13sg9LBd4w=
+github.com/MagaluCloud/mgc-sdk-go v1.19.0 h1:WK8H9R8cclt3diboH1OA4Hq8/b5vdNCpZxpGbnu6OpM=
+github.com/MagaluCloud/mgc-sdk-go v1.19.0/go.mod h1:xGSeJPKh1vpU3CCrGyvlzr0rsqZrncfxc13sg9LBd4w=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/ProtonMail/go-crypto v1.1.6 h1:ZcV+Ropw6Qn0AX9brlQLAUXfqLBc7Bl+f/DmNxpLfdw=
