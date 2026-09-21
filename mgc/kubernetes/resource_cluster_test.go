@@ -202,6 +202,68 @@ func TestConvertTypeSetToStringArray(t *testing.T) {
 	})
 }
 
+func TestBuildPatchClusterRequest(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    types.Set
+		plan     types.Set
+		expected *[]string
+	}{
+		{
+			name:     "unchanged cidrs are not resent when another field changes",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			expected: nil,
+		},
+		{
+			name:     "reordered cidrs are the same set and are not resent",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"10.0.0.0/16", "192.168.0.0/24"}),
+			expected: nil,
+		},
+		{
+			name:     "changed cidrs send the planned list",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			expected: &[]string{"192.168.0.0/24", "10.0.0.0/16"},
+		},
+		{
+			name:     "removed cidrs send an empty list to clear them",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24"}),
+			plan:     types.SetNull(types.StringType),
+			expected: &[]string{},
+		},
+		{
+			name:     "going from an empty list to null still sends an empty list",
+			state:    utils.StringSliceToTypesSet(&[]string{}),
+			plan:     types.SetNull(types.StringType),
+			expected: &[]string{},
+		},
+		{
+			name:     "null on both sides sends nothing",
+			state:    types.SetNull(types.StringType),
+			plan:     types.SetNull(types.StringType),
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			patch := buildPatchClusterRequest(
+				KubernetesClusterCreateResourceModel{AllowedCidrs: tc.state, Description: types.StringValue("old")},
+				KubernetesClusterCreateResourceModel{AllowedCidrs: tc.plan, Description: types.StringValue("new")},
+			)
+
+			if tc.expected == nil {
+				assert.Nil(t, patch.AllowedCIDRs)
+				return
+			}
+			require.NotNil(t, patch.AllowedCIDRs)
+			assert.ElementsMatch(t, *tc.expected, *patch.AllowedCIDRs)
+		})
+	}
+}
+
 func TestClusterResourceValidation(t *testing.T) {
 	t.Run("should validate new fields mapping", func(t *testing.T) {
 		now := time.Now()

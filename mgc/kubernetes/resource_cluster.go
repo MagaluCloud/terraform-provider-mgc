@@ -361,7 +361,7 @@ func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.Impor
 func buildPatchClusterRequest(state, plan KubernetesClusterCreateResourceModel) k8sSDK.PatchClusterRequest {
 	patch := k8sSDK.PatchClusterRequest{}
 
-	if utils.ConvertTypeSetToStringArray(plan.AllowedCidrs) != utils.ConvertTypeSetToStringArray(state.AllowedCidrs) {
+	if !plan.AllowedCidrs.Equal(state.AllowedCidrs) {
 		allowedCidrs := utils.ConvertTypeSetToStringArray(plan.AllowedCidrs)
 		if allowedCidrs == nil {
 			allowedCidrs = &[]string{}
