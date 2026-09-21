@@ -308,7 +308,7 @@ func PollInterval(def time.Duration) time.Duration {
 	if isReplay() {
 		return replayPollingInterval
 	}
-	return 10 * time.Millisecond
+	return def
 }
 
 func PollTimeout(def time.Duration) time.Duration {
