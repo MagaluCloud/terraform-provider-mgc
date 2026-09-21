@@ -113,7 +113,6 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				DeprecationMessage: "This attribute has been marked as obsolete and has no effect.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
-					boolplanmodifier.RequiresReplace(),
 				},
 			},
 			"version": schema.StringAttribute{
