@@ -11,7 +11,6 @@ import (
 	dbSDK "github.com/MagaluCloud/mgc-sdk-go/dbaas"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -105,7 +104,7 @@ func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 				Description: "Availability zone where the replica will be placed. Defaults to the source instance's availability zone when not set.",
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					utils.AvailabilityZoneValidator(),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -149,11 +148,17 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 		v := instanceTypeID
 		ptrTypeID = &v
 	}
+
+	az := data.AvailabilityZone.ValueStringPointer()
+	if data.AvailabilityZone.ValueString() == "" {
+		az = nil
+	}
+
 	created, err := r.dbaasReplicas.Create(ctx, dbSDK.ReplicaCreateRequest{
 		SourceID:         data.SourceID.ValueString(),
 		Name:             data.Name.ValueString(),
 		InstanceTypeID:   ptrTypeID,
-		AvailabilityZone: data.AvailabilityZone.ValueStringPointer(),
+		AvailabilityZone: az,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
