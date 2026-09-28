@@ -23,10 +23,6 @@ const (
 	ResourcePrefix = "tf-acctest"
 	replayAPIKey   = "00000000-0000-4000-8000-000000000000"
 
-	// EnvPollingInterval and EnvPollingTimeout let a profile speed up recording
-	// against the fake by overriding the resources' slow real-world polling
-	// defaults through the provider config. Replay ignores them (applyVCR forces
-	// its own pace); a real provider user never sets them.
 	EnvPollingInterval = "MGC_POLLING_INTERVAL"
 	EnvPollingTimeout  = "MGC_POLLING_TIMEOUT"
 )
@@ -117,10 +113,6 @@ provider "mgc" {
 `, effectiveAPIKey(), Region(), polling, endpoints.String())
 }
 
-// pollingConfig emits provider polling attributes from the environment so a
-// profile can override the resources' slow real-world defaults when recording
-// against the fake. Empty when unset — replay stays hermetic and applyVCR
-// forces its own fast pace regardless.
 func pollingConfig() string {
 	var b strings.Builder
 	if v := os.Getenv(EnvPollingInterval); v != "" {

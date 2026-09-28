@@ -41,9 +41,7 @@ const (
 	// user cache dir.
 	EnvVCRPath = "MGC_VCR_PATH"
 
-	// StagingDir is the single local cassette set: download seeds it from the
-	// published main set, recordings overlay it, publish uploads it by branch.
-	StagingDir = "staging"
+	cassetteExt = ".yaml"
 )
 
 const providerName = "mgc"
@@ -81,7 +79,7 @@ func NewVCR(t *testing.T) *VCR {
 		t.Fatalf("refusing to record against fake endpoint %q: published cassettes must come from the real API so replay stays faithful — set %s to a real API host",
 			Endpoint(), EnvEndpoint)
 	}
-	cassetteName := cassettePath(t)
+	cassetteName := cassettePath(t, mode)
 	if mode != recorder.ModeReplayOnly {
 		if err := os.MkdirAll(filepath.Dir(cassetteName), 0o755); err != nil {
 			t.Fatalf("creating cassette dir: %v", err)
@@ -98,18 +96,18 @@ func NewVCR(t *testing.T) *VCR {
 	)
 	if err != nil {
 		if mode == recorder.ModeReplayOnly {
-			t.Fatalf("loading cassette %s.yaml: %v\nfetch the published set with `make download-cassetes`, or record it with `make testacc-record RUN=%s`",
+			t.Fatalf("loading cassette %s.yaml: %v\nfetch the published set with `make cassettes-download`, or record it with `make testacc-record RUN=%s`",
 				cassetteName, err, t.Name())
 		}
 		t.Fatalf("creating VCR recorder: %v", err)
 	}
 
 	t.Cleanup(func() {
-		// Recordings are kept even when the test fails: the traffic of a run
-		// that broke on a state check is exactly what lets the fix be
-		// iterated in replay. Staging is a workbench — pre-commit gates what
-		// gets published.
 		recording := rec.IsRecording()
+		if recording && t.Failed() {
+			t.Logf("test failed while recording: %s", cassetteName+cassetteExt)
+			return
+		}
 		if err := rec.Stop(); err != nil {
 			t.Errorf("stopping VCR recorder: %v", err)
 		}
@@ -155,16 +153,46 @@ func isReplay() bool {
 }
 
 // cassettePath resolves where this test's cassette lives (without the .yaml
-// extension the recorder appends), laid out as <base>/staging/<service>/<TestName>,
-// service being the package dir go test runs in. Staging is the single local
-// cassette set: `make download-cassetes` seeds it from the published main set,
-// recordings overlay it, and `make pre-commit` uploads it under the branch name.
-func cassettePath(t *testing.T) string {
+// extension the recorder appends), laid out as <base>/<set>/<service>/<TestName>,
+// service being the package dir go test runs in.
+func cassettePath(t *testing.T, mode recorder.Mode) string {
 	base, err := VCRBase()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return filepath.Join(base, StagingDir, serviceDir(t), sanitizeName(t.Name()))
+	var set string
+	if mode != recorder.ModePassthrough {
+		if set, err = CurrentSet(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path, err := resolveCassette(base, set, filepath.Join(serviceDir(t), sanitizeName(t.Name())), mode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// resolveCassette picks the layer rel is served from: recordings always go to
+// the branch layer, and replay prefers it over the published main layer, so a
+// run only re-records the tests it changes and reads the rest from main.
+func resolveCassette(base, set, rel string, mode recorder.Mode) (string, error) {
+	mainPath := filepath.Join(base, MainSet, rel)
+	if mode == recorder.ModePassthrough {
+		return mainPath, nil // never read nor written
+	}
+
+	branchPath := filepath.Join(base, set, rel)
+	if mode == recorder.ModeRecordOnly {
+		if set == MainSet {
+			return "", fmt.Errorf("refusing to record with %q checked out: the published set is only written by promoting a merged branch — record from a branch", MainSet)
+		}
+		return branchPath, nil
+	}
+	if _, err := os.Stat(branchPath + cassetteExt); err == nil {
+		return branchPath, nil
+	}
+	return mainPath, nil
 }
 
 // discardCassetteIfEmpty removes a recording with no interactions: a run that
@@ -326,15 +354,10 @@ const replayPlaceholderURL = "https://acctest.invalid"
 
 // SDKClient returns a CoreClient wired to this test's recorder transport, so
 // out-of-band SDK checks (exists/destroy/disappears) are recorded and replayed
-// together with the provider traffic. Building an SDK client any other way in
-// an acc test records fine but breaks on replay.
+// together with the provider traffic.
 func (v *VCR) SDKClient(service string) *sdk.CoreClient {
 	url := EndpointFor(service)
 	if url == "" {
-		// Only replay reaches here — NewVCR blocks record/live without an
-		// endpoint. The recorder answers every request and the matcher ignores
-		// the host, so this base URL is an unroutable placeholder that never
-		// dials out; deliberately not a real (production) URL.
 		url = replayPlaceholderURL
 	}
 	return sdk.NewMgcClient(
@@ -365,14 +388,7 @@ func sanitizeName(name string) string {
 }
 
 // regionSegmentRe drops a leading region path segment (e.g. /br-se1/...):
-// prod URLs carry the region in the path, fakes and other regions may not,
-// and a cassette must replay against any of them.
-//
-// UUIDs in the path are deliberately NOT normalized: a resource's id flows from
-// the recorded create response, so it is already stable across record→replay.
-// Collapsing UUIDs instead erased the only field distinguishing sibling reads
-// (e.g. GET /subnets/<a> vs /subnets/<b>), letting go-vcr return them in the
-// wrong order and swap their state — a real drift bug. See TestMatcher.
+// prod URLs carry the region in the path and a cassette must replay against any of them.
 var regionSegmentRe = regexp.MustCompile(`^/br-[a-z0-9-]+/`)
 
 func matcher(r *http.Request, i cassette.Request) bool {

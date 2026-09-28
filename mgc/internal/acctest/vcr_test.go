@@ -397,16 +397,95 @@ func TestApplyVCR(t *testing.T) {
 	}
 }
 
-func TestCassettePath(t *testing.T) {
-	base := t.TempDir()
-	t.Setenv(EnvVCRPath, base)
+func TestResolveCassette(t *testing.T) {
+	t.Parallel()
 
-	// Staging is the only local cassette set: record, live and replay all
-	// resolve to it, namespaced by the package dir go test runs in ("acctest").
-	want := filepath.Join(base, StagingDir, "acctest", "TestCassettePath")
-	if got := cassettePath(t); got != want {
-		t.Errorf("cassette path = %q, want %q", got, want)
+	const set = "feat-tags"
+	rel := filepath.Join("kubernetes", "TestAccKubernetesCluster_basic")
+
+	newBase := func(t *testing.T, layers ...string) (base, mainPath, branchPath string) {
+		t.Helper()
+		base = t.TempDir()
+		mainPath = filepath.Join(base, MainSet, rel)
+		branchPath = filepath.Join(base, set, rel)
+		for _, layer := range layers {
+			writeFile(t, filepath.Join(base, layer, rel)+cassetteExt, "---\nversion: 4\n")
+		}
+		return base, mainPath, branchPath
 	}
+
+	t.Run("replay falls back to the published main layer", func(t *testing.T) {
+		base, mainPath, _ := newBase(t, MainSet)
+
+		got, err := resolveCassette(base, set, rel, recorder.ModeReplayOnly)
+		if err != nil {
+			t.Fatalf("resolveCassette: %v", err)
+		}
+		if got != mainPath {
+			t.Errorf("path = %q, want %q", got, mainPath)
+		}
+	})
+
+	t.Run("replay prefers the branch layer", func(t *testing.T) {
+		base, _, branchPath := newBase(t, MainSet, set)
+
+		got, err := resolveCassette(base, set, rel, recorder.ModeReplayOnly)
+		if err != nil {
+			t.Fatalf("resolveCassette: %v", err)
+		}
+		if got != branchPath {
+			t.Errorf("path = %q, want %q", got, branchPath)
+		}
+	})
+
+	t.Run("replay with no cassette resolves to main", func(t *testing.T) {
+		// The recorder then fails with ErrCassetteNotFound, pointing at the
+		// published set the run is missing.
+		base, mainPath, _ := newBase(t)
+
+		got, err := resolveCassette(base, set, rel, recorder.ModeReplayOnly)
+		if err != nil {
+			t.Fatalf("resolveCassette: %v", err)
+		}
+		if got != mainPath {
+			t.Errorf("path = %q, want %q", got, mainPath)
+		}
+	})
+
+	t.Run("record always writes the branch layer", func(t *testing.T) {
+		base, _, branchPath := newBase(t, MainSet)
+
+		got, err := resolveCassette(base, set, rel, recorder.ModeRecordOnly)
+		if err != nil {
+			t.Fatalf("resolveCassette: %v", err)
+		}
+		if got != branchPath {
+			t.Errorf("path = %q, want %q", got, branchPath)
+		}
+	})
+
+	t.Run("recording onto main is refused", func(t *testing.T) {
+		// Only the promote step writes the published set.
+		base, _, _ := newBase(t, MainSet)
+
+		if _, err := resolveCassette(base, MainSet, rel, recorder.ModeRecordOnly); err == nil {
+			t.Error("recording with the main branch checked out should fail")
+		}
+	})
+
+	t.Run("live needs no layer", func(t *testing.T) {
+		// Passthrough neither reads nor writes the file, so a detached HEAD
+		// must not stop `make testacc-live`.
+		base, mainPath, _ := newBase(t)
+
+		got, err := resolveCassette(base, "", rel, recorder.ModePassthrough)
+		if err != nil {
+			t.Fatalf("resolveCassette: %v", err)
+		}
+		if got != mainPath {
+			t.Errorf("path = %q, want %q", got, mainPath)
+		}
+	})
 }
 
 func TestRandomNameDeterministicAcrossRuns(t *testing.T) {

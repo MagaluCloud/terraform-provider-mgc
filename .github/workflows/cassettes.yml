@@ -1,0 +1,74 @@
+name: Cassettes
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+# One promotion at a time: the published set is shared state.
+concurrency:
+  group: cassettes-main
+  cancel-in-progress: false
+
+env:
+  MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
+  TF_ACC_TERRAFORM_VERSION: "1.9.8"
+  MGC_CASSETTE_KEY_PAIR_ID: ${{ secrets.MGC_CASSETTE_KEY_PAIR_ID }}
+  MGC_CASSETTE_KEY_PAIR_SECRET: ${{ secrets.MGC_CASSETTE_KEY_PAIR_SECRET }}
+
+jobs:
+  promote:
+    name: Promote the branch set into main
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: Set up Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
+
+      - name: Promote
+        # What the branch recorded matches the code that just merged, so it
+        # wins per file; the tests it never touched keep their cassettes.
+        run: make cassettes-promote SET="$GITHUB_HEAD_REF"
+
+      - name: Replay main
+        run: |
+          make cassettes-download
+          make testacc-replay
+
+      # Kept on failure: a red main is investigated with the branch set still
+      # in the bucket.
+      - name: Delete the branch set
+        run: make cassettes-delete SET="$GITHUB_HEAD_REF"
+
+  cleanup:
+    name: Delete the branch set of a closed PR
+    if: github.event.pull_request.merged == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
+
+      - name: Delete
+        run: make cassettes-delete SET="$GITHUB_HEAD_REF"

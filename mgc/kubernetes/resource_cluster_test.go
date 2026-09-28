@@ -183,6 +183,11 @@ func TestConvertTypeSetToStringArray(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
+	t.Run("returns nil for an unknown set", func(t *testing.T) {
+		result := utils.ConvertTypeSetToStringArray(types.SetUnknown(types.StringType))
+		assert.Nil(t, result)
+	})
+
 	t.Run("returns an empty slice for an empty set", func(t *testing.T) {
 		result := utils.ConvertTypeSetToStringArray(types.SetValueMust(types.StringType, []attr.Value{}))
 
@@ -357,6 +362,18 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 func TestCreateKubernetesSDKNetworkRequest(t *testing.T) {
 	t.Run("returns nil when the configured set is null so the API uses the default VPC", func(t *testing.T) {
 		request := CreateKubernetesSDKNetworkRequest(types.SetNull(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("returns nil when the set is unknown, as it is on a create that omits subnet_ids", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetUnknown(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("returns nil for an empty set, since a cluster cannot run on no subnet", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetValueMust(types.StringType, []attr.Value{}))
 
 		assert.Nil(t, request)
 	})

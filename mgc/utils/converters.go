@@ -221,11 +221,11 @@ func KnownFloat64Pointer(v types.Float64) *float64 {
 }
 
 func ConvertTypeSetToStringArray(set types.Set) *[]string {
-	if set.IsNull() {
+	if set.IsNull() || set.IsUnknown() {
 		return nil
 	}
 
-	if set.IsUnknown() || len(set.Elements()) == 0 {
+	if len(set.Elements()) == 0 {
 		return &[]string{}
 	}
 

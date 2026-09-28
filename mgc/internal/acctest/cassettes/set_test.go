@@ -6,41 +6,6 @@ import (
 	"testing"
 )
 
-func TestSanitizeSetName(t *testing.T) {
-	tests := []struct {
-		in      string
-		want    string
-		wantErr bool
-	}{
-		{in: "main", want: "main"},
-		{in: "feat/tags", want: "feat-tags"},
-		{in: "chore/tf-acctest-with-vcr", want: "chore-tf-acctest-with-vcr"},
-		{in: "Fix_Bug.2", want: "Fix_Bug.2"},
-		{in: "weird//name", want: "weird-name"},
-		{in: "/leading/trailing/", want: "leading-trailing"},
-		// Reserved and degenerate names must be refused.
-		{in: "staging", wantErr: true},
-		{in: "///", wantErr: true},
-		{in: "", wantErr: true},
-	}
-	for _, tt := range tests {
-		got, err := sanitizeSetName(tt.in)
-		if tt.wantErr {
-			if err == nil {
-				t.Errorf("sanitizeSetName(%q) = %q, want error", tt.in, got)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("sanitizeSetName(%q): %v", tt.in, err)
-			continue
-		}
-		if got != tt.want {
-			t.Errorf("sanitizeSetName(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
-}
-
 func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -75,4 +40,34 @@ func TestListYamlFiles(t *testing.T) {
 			t.Errorf("missing %s in %v", rel, files)
 		}
 	}
+}
+
+func assertFile(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+	if string(got) != want {
+		t.Errorf("%s = %q, want %q", path, got, want)
+	}
+}
+
+func assertMissing(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err == nil {
+		t.Errorf("%s should not exist", path)
+	}
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

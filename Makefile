@@ -8,11 +8,13 @@ CSPELL_VERSION = "latest"
 # Test selector for acceptance-test targets (override, e.g. RUN=TestAccKubernetes)
 RUN ?= TestAcc
 
-# Optional env profile for acceptance tests: PROFILE=dev loads env/dev.env
-# (plain KEY=value lines) into the environment of every recipe.
 ifdef PROFILE
-include env/$(PROFILE).env
-export $(shell grep -E '^[A-Za-z_][A-Za-z0-9_]*=' env/$(PROFILE).env | cut -d= -f1)
+PROFILE_ENV := env/$(PROFILE).env
+ifeq ($(wildcard $(PROFILE_ENV)),)
+$(error profile file not found: $(PROFILE_ENV))
+endif
+include $(PROFILE_ENV)
+export $(shell grep -E '^[A-Za-z_][A-Za-z0-9_]*=' $(PROFILE_ENV) | cut -d= -f1)
 endif
 
 # Go commands
@@ -24,7 +26,7 @@ GOTEST          := go test
 # Directories
 DOCS_DIR_PATH   := docs
 MGC_DIR_PATH    := mgc
-SCRIPT_DIR      := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+SCRIPT_DIR      := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 DOCS_DIR        := $(SCRIPT_DIR)/$(DOCS_DIR_PATH)
 RESOURCES_DIR   := $(DOCS_DIR)/resources
 DATA_SOURCES_DIR := $(DOCS_DIR)/data-sources
@@ -46,7 +48,7 @@ NC     := \033[0m # No Color
 # Declare all targets as phony
 .PHONY: help update-subcategory check-example-usage check-empty-subcategory generate-docs \
         tf-docs-setup tf-gen-docs go-fmt go-vet go-test testacc-record testacc-replay testacc-live \
-        download-cassetes pre-commit build before-commit debug clean all
+        cassettes-download cassettes-publish cassettes-promote cassettes-delete build before-commit debug clean all
 
 install:
 	@export GOBIN=${PWD}/bin
@@ -55,7 +57,7 @@ install:
 
 help: ## Display this help screen
 	@echo -e "$(GREEN)Available commands:$(NC)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "  $(YELLOW)%-24s$(NC) %s\n", $$1, $$2}'
 
 update-subcategory: ## Update subcategories in documentation files
 	@echo -e "$(GREEN)Updating subcategories...$(NC)"
@@ -156,14 +158,24 @@ testacc-live: ## Run acceptance tests live, without cassettes (requires MGC_API_
 	@test -n "$${MGC_API_KEY:-}" || { echo -e "$(RED)MGC_API_KEY is required to run live$(NC)"; exit 1; }
 	@test -n "$${MGC_ENDPOINT:-}" || { echo -e "$(RED)MGC_ENDPOINT is required to run live (root URL of the target API; no default fallback)$(NC)"; exit 1; }
 	@echo -e "$(GREEN)Running acceptance tests live against $$MGC_ENDPOINT...$(NC)"
-	@TF_ACC=1 MGC_VCR_MODE=off $(GOTEST) -v ./mgc/... -run '$(RUN)' -timeout 180m
+	@TF_ACC=1 MGC_VCR_MODE=off $(GOTEST) -count=1 -v ./mgc/... -run '$(RUN)' -timeout 180m
 
-download-cassetes: ## Download a published cassette set into staging (default: main; override with VERSION=<set>)
-	@go run ./mgc/internal/acctest/cassettes download $(VERSION)
 
-pre-commit: ## Publish cassettes: gate the staging set with a full replay, then upload it under the branch name
+cassettes-download: ## Mirror a published cassette set into its local layer (default: main; override with SET=<branch>)
+	@go run ./mgc/internal/acctest/cassettes download $(SET)
+
+cassettes-publish: ## Upload this branch's recordings under its name, gated by a full replay
+	@test "$$(git rev-parse --abbrev-ref HEAD)" != "main" || { echo -e "$(RED)cassettes are published under the branch name: check out a branch (main is only written by promoting a merged PR)$(NC)"; exit 1; }
 	@$(MAKE) testacc-replay
 	@go run ./mgc/internal/acctest/cassettes publish
+
+cassettes-promote: ## CI: copy a merged branch's recordings over the published main set (SET= is mandatory)
+	@test "$(origin SET)" = "command line" || { echo -e "$(RED)SET must be given explicitly (e.g. make cassettes-promote SET=feat/tags)$(NC)"; exit 1; }
+	@go run ./mgc/internal/acctest/cassettes promote $(SET)
+
+cassettes-delete: ## CI: remove a published branch set from the bucket (SET= is mandatory)
+	@test "$(origin SET)" = "command line" || { echo -e "$(RED)SET must be given explicitly (e.g. make cassettes-delete SET=feat/tags)$(NC)"; exit 1; }
+	@go run ./mgc/internal/acctest/cassettes delete $(SET)
 
 .PHONY: sweep
 sweep: ## DESTRUCTIVE: delete leaked acceptance-test resources (tf-acctest-*) on MGC_ENDPOINT

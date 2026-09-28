@@ -221,11 +221,12 @@ func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest,
 }
 
 func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan KubernetesClusterCreateResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var plan KubernetesClusterCreateResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	cluster, err := r.k8sCluster.Create(ctx, k8sSDK.ClusterRequest{
 		AllowedCIDRs:       utils.ConvertTypeSetToStringArray(plan.AllowedCidrs),
@@ -247,7 +248,8 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		resp.State.Set(ctx, &plan)
+		plan.ID = types.StringValue(cluster.ID)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		return
 	}
 	plan = flattenCluster(plan, createdCluster)
