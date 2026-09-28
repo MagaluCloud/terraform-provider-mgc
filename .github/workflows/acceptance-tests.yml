@@ -14,7 +14,7 @@ concurrency:
 
 env:
   MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
-  TF_ACC_TERRAFORM_VERSION: "1.9.8"
+  TERRAFORM_VERSION: "1.15.4"
 
 jobs:
   replay:
@@ -36,6 +36,18 @@ jobs:
           cache-dependency-path: |
             **/go.mod
             **/go.sum
+
+      - name: Install Terraform
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION"
+          zip="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -O "$base/$zip"
+          curl -fsSL -O "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          grep " $zip$" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c -
+          unzip -o -q "$zip" -d tf
+          echo "TF_ACC_TERRAFORM_PATH=$RUNNER_TEMP/tf/terraform" >> "$GITHUB_ENV"
+          tf/terraform version
 
       - name: Download published cassettes
         env:

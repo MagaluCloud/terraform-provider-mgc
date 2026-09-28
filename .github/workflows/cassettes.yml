@@ -14,7 +14,8 @@ concurrency:
 
 env:
   MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
-  TF_ACC_TERRAFORM_VERSION: "1.9.8"
+  # Pinned so a replay runs the same Terraform that recorded the cassettes.
+  TERRAFORM_VERSION: "1.15.4"
   MGC_CASSETTE_KEY_PAIR_ID: ${{ secrets.MGC_CASSETTE_KEY_PAIR_ID }}
   MGC_CASSETTE_KEY_PAIR_SECRET: ${{ secrets.MGC_CASSETTE_KEY_PAIR_SECRET }}
 
@@ -37,6 +38,21 @@ jobs:
           cache-dependency-path: |
             **/go.mod
             **/go.sum
+
+      - name: Install Terraform
+        # The test framework's own installer verifies HashiCorp's PGP key,
+        # which expired in April 2026, so the zip is fetched and checked
+        # against its published sha256 instead.
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION"
+          zip="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -O "$base/$zip"
+          curl -fsSL -O "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          grep " $zip$" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c -
+          unzip -o -q "$zip" -d tf
+          echo "TF_ACC_TERRAFORM_PATH=$RUNNER_TEMP/tf/terraform" >> "$GITHUB_ENV"
+          tf/terraform version
 
       - name: Promote
         # What the branch recorded matches the code that just merged, so it
