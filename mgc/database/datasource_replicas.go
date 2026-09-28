@@ -76,6 +76,10 @@ func (r *DataSourceDbReplicaList) Schema(_ context.Context, _ datasource.SchemaR
 							Computed:    true,
 							Description: "Volume type",
 						},
+						"availability_zone": schema.StringAttribute{
+							Computed:    true,
+							Description: "Availability zone where the replica is placed",
+						},
 						"addresses": schema.ListNestedAttribute{
 							Computed: true,
 							NestedObject: schema.NestedAttributeObject{
@@ -152,6 +156,7 @@ func (r *DataSourceDbReplicaList) Read(ctx context.Context, req datasource.ReadR
 		replica.InstanceTypeID = types.StringValue(d.InstanceTypeID)
 		replica.VolumeSize = types.Int64Value(int64(d.Volume.Size))
 		replica.VolumeType = types.StringValue(d.Volume.Type)
+		replica.AvailabilityZone = types.StringValue(d.AvailabilityZone)
 		for _, a := range d.Addresses {
 			replica.Addresses = append(replica.Addresses, ReplicaAddressModel{
 				Access:  types.StringPointerValue(utils.SdkEnumToTFString(&a.Access)),

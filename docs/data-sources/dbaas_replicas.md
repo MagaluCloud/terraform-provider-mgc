@@ -30,6 +30,7 @@ data "mgc_dbaas_replicas" "all" {
 Read-Only:
 
 - `addresses` (Attributes List) (see [below for nested schema](#nestedatt--replicas--addresses))
+- `availability_zone` (String) Availability zone where the replica is placed
 - `created_at` (String) Creation timestamp
 - `engine_id` (String) Engine ID
 - `finished_at` (String) Finish timestamp

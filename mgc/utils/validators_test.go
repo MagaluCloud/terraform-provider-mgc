@@ -151,6 +151,42 @@ func TestCIDRValidator(t *testing.T) {
 	}
 }
 
+func TestAvailabilityZoneValidator(t *testing.T) {
+	testCases := []struct {
+		name          string
+		zone          types.String
+		expectedValid bool
+	}{
+		{name: "Valid zone", zone: types.StringValue("br-se1-a"), expectedValid: true},
+		{name: "Unsupported zone", zone: types.StringValue("br-ne1-c"), expectedValid: false},
+		{name: "Region without zone", zone: types.StringValue("br-se1"), expectedValid: false},
+		{name: "Wrong case", zone: types.StringValue("BR-SE1-A"), expectedValid: false},
+		{name: "Empty string", zone: types.StringValue(""), expectedValid: false},
+		{name: "Null value", zone: types.StringNull(), expectedValid: true},
+		{name: "Unknown value", zone: types.StringUnknown(), expectedValid: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := validator.StringRequest{
+				Path:        path.Root("availability_zone"),
+				ConfigValue: tc.zone,
+			}
+			resp := &validator.StringResponse{
+				Diagnostics: diag.Diagnostics{},
+			}
+
+			AvailabilityZoneValidator().ValidateString(context.Background(), req, resp)
+
+			if tc.expectedValid {
+				assert.Empty(t, resp.Diagnostics, "Expected no diagnostics for valid availability zone")
+			} else {
+				assert.NotEmpty(t, resp.Diagnostics, "Expected diagnostics for invalid availability zone")
+			}
+		})
+	}
+}
+
 func TestCIDRValidatorDescription(t *testing.T) {
 	validator := CidrValidator{}
 	description := validator.Description(context.Background())
