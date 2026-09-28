@@ -14,6 +14,7 @@ concurrency:
 
 env:
   MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
+  MGC_REGION: br-ne1
   TERRAFORM_VERSION: "1.15.4"
 
 jobs:

@@ -14,7 +14,7 @@ concurrency:
 
 env:
   MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
-  # Pinned so a replay runs the same Terraform that recorded the cassettes.
+  MGC_REGION: br-ne1
   TERRAFORM_VERSION: "1.15.4"
   MGC_CASSETTE_KEY_PAIR_ID: ${{ secrets.MGC_CASSETTE_KEY_PAIR_ID }}
   MGC_CASSETTE_KEY_PAIR_SECRET: ${{ secrets.MGC_CASSETTE_KEY_PAIR_SECRET }}
@@ -40,9 +40,6 @@ jobs:
             **/go.sum
 
       - name: Install Terraform
-        # The test framework's own installer verifies HashiCorp's PGP key,
-        # which expired in April 2026, so the zip is fetched and checked
-        # against its published sha256 instead.
         run: |
           cd "$RUNNER_TEMP"
           base="https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION"
