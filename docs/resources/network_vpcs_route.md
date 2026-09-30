@@ -64,7 +64,7 @@ resource "mgc_network_vpcs_route" "route_a" {
 
 - `description` (String) The description to help identify the route.
 - `peering_id` (String) ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
-- `port_id` (String) ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.
+- `port_id` (String) ID of the virtual network port (network interface) used as the next hop for this route. Not a TCP/UDP port number. Exactly one of `port_id` or `peering_id` must be set.
 
 ### Read-Only
 
