@@ -17,7 +17,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const NetworkPoolingTimeout = 15 * time.Minute
+const (
+	NetworkPoolingTimeout     = 15 * time.Minute
+	defaultVPCPollingInterval = 10 * time.Second
+)
 
 type NetworkVPCModel struct {
 	Id          types.String `tfsdk:"id"`
@@ -26,7 +29,9 @@ type NetworkVPCModel struct {
 }
 
 type NetworkVPCResource struct {
-	networkVPC netSDK.VPCService
+	networkVPC      netSDK.VPCService
+	pollingInterval time.Duration
+	pollingTimeout  time.Duration
 }
 
 func NewNetworkVPCResource() resource.Resource {
@@ -48,6 +53,8 @@ func (r *NetworkVPCResource) Configure(ctx context.Context, req resource.Configu
 	}
 
 	r.networkVPC = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VPCs()
+	r.pollingInterval = dataConfig.PollingIntervalOr(defaultVPCPollingInterval)
+	r.pollingTimeout = dataConfig.PollingTimeoutOr(NetworkPoolingTimeout)
 }
 
 func (r *NetworkVPCResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -95,7 +102,7 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	for startTime := time.Now(); time.Since(startTime) < NetworkPoolingTimeout; {
+	for startTime := time.Now(); time.Since(startTime) < r.pollingTimeout; {
 		res, err := r.networkVPC.Get(ctx, createdVPC)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -110,9 +117,9 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 				"VPC creation failed with status: ["+res.Status+"] \nVPC ID: "+createdVPC+" \nPlease check the VPC status in the Magalu Cloud CLI or contact support")
 			return
 		}
-		tflog.Info(ctx, "VPC is not yet created, waiting for 10 seconds",
-			map[string]any{"status": res.Status})
-		time.Sleep(10 * time.Second)
+		tflog.Info(ctx, "VPC is not yet created, waiting for the next poll",
+			map[string]any{"status": res.Status, "interval": r.pollingInterval})
+		time.Sleep(r.pollingInterval)
 	}
 
 	data.Id = types.StringValue(createdVPC)

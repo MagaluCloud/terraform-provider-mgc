@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/blockstorage"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/containerregistry"
@@ -52,6 +53,9 @@ type ProviderModel struct {
 	KeyPairID     types.String    `tfsdk:"key_pair_id"`
 	KeyPairSecret types.String    `tfsdk:"key_pair_secret"`
 	Endpoints     *EndpointsModel `tfsdk:"endpoints"`
+
+	PollingInterval types.String `tfsdk:"polling_interval"`
+	PollingTimeout  types.String `tfsdk:"polling_timeout"`
 }
 
 type EndpointsModel struct {
@@ -132,6 +136,12 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					stringvalidator.AlsoRequires(path.MatchRoot("key_pair_id")),
 				},
 			},
+			"polling_interval": durationAttribute(
+				"Interval between status checks while waiting for long-running operations, as a Go duration string (e.g. \"1m\", \"500ms\"). " +
+					"Applies to every service; when omitted each resource uses its own default."),
+			"polling_timeout": durationAttribute(
+				"Maximum time to wait for a long-running operation to finish, as a Go duration string (e.g. \"160m\", \"2h\"). " +
+					"Applies to every service; when omitted each resource uses its own default."),
 		},
 	}
 }
@@ -192,11 +202,13 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 
 func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 	output := utils.DataConfig{
-		ApiKey:        plan.ApiKey.ValueString(),
-		Env:           plan.Env.ValueString(),
-		Region:        plan.Region.ValueString(),
-		KeyPairID:     plan.KeyPairID.ValueString(),
-		KeyPairSecret: plan.KeyPairSecret.ValueString(),
+		ApiKey:          plan.ApiKey.ValueString(),
+		Env:             plan.Env.ValueString(),
+		Region:          plan.Region.ValueString(),
+		KeyPairID:       plan.KeyPairID.ValueString(),
+		KeyPairSecret:   plan.KeyPairSecret.ValueString(),
+		PollingInterval: parseDurationOr0(plan.PollingInterval),
+		PollingTimeout:  parseDurationOr0(plan.PollingTimeout),
 	}
 
 	sdkUrl := sdk.MgcUrl(utils.RegionToUrl(output.Region, output.Env))
@@ -244,6 +256,57 @@ func endpointAttribute(description string) schema.StringAttribute {
 		Optional:    true,
 		Description: description,
 		Validators:  []validator.String{endpointURLValidator{}},
+	}
+}
+
+// durationAttribute builds the schema definition for an optional Go duration value.
+func durationAttribute(description string) schema.StringAttribute {
+	return schema.StringAttribute{
+		Optional:    true,
+		Description: description,
+		Validators:  []validator.String{durationValidator{}},
+	}
+}
+
+// parseDurationOr0 converts an optional Go duration string to a time.Duration,
+// returning 0 when the value is unset or unusable so the resource falls back to
+// its per-operation default. The schema validator already rejects bad input; the
+// defensive checks here keep the zero-means-default contract regardless.
+func parseDurationOr0(v types.String) time.Duration {
+	if v.IsNull() || v.IsUnknown() {
+		return 0
+	}
+	d, err := time.ParseDuration(strings.TrimSpace(v.ValueString()))
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return d
+}
+
+type durationValidator struct{}
+
+func (durationValidator) Description(_ context.Context) string {
+	return "value must be a positive Go duration string, e.g. \"500ms\", \"1m\" or \"2h\""
+}
+
+func (v durationValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (durationValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	raw := strings.TrimSpace(req.ConfigValue.ValueString())
+	if raw == "" {
+		return
+	}
+	if d, err := time.ParseDuration(raw); err != nil || d <= 0 {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid duration",
+			fmt.Sprintf("%q must be a positive Go duration string such as \"500ms\", \"1m\" or \"2h\".", raw),
+		)
 	}
 }
 

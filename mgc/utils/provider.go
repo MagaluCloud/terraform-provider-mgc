@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"time"
+
 	sdk "github.com/MagaluCloud/mgc-sdk-go/client"
 )
 
@@ -23,7 +25,27 @@ type DataConfig struct {
 	KeyPairID        string
 	KeyPairSecret    string
 	CoreConfig       sdk.CoreClient
+	PollingInterval  time.Duration
+	PollingTimeout   time.Duration
 	serviceEndpoints map[string]string
+}
+
+// PollingIntervalOr resolves the polling interval: explicit config value,
+// else def.
+func (d *DataConfig) PollingIntervalOr(def time.Duration) time.Duration {
+	if d.PollingInterval > 0 {
+		return d.PollingInterval
+	}
+	return def
+}
+
+// PollingTimeoutOr resolves the polling deadline: explicit config value,
+// else def.
+func (d *DataConfig) PollingTimeoutOr(def time.Duration) time.Duration {
+	if d.PollingTimeout > 0 {
+		return d.PollingTimeout
+	}
+	return def
 }
 
 // SetServiceEndpoints stores custom base URL overrides keyed by service name constant.

@@ -134,6 +134,64 @@ make before-commit
 make go-test
 ```
 
+#### Acceptance tests
+
+The `TestAcc*` tests cover the entire Terraform lifecycle—plan, apply, import,
+update, refresh, and destroy—using the `terraform-plugin-testing`. These tests require that the
+`terraform` binary be in the `PATH` and are skipped unless the `TF_ACC` variable is set,
+which is the purpose of the `testacc-*` tests.
+
+A normal run replays previously recorded HTTP traffic from a **replay**.
+No infrastructure, no credentials—all in a matter of seconds
+
+##### Run the suite
+
+```bash
+make cassettes-download            # fetch the published cassettes
+make testacc-replay                # replay everything
+make testacc-replay RUN=TestAccKubernetesCluster_basic
+```
+
+The cassettes are stored outside the repository, in `MGC_VCR_PATH` (the developer’s cache directory), in two layers:
+
+- `main/` — the published set, the base that each playback reads from. Only CI should write to this when a PR is merged.
+- `<branch>/` — only what your branch has rewritten. It is written using `make cassettes-publish`.
+
+A replay first searches the branch layer and, if it doesn’t find what it’s looking for, falls back to `main/`.
+
+##### Changing a test
+
+Replay only works for identical requests; making changes requires re-recording the cassettes.
+
+```bash
+PROFILE=prod make testacc-record RUN=TestAccKubernetesCluster_basic
+make testacc-replay                # condition: the entire test suite must pass
+make cassettes-publish             # loads your branch layer
+```
+
+Four rules enforced by the tool:
+
+- `RUN=` is required during recording. Rewriting everything is never implicit.
+- Recording to a loopback endpoint is disallowed: a published cassette must
+  come from the actual API; otherwise, playback no longer makes sense.
+- `cassettes-publish` rejects `main`. The published set is only recorded by
+  promoting a merged branch.
+- A recording whose test failed is discarded, so a failed run never overwrites a valid cassette.
+
+##### Iterating Against a Mock API
+
+While writing a test, run it in real time against a local mock API. Nothing is recorded:
+
+```bash
+PROFILE=dev make testacc-live RUN=TestAccKubernetesCluster_basic
+```
+
+##### Add a test to a new service
+
+Create the recorder with `acctest.NewVCR(t)`, and then use
+`vcr.ProtoV6ProviderFactories()`, `vcr.RandomName()`, and `vcr.SDKClient()`.
+See `mgc/kubernetes/resource_cluster_acc_test.go`.
+
 ## Contributing
 
 We welcome contributions to the Magalu Cloud Terraform Provider!

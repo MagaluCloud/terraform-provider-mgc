@@ -672,3 +672,59 @@ func TestStringSliceToTypesList(t *testing.T) {
 		})
 	}
 }
+
+func TestKnownStringPointer(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, KnownStringPointer(types.StringNull()))
+	assert.Nil(t, KnownStringPointer(types.StringUnknown()))
+
+	if got := KnownStringPointer(types.StringValue("")); assert.NotNil(t, got) {
+		assert.Equal(t, "", *got)
+	}
+	if got := KnownStringPointer(types.StringValue("abc")); assert.NotNil(t, got) {
+		assert.Equal(t, "abc", *got)
+	}
+}
+
+func TestKnownBoolPointer(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, KnownBoolPointer(types.BoolNull()))
+	assert.Nil(t, KnownBoolPointer(types.BoolUnknown()))
+
+	if got := KnownBoolPointer(types.BoolValue(true)); assert.NotNil(t, got) {
+		assert.True(t, *got)
+	}
+	if got := KnownBoolPointer(types.BoolValue(false)); assert.NotNil(t, got) {
+		assert.False(t, *got)
+	}
+}
+
+func TestKnownInt64Pointer(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, KnownInt64Pointer(types.Int64Null()))
+	assert.Nil(t, KnownInt64Pointer(types.Int64Unknown()))
+
+	if got := KnownInt64Pointer(types.Int64Value(0)); assert.NotNil(t, got) {
+		assert.Equal(t, int64(0), *got)
+	}
+	if got := KnownInt64Pointer(types.Int64Value(42)); assert.NotNil(t, got) {
+		assert.Equal(t, int64(42), *got)
+	}
+}
+
+func TestKnownFloat64Pointer(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, KnownFloat64Pointer(types.Float64Null()))
+	assert.Nil(t, KnownFloat64Pointer(types.Float64Unknown()))
+
+	if got := KnownFloat64Pointer(types.Float64Value(0)); assert.NotNil(t, got) {
+		assert.Equal(t, float64(0), *got)
+	}
+	if got := KnownFloat64Pointer(types.Float64Value(3.14)); assert.NotNil(t, got) {
+		assert.Equal(t, 3.14, *got)
+	}
+}

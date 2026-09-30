@@ -45,9 +45,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				}, nil
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "")
 		assert.NoError(t, err)
 	})
 
@@ -66,9 +66,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				}, nil
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "")
 		assert.NoError(t, err)
 	})
 
@@ -80,9 +80,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				}, nil
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "timeout waiting for node pool")
 	})
@@ -107,9 +107,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				}, nil
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, newVersion, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, newVersion)
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, callCount, 3)
 	})
@@ -124,9 +124,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				}, nil
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "v1.31.0", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "v1.31.0")
 		assert.Error(t, err)
 	})
 
@@ -137,9 +137,9 @@ func TestWaitNodePoolState(t *testing.T) {
 				return nil, expectedErr
 			},
 		}
-		r := &NewNodePoolResource{sdkNodepool: mockSvc}
+		r := &NewNodePoolResource{sdkNodepool: mockSvc, pollingTimeout: testTimeout, pollingInterval: testInterval}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "")
 		assert.Error(t, err)
 		assert.Equal(t, expectedErr, err)
 	})
