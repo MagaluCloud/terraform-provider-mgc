@@ -125,6 +125,7 @@ Read the documentation guides for more details.
 - `created_at` (String) The timestamp when the virtual machine instance was created.
 - `id` (String) The unique identifier of the virtual machine instance.
 - `ipv4` (String) The primary network interface public IPv4 address of the virtual machine instance.
+When creating an instance without "allocate_public_ipv4" and without "network_interface_id", this is known to be null at plan time.
 - `ipv6` (String) The primary network interface IPv6 address of the virtual machine instance.
 - `local_ipv4` (String) The primary network interface IPv4 address of the virtual machine instance.
 - `network_interfaces` (Attributes List) The network interfaces attached to the virtual machine instance. (see [below for nested schema](#nestedatt--network_interfaces))

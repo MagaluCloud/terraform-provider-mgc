@@ -344,9 +344,11 @@ This attribute can only be used when "network_interface_id" is not set.`,
 				},
 			},
 			"ipv4": schema.StringAttribute{
-				Description: "The primary network interface public IPv4 address of the virtual machine instance.",
-				Computed:    true,
+				Description: `The primary network interface public IPv4 address of the virtual machine instance.
+When creating an instance without "allocate_public_ipv4" and without "network_interface_id", this is known to be null at plan time.`,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
+					NullPublicIPv4WhenNotAllocated(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -611,7 +613,7 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 			interfaces = append(interfaces, VmInstancesNetworkInterfaceModel{
 				ID:        types.StringValue(port.ID),
 				Name:      types.StringValue(port.Name),
-				Ipv4:      types.StringPointerValue(port.AssociatedPublicIpv4),
+				Ipv4:      publicIPv4Value(port.AssociatedPublicIpv4),
 				LocalIpv4: types.StringValue(port.IpAddresses.PrivateIpv4),
 				Ipv6:      types.StringPointerValue(&port.IpAddresses.PublicIpv6),
 				Primary:   types.BoolPointerValue(port.Primary),
@@ -751,4 +753,12 @@ func (r *vmInstances) toTerraformNetworkInterfacesList(ctx context.Context, inte
 		interfaces,
 	)
 	return listValue
+}
+
+// publicIPv4Value treats an empty address as no public IPv4, so it matches the null planned on creation.
+func publicIPv4Value(ip *string) types.String {
+	if ip == nil || *ip == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(*ip)
 }
