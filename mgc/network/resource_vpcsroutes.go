@@ -90,7 +90,7 @@ func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"port_id": schema.StringAttribute{
-				Description: "ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.",
+				Description: "ID of the virtual network port (network interface) used as the next hop for this route. Not a TCP/UDP port number. Exactly one of `port_id` or `peering_id` must be set.",
 				Optional:    true,
 				Validators: []validator.String{
 					routeTargetExactlyOneOf(),
