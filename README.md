@@ -136,71 +136,61 @@ make go-test
 
 #### Acceptance tests
 
-Acceptance tests (`TestAcc*`) exercise the full Terraform lifecycle (plan, apply,
-import, in-place update, refresh and destroy) through `terraform-plugin-testing`.
-They are endpoint-agnostic: the API they target is decided solely by
-`MGC_ENDPOINT`, which may point to a fake API that simulates Magalu Cloud or to
-the production API. The tests behave identically against either.
+The `TestAcc*` tests cover the entire Terraform lifecycle—plan, apply, import,
+update, refresh, and destroy—using the `terraform-plugin-testing`. These tests require that the
+`terraform` binary be in the `PATH` and are skipped unless the `TF_ACC` variable is set,
+which is the purpose of the `testacc-*` tests.
+
+A normal run replays previously recorded HTTP traffic from a **replay**.
+No infrastructure, no credentials—all in a matter of seconds
+
+##### Run the suite
 
 ```bash
-# Against a locally running fake API (fast; any valid UUIDv4 works as key)
-MGC_ENDPOINT=http://localhost:8080 \
-MGC_API_KEY=8a1f47b0-3a4e-4b91-9e55-1c2d3e4f5a6b \
-MGC_POLLING_INTERVAL=200ms \
-make testacc
-
-# Against production (creates real, billable resources)
-MGC_ENDPOINT=<production API root URL> MGC_API_KEY=<real key> make testacc
+make cassettes-download            # fetch the published cassettes
+make testacc-replay                # replay everything
+make testacc-replay RUN=TestAccKubernetesCluster_basic
 ```
 
-Optional variables: `MGC_REGION` (default `br-se1`), `MGC_K8S_VERSION` /
-`MGC_K8S_VERSION_UPGRADE` (cluster versions used by the Kubernetes lifecycle
-test; when unset, `version` is omitted from the config), and
-`MGC_POLLING_INTERVAL` (Go duration overriding the 10s wait between status
-checks — useful against a fake API that transitions states instantly).
+The cassettes are stored outside the repository, in `MGC_VCR_PATH` (the developer’s cache directory), in two layers:
 
-Without `TF_ACC` set (exported automatically by `make testacc`), `TestAcc*`
-tests are skipped, so `make go-test` and CI remain unaffected.
+- `main/` — the published set, the base that each playback reads from. Only CI should write to this when a PR is merged.
+- `<branch>/` — only what your branch has rewritten. It is written using `make cassettes-publish`.
 
-##### Recording and replaying with VCR
+A replay first searches the branch layer and, if it doesn’t find what it’s looking for, falls back to `main/`.
 
-Acceptance tests can record their HTTP traffic into a **cassette** once and then
-**replay** it on every later run, so regression checks need no infrastructure,
-no credentials and finish in milliseconds. This is driven by `MGC_VCR_MODE`:
+##### Changing a test
 
-| `MGC_VCR_MODE` | Behaviour |
-| --- | --- |
-| unset / `auto` | Record once: replay if a cassette exists, otherwise hit the API and record it. This is what you want for a brand-new test. |
-| `record` | Always hit the live API and (re)record. Requires `MGC_ENDPOINT` + `MGC_API_KEY`. |
-| `replay` | Replay only, from the committed cassette. Fails if the cassette is missing. No network. |
-| `off` / `live` | Bypass VCR entirely and talk to the real API. |
+Replay only works for identical requests; making changes requires re-recording the cassettes.
 
 ```bash
-# Record cassettes against a live/fake API (run once per new or changed test)
-MGC_ENDPOINT=http://localhost:8080 MGC_API_KEY=<uuid> MGC_K8S_VERSION=<v> \
-MGC_POLLING_INTERVAL=200ms make testacc-record
-
-# Replay from committed cassettes — no infra, no secrets
-make testacc-replay
+PROFILE=prod make testacc-record RUN=TestAccKubernetesCluster_basic
+make testacc-replay                # condition: the entire test suite must pass
+make cassettes-publish             # loads your branch layer
 ```
 
-Cassettes are written under each service package's `testdata/cassettes/`
-directory (e.g. `mgc/kubernetes/testdata/cassettes/<TestName>.yaml`) and are
-meant to be committed. Credentials (`Authorization`, `X-Api-Key`) are scrubbed
-before the cassette is written, and random resource names are seeded from the
-test name so record and replay stay byte-for-byte identical.
+Four rules enforced by the tool:
 
-> **Replay needs the same non-secret inputs used at record time.** Values that
-> end up in request bodies — `MGC_K8S_VERSION`, `MGC_K8S_VERSION_UPGRADE`,
-> `MGC_REGION` — must match the recording, because the request matcher compares
-> request bodies. `make testacc-replay` defaults `MGC_ENDPOINT`/`MGC_API_KEY`/
-> `MGC_POLLING_INTERVAL` to harmless placeholders but passes these through from
-> your environment.
+- `RUN=` is required during recording. Rewriting everything is never implicit.
+- Recording to a loopback endpoint is disallowed: a published cassette must
+  come from the actual API; otherwise, playback no longer makes sense.
+- `cassettes-publish` rejects `main`. The published set is only recorded by
+  promoting a merged branch.
+- A recording whose test failed is discarded, so a failed run never overwrites a valid cassette.
 
-To wire a new service's acceptance test into VCR, build the recorder with
-`acctest.NewVCR(t)` and use `vcr.ProtoV6ProviderFactories()`, `vcr.RandomName()`
-and `vcr.HTTPClient()` (for any SDK client a check builds directly, e.g.
-`CheckDestroy`) — see `mgc/kubernetes/resource_cluster_acc_test.go`.
+##### Iterating Against a Mock API
+
+While writing a test, run it in real time against a local mock API. Nothing is recorded:
+
+```bash
+PROFILE=dev make testacc-live RUN=TestAccKubernetesCluster_basic
+```
+
+##### Add a test to a new service
+
+Create the recorder with `acctest.NewVCR(t)`, and then use
+`vcr.ProtoV6ProviderFactories()`, `vcr.RandomName()`, and `vcr.SDKClient()`.
+See `mgc/kubernetes/resource_cluster_acc_test.go`.
 
 ## Contributing
 

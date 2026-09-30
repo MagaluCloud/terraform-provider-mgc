@@ -1,8 +1,3 @@
-// Command cassettes manages the acceptance-test cassette sets in the bucket.
-// Cassettes live in two layers: the published main set every run replays from,
-// and a branch set holding only what that branch re-recorded. download mirrors
-// a set into its local layer, publish uploads the branch layer under the branch
-// name, and promote copies a merged branch set over main.
 package main
 
 import (
@@ -67,8 +62,6 @@ func usage() {
 	os.Exit(2)
 }
 
-// run wires a command to the bucket. The commands take the service itself, so
-// they can be exercised against a fake.
 func run(cmd func(context.Context, objectstorage.ObjectService, string) error) error {
 	objects, bucket, err := objectsClient()
 	if err != nil {
@@ -112,8 +105,6 @@ func publish() error {
 
 func setPrefix(set string) string { return bucketPrefix + "/" + set + "/" }
 
-// downloadSet mirrors a published set into its local layer. The local copy is
-// derived data, so it replaces what is there instead of merging with it.
 func downloadSet(ctx context.Context, objects objectstorage.ObjectService, bucket, base, set string) error {
 	if set == "" {
 		set = acctest.MainSet
@@ -132,7 +123,6 @@ func downloadSet(ctx context.Context, objects objectstorage.ObjectService, bucke
 		if set == acctest.MainSet {
 			return fmt.Errorf("cassette set %q not found in bucket %s: replay has no base layer without it", set, bucket)
 		}
-		// A PR that re-recorded nothing has no set of its own.
 		fmt.Printf("no cassettes published for set %q; nothing to download\n", set)
 		return nil
 	}
@@ -169,8 +159,6 @@ func layerPath(dir, key string) (string, error) {
 	return target, nil
 }
 
-// publishSet uploads the branch layer, which holds exactly the cassettes this
-// branch re-recorded.
 func publishSet(ctx context.Context, objects objectstorage.ObjectService, bucket, base, set string) error {
 	set, err := acctest.SetName(set)
 	if err != nil {
@@ -211,9 +199,6 @@ func publishSet(ctx context.Context, objects objectstorage.ObjectService, bucket
 	return nil
 }
 
-// promoteSet copies a merged branch set over main, file by file: what the
-// branch recorded matches the code being merged, so it wins, while the tests it
-// never touched keep the cassettes main already had.
 func promoteSet(ctx context.Context, objects objectstorage.ObjectService, bucket, set string) error {
 	set, err := acctest.SetName(set)
 	if err != nil {
@@ -244,8 +229,6 @@ func promoteSet(ctx context.Context, objects objectstorage.ObjectService, bucket
 	return nil
 }
 
-// deleteSet drops a branch set once its PR is closed, so the bucket does not
-// keep a set per branch forever.
 func deleteSet(ctx context.Context, objects objectstorage.ObjectService, bucket, set string) error {
 	set, err := acctest.SetName(set)
 	if err != nil {

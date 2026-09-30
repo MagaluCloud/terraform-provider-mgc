@@ -35,20 +35,13 @@ import (
 )
 
 const (
-	EnvVCRMode = "MGC_VCR_MODE"
-
-	// EnvVCRPath overrides where cassettes live locally. The default is the
-	// user cache dir.
-	EnvVCRPath = "MGC_VCR_PATH"
-
+	EnvVCRMode  = "MGC_VCR_MODE"
+	EnvVCRPath  = "MGC_VCR_PATH"
 	cassetteExt = ".yaml"
 )
 
 const providerName = "mgc"
 
-// Replay pace: cassette interactions advance per request, not per wall-clock
-// time, so polling as fast as possible is correct; the short timeout makes a
-// polling bug fail in minutes instead of the resource's real-world deadline.
 const (
 	replayPollingInterval = 10 * time.Millisecond
 	replayPollingTimeout  = 5 * time.Minute
@@ -124,8 +117,6 @@ func NewVCR(t *testing.T) *VCR {
 	}
 }
 
-// parseVCRMode maps MGC_VCR_MODE to a recorder mode. Replay is the default:
-// recording is always an explicit, deliberate act against a live API.
 func parseVCRMode(raw string) (recorder.Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "replay":
@@ -173,13 +164,10 @@ func cassettePath(t *testing.T, mode recorder.Mode) string {
 	return path
 }
 
-// resolveCassette picks the layer rel is served from: recordings always go to
-// the branch layer, and replay prefers it over the published main layer, so a
-// run only re-records the tests it changes and reads the rest from main.
 func resolveCassette(base, set, rel string, mode recorder.Mode) (string, error) {
 	mainPath := filepath.Join(base, MainSet, rel)
 	if mode == recorder.ModePassthrough {
-		return mainPath, nil // never read nor written
+		return mainPath, nil
 	}
 
 	branchPath := filepath.Join(base, set, rel)
@@ -195,9 +183,6 @@ func resolveCassette(base, set, rel string, mode recorder.Mode) (string, error) 
 	return mainPath, nil
 }
 
-// discardCassetteIfEmpty removes a recording with no interactions: a run that
-// aborted before any request (e.g. a failed PreCheck) documents nothing and
-// would only shadow the published set on replay.
 func discardCassetteIfEmpty(t *testing.T, name string) {
 	c, err := cassette.Load(name)
 	if err != nil {
@@ -218,8 +203,6 @@ func serviceDir(t *testing.T) string {
 	return filepath.Base(wd)
 }
 
-// VCRBase returns the local cassette base directory: MGC_VCR_PATH or the
-// user cache default. Cassettes are synced artifacts, never repo files.
 func VCRBase() (string, error) {
 	if p := os.Getenv(EnvVCRPath); p != "" {
 		return p, nil
@@ -231,9 +214,6 @@ func VCRBase() (string, error) {
 	return filepath.Join(cache, "terraform-provider-mgc", "cassettes"), nil
 }
 
-// isLoopbackEndpoint reports whether raw points at a loopback host — the shape
-// of the local fake. Recording against it is refused: published cassettes must
-// come from the real API so replay stays faithful.
 func isLoopbackEndpoint(raw string) bool {
 	if raw == "" {
 		return false
@@ -255,8 +235,6 @@ func isLoopbackEndpoint(raw string) bool {
 	return false
 }
 
-// SkipIfVcr skips tests whose traffic cannot be recorded deterministically
-// (e.g. sibling resources created in undefined order); they only run live.
 func SkipIfVcr(t *testing.T) {
 	t.Helper()
 	if vcrMode(t) != recorder.ModePassthrough {
@@ -481,8 +459,6 @@ var (
 		"certificate_authority_data": {},
 	}
 
-	// pemBlockRe and textSecretRe cover non-JSON bodies (e.g. a kubeconfig
-	// YAML), which the JSON walk cannot reach.
 	pemBlockRe   = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----`)
 	textSecretRe = regexp.MustCompile(`(?im)^(\s*(?:client-key-data|client-certificate-data|certificate-authority-data|token|password)\s*:\s*)\S+`)
 )
@@ -506,9 +482,6 @@ func redactBody(body string) string {
 	return body
 }
 
-// credentialLeakRes are signatures of credential material that must never
-// reach a cassette: the scrub redacts the known fields, the guard fails the
-// save on anything that slipped through.
 var credentialLeakRes = []*regexp.Regexp{
 	regexp.MustCompile(`-----BEGIN `),
 	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`),
@@ -516,8 +489,6 @@ var credentialLeakRes = []*regexp.Regexp{
 	regexp.MustCompile(`[A-Za-z0-9+/]{256,}`),
 }
 
-// findCredential returns a truncated sample of credential-like content in s,
-// or "" when s is clean.
 func findCredential(s string) string {
 	for _, re := range credentialLeakRes {
 		if m := re.FindString(s); m != "" {

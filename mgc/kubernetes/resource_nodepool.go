@@ -91,8 +91,8 @@ func (r *NewNodePoolResource) Schema(_ context.Context, req resource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "An array representing a set of nodes within a Kubernetes cluster. " +
 			"**Provisioning time.** Node pool creation is asynchronous: `terraform apply` blocks until the nodes reach the `running` state. " +
-			"This can take up to **1h30m**, which is also the default `polling_timeout` the provider waits before giving up. " +
-			"This deadline is configurable on the provider block (`polling_timeout = \"2h\"`); the setting is global and applies to every resource.",
+			"The provider keeps waiting up to the default `polling_timeout` of **1h30** before giving up. " +
+			"This deadline is configurable on the provider block (`polling_timeout = \"2h\"`); the setting is global.",
 		Attributes: map[string]schema.Attribute{
 			"flavor_name": schema.StringAttribute{
 				Description: "Definition of the CPU, RAM, and storage capacity of the nodes.",

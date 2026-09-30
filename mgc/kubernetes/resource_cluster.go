@@ -82,8 +82,8 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Description: "Kubernetes cluster resource in MGC. " +
 			"**Provisioning time.** Cluster creation is asynchronous: `terraform apply` blocks until the control plane reaches the `running` state. " +
-			"This typically takes between **1 and 2 hours**. The provider keeps waiting up to the default `polling_timeout` of **2h40m** before giving up. " +
-			"This deadline is configurable on the provider block (`polling_timeout = \"3h\"`); the setting is global and applies to every resource.",
+			"The provider keeps waiting up to the default `polling_timeout` of **2h40m** before giving up. " +
+			"This deadline is configurable on the provider block (`polling_timeout = \"3h\"`); the setting is global.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Description: "Kubernetes cluster name. Must be unique within a namespace and follow naming rules.",

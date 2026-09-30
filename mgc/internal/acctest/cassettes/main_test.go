@@ -14,8 +14,6 @@ import (
 
 const testBucket = "tf-acctest-bucket"
 
-// fakeObjects stands in for the bucket. The embedded interface keeps the fake
-// to the handful of calls the tool makes; anything else panics.
 type fakeObjects struct {
 	objectstorage.ObjectService
 
@@ -120,7 +118,6 @@ func TestDownloadSet(t *testing.T) {
 	})
 
 	t.Run("an unpublished branch set is not an error", func(t *testing.T) {
-		// A PR that re-recorded nothing has no set of its own.
 		base := t.TempDir()
 		if err := downloadSet(t.Context(), newFakeObjects(nil), testBucket, base, "feat/tags"); err != nil {
 			t.Fatalf("downloadSet: %v", err)
