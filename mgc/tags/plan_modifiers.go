@@ -10,10 +10,6 @@ import (
 
 var _ planmodifier.String = idFromAttributes{}
 
-// idFromAttributes plans the id from the names it is built from. Tags and values
-// are renamed in place, so UseStateForUnknown would promise the old id and the
-// apply would fail with an inconsistent result. While any of the names is still
-// unknown, the id stays unknown too.
 type idFromAttributes struct {
 	attributes []string
 	build      func(names []string) string
@@ -28,7 +24,6 @@ func (m idFromAttributes) MarkdownDescription(ctx context.Context) string {
 }
 
 func (m idFromAttributes) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	// A destroy plans no id.
 	if req.Plan.Raw.IsNull() {
 		return
 	}

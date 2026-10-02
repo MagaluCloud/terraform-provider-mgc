@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-// knownKinds are the kinds the API accepts today. The list grows on the API
-// side, so it drives a warning, never an error.
 var knownKinds = []string{string(tagSDK.TagKindFinops)}
 
 var _ validator.String = kindValidator{}

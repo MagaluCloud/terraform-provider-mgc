@@ -23,9 +23,6 @@ func TestGetDataSources(t *testing.T) {
 	assert.NotEmpty(t, GetDataSources())
 }
 
-// newDataSourceConfig builds the configuration a data source receives. tfsdk.Config
-// has no Set, so the raw value is assembled by hand: the attributes given are the
-// ones the user wrote, and every other one is null, as it is on a real read.
 func newDataSourceConfig(t *testing.T, dataSourceSchema schema.Schema, attributes map[string]tftypes.Value) tfsdk.Config {
 	t.Helper()
 

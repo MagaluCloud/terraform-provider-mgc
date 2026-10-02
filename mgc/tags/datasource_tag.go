@@ -132,12 +132,7 @@ func tagAttributes() map[string]schema.Attribute {
 	}
 }
 
-// convertTag maps a tag of the API onto the model. A data source has no previous
-// configuration to preserve, so this is a plain conversion: the merge the
-// resources do with flattenTag would have nothing to merge here.
 func convertTag(tag tagSDK.Tag) tagModel {
-	// A tag with no values answers with [], which is not the same as an answer
-	// that leaves the field out, as the listing endpoint does.
 	var values []tagValueModel
 	if tag.Values != nil {
 		values = make([]tagValueModel, 0, len(tag.Values))
@@ -154,8 +149,6 @@ func convertTag(tag tagSDK.Tag) tagModel {
 		Kinds:       utils.StringSliceToTypesSet(kindsToStrings(tag.Kinds)),
 		Values:      values,
 
-		// The timestamp type of the SDK lives in an internal package and cannot be
-		// named here, but it converts to time.Time.
 		CreatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(&tag.CreatedAt))),
 		UpdatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(tag.UpdatedAt))),
 	}

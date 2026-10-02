@@ -143,14 +143,8 @@ func attachmentAttributes() map[string]schema.Attribute {
 	}
 }
 
-// convertAttachment maps a tagged resource of the API onto the model. A data
-// source has no previous configuration to preserve, so this is a plain
-// conversion, unlike flattenAttachment on the resource.
 func convertAttachment(taggedResource tagSDK.Resource) tagAttachmentModel {
 	return tagAttachmentModel{
-		// The resource is identified by the id its own product uses for it, which
-		// is what every other resource of the provider knows it by. The id the tags
-		// service keeps for its own bookkeeping is left out on purpose.
 		ID:           types.StringValue(taggedResource.ExternalID),
 		ResourceID:   types.StringValue(taggedResource.ExternalID),
 		Tags:         mirrorTags(taggedResource),
@@ -158,8 +152,6 @@ func convertAttachment(taggedResource tagSDK.Resource) tagAttachmentModel {
 		Product:      types.StringValue(string(taggedResource.ResourceType.Product)),
 		Region:       types.StringValue(taggedResource.Region),
 
-		// The timestamp type of the SDK lives in an internal package and cannot be
-		// named here, but it converts to time.Time.
 		CreatedAt:           types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(&taggedResource.CreatedAt))),
 		UpdatedAt:           types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(taggedResource.UpdatedAt))),
 		LastTagAssociatedAt: types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(taggedResource.LastTagAssociatedAt))),

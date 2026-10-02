@@ -22,8 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// The API validates names with a unicode-aware pattern, so \w cannot be used
-// here: it would reject accented names the API accepts.
 var (
 	tagNameRule = regexp.MustCompile(`^[\p{L}\p{N}_ \-\[\]\(\)\.\:]+$`)
 	colorRule   = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
