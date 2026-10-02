@@ -9,6 +9,7 @@ import (
 	tagSDK "github.com/MagaluCloud/mgc-sdk-go/tag"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/mocks"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -455,98 +456,109 @@ func TestTagValueResourceUpdateRename(t *testing.T) {
 	mockSvc.AssertExpectations(t)
 }
 
-// Renaming the tag takes its values along: the value is found under the new tag
-// name and is only updated there, never recreated.
+// Renaming the tag takes its values along, so the value is no longer under the
+// old name and is only updated under the new one, never recreated.
 func TestTagValueResourceUpdateFollowsTagRename(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 
-	value := tagValueFromJSON(t, `{
+	tests := []struct {
+		name    string
+		to      [2]string
+		request tagSDK.UpdateTagValueRequest
+	}{
+		{
+			name:    "tag renamed",
+			to:      [2]string{"env", "producao"},
+			request: tagSDK.UpdateTagValueRequest{Description: ptr("mesma")},
+		},
+		{
+			name:    "tag and value renamed together",
+			to:      [2]string{"env", "prod"},
+			request: tagSDK.UpdateTagValueRequest{Name: ptr("prod"), Description: ptr("mesma")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			value := tagValueFromJSON(t, `{
+				"name": "`+tt.to[1]+`",
+				"description": "mesma",
+				"created_at": "2026-08-03T00:58:38.215088",
+				"updated_at": null
+			}`)
+
+			mockSvc := new(mocks.TagValueService)
+			mockSvc.On("Get", ctx, "ambiente", "producao").Return(nil, httpError(http.StatusNotFound, ""))
+			mockSvc.On("Update", ctx, "env", "producao", tt.request).Return(&value, nil)
+
+			r, valueSchema := newTestTagValueResource(t, mockSvc)
+			resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+			r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, tt.to), resp)
+
+			require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+			var state tagValueResourceModel
+			resp.State.Get(ctx, &state)
+			assert.Equal(t, tagValueID(tt.to[0], tt.to[1]), state.ID.ValueString())
+			assert.Equal(t, "2026-08-03T00:58:38Z", state.CreatedAt.ValueString())
+			mockSvc.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+			mockSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
+			mockSvc.AssertExpectations(t)
+		})
+	}
+}
+
+// A value still under the old tag means the config moves it to another tag. That
+// is refused before any write: an attached value cannot be deleted, so a move
+// would fail halfway and leave the old value behind.
+func TestTagValueResourceUpdateRejectsMove(t *testing.T) {
+	t.Parallel()
+
+	stillThere := tagValueFromJSON(t, `{
 		"name": "producao",
 		"description": "mesma",
 		"created_at": "2026-08-03T00:58:38.215088",
 		"updated_at": null
 	}`)
 
-	mockSvc := new(mocks.TagValueService)
-	mockSvc.On("Get", ctx, "env", "producao").Return(&value, nil)
-	mockSvc.On("Update", ctx, "env", "producao", tagSDK.UpdateTagValueRequest{Description: ptr("mesma")}).
-		Return(&value, nil)
+	tests := []struct {
+		name  string
+		value *tagSDK.TagValue
+		err   error
+	}{
+		{name: "value still under the old tag", value: &stillThere},
+		{name: "old tag cannot be read", err: httpError(http.StatusInternalServerError, "")},
+	}
 
-	r, valueSchema := newTestTagValueResource(t, mockSvc)
-	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
-	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"env", "producao"}), resp)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
 
-	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+			mockSvc := new(mocks.TagValueService)
+			mockSvc.On("Get", ctx, "ambiente", "producao").Return(tt.value, tt.err)
 
-	var state tagValueResourceModel
-	resp.State.Get(ctx, &state)
-	assert.Equal(t, "env,producao", state.ID.ValueString())
-	assert.Equal(t, "env", state.TagName.ValueString())
-	mockSvc.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
-	mockSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
-	mockSvc.AssertExpectations(t)
-}
+			r, valueSchema := newTestTagValueResource(t, mockSvc)
+			resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+			r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"time", "producao"}), resp)
 
-// Pointing the value to a tag that does not have it moves the value: created in
-// the new tag, deleted from the old one.
-func TestTagValueResourceUpdateMovesToAnotherTag(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
+			wantSummary := "Moving a tag value is not supported"
+			if tt.err != nil {
+				wantSummary, _ = utils.ParseSDKError(tt.err)
+			}
 
-	created := tagValueFromJSON(t, `{
-		"name": "producao",
-		"description": "mesma",
-		"created_at": "2026-08-03T02:00:00.000000",
-		"updated_at": null
-	}`)
-
-	mockSvc := new(mocks.TagValueService)
-	mockSvc.On("Get", ctx, "time", "producao").Return(nil, httpError(http.StatusNotFound, ""))
-	mockSvc.On("Create", ctx, "time", tagSDK.CreateTagValueRequest{Name: "producao", Description: ptr("mesma")}).
-		Return(&created, nil)
-	mockSvc.On("Delete", ctx, "ambiente", "producao").Return(nil)
-
-	r, valueSchema := newTestTagValueResource(t, mockSvc)
-	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
-	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"time", "producao"}), resp)
-
-	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
-
-	var state tagValueResourceModel
-	resp.State.Get(ctx, &state)
-	assert.Equal(t, "time,producao", state.ID.ValueString())
-	assert.Equal(t, "2026-08-03T02:00:00Z", state.CreatedAt.ValueString(), "the moved value is a new one")
-	mockSvc.AssertExpectations(t)
-}
-
-// A failed delete of the old value still records the new one, which exists.
-func TestTagValueResourceUpdateMoveDeleteFails(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	created := tagValueFromJSON(t, `{
-		"name": "producao",
-		"description": "mesma",
-		"created_at": "2026-08-03T02:00:00.000000",
-		"updated_at": null
-	}`)
-
-	mockSvc := new(mocks.TagValueService)
-	mockSvc.On("Get", ctx, "time", "producao").Return(nil, httpError(http.StatusNotFound, ""))
-	mockSvc.On("Create", ctx, "time", mock.Anything).Return(&created, nil)
-	mockSvc.On("Delete", ctx, "ambiente", "producao").Return(httpError(http.StatusInternalServerError, ""))
-
-	r, valueSchema := newTestTagValueResource(t, mockSvc)
-	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
-	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"time", "producao"}), resp)
-
-	assert.True(t, resp.Diagnostics.HasError(), "the failed delete has to reach the user")
-
-	var state tagValueResourceModel
-	resp.State.Get(ctx, &state)
-	assert.Equal(t, "time,producao", state.ID.ValueString())
-	mockSvc.AssertExpectations(t)
+			require.True(t, resp.Diagnostics.HasError())
+			assert.Equal(t, wantSummary, resp.Diagnostics.Errors()[0].Summary())
+			assert.True(t, resp.State.Raw.IsNull(), "nothing was written, so the state is left alone")
+			mockSvc.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+			mockSvc.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mockSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
+			mockSvc.AssertExpectations(t)
+		})
+	}
 }
 
 func TestTagValueResourceDelete(t *testing.T) {

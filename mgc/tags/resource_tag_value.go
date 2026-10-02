@@ -5,6 +5,7 @@ package tags
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -71,7 +72,7 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"tag_name": schema.StringAttribute{
 				Description: "Name of the tag that owns this value. Renaming the tag takes the value along, so this only follows " +
-					"the new name. Pointing it to a different tag moves the value: it is created in that tag and deleted from the old one.",
+					"the new name.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
@@ -171,12 +172,20 @@ func (r *tagValueResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	if !plan.TagName.Equal(state.TagName) {
-		_, err := r.values.Get(ctx, plan.TagName.ValueString(), state.Name.ValueString())
-		if isNotFound(err) {
-			r.move(ctx, state, plan, resp)
+		// A renamed tag takes its values along, so a value still under the old
+		// name means the config moves it to another tag.
+		_, err := r.values.Get(ctx, state.TagName.ValueString(), state.Name.ValueString())
+		if err == nil {
+			resp.Diagnostics.AddError(
+				"Moving a tag value is not supported",
+				fmt.Sprintf("The value %q still exists in the tag %q, so it cannot follow tag_name to %q: the API has no move, "+
+					"and deleting a value attached to a resource fails. Declare a new mgc_tag_value in %q, point the attachments to it, "+
+					"and remove this one in a later apply.",
+					state.Name.ValueString(), state.TagName.ValueString(), plan.TagName.ValueString(), plan.TagName.ValueString()),
+			)
 			return
 		}
-		if err != nil {
+		if !isNotFound(err) {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
@@ -202,32 +211,6 @@ func (r *tagValueResource) Update(ctx context.Context, req resource.UpdateReques
 
 	plan = flattenTagValue(plan, *updated)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-}
-
-func (r *tagValueResource) move(ctx context.Context, state, plan tagValueResourceModel, resp *resource.UpdateResponse) {
-	created, err := r.values.Create(ctx, plan.TagName.ValueString(), tagSDK.CreateTagValueRequest{
-		Name:        plan.Name.ValueString(),
-		Description: utils.KnownStringPointer(plan.Description),
-	})
-	if err != nil {
-		if isConflict(err) {
-			resp.Diagnostics.AddError(
-				"Tag value already exists",
-				"Cannot move the value: the tag "+plan.TagName.ValueString()+" already has a value named "+plan.Name.ValueString()+".",
-			)
-			return
-		}
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-		return
-	}
-
-	plan = flattenTagValue(plan, *created)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-
-	err = r.values.Delete(ctx, state.TagName.ValueString(), state.Name.ValueString())
-	if err != nil && !isNotFound(err) {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
-	}
 }
 
 func (r *tagValueResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

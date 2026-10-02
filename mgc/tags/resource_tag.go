@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -110,9 +111,13 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"kinds": schema.SetAttribute{
 				Description: "Kinds that describe what the tag is for, such as `finops`.",
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(kindValidator{}),
+				},
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_at": schema.StringAttribute{
