@@ -26,7 +26,7 @@ resource "mgc_tag" "environment" {
 
 ### Required
 
-- `name` (String) Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. The API has no rename, so changing this replaces the tag. While the tag is attached to a resource that replacement fails with a conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag_value` resources.
+- `name` (String) Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. Changing this renames the tag in place: its values and the resources that carry it follow the new name.
 
 ### Optional
 

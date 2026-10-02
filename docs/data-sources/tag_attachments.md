@@ -3,12 +3,12 @@
 page_title: "mgc_tag_attachments Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads every resource of the tenant that carries at least one tag, optionally narrowed by type or region. The API takes no filter by tag, so narrowing by tag is done over the result, as in [for attachment in data.mgc_tag_attachments.all.attachments : attachment if contains(keys(attachment.tags), "finops")].
+  Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. The API filters by tag name only, so narrowing by the value is done over the result, as in [for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags["finops"] == "test-labs"].
 ---
 
 # mgc_tag_attachments (Data Source)
 
-Reads every resource of the tenant that carries at least one tag, optionally narrowed by type or region. The API takes no filter by tag, so narrowing by tag is done over the result, as in `[for attachment in data.mgc_tag_attachments.all.attachments : attachment if contains(keys(attachment.tags), "finops")]`.
+Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. The API filters by tag name only, so narrowing by the value is done over the result, as in `[for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags["finops"] == "test-labs"]`.
 
 ## Example Usage
 
@@ -27,11 +27,16 @@ output "tagged_vpc_ids" {
   value = [for attachment in data.mgc_tag_attachments.vpcs.attachments : attachment.resource_id]
 }
 
-# The API takes no filter by tag, so narrowing by tag is done over the result.
+# Only the resources that carry the environment tag. The API filters by tag
+# name only, so narrowing by the value is done over the result.
+data "mgc_tag_attachments" "environment" {
+  tag_name = "environment"
+}
+
 output "production_resources" {
   value = [
-    for attachment in data.mgc_tag_attachments.all.attachments :
-    attachment.resource_id if lookup(attachment.tags, "environment", "") == "production"
+    for attachment in data.mgc_tag_attachments.environment.attachments :
+    attachment.resource_id if attachment.tags["environment"] == "production"
   ]
 }
 ```
@@ -43,6 +48,7 @@ output "production_resources" {
 
 - `region` (String) Only return resources of this region.
 - `resource_type` (String) Only return resources of this type, such as `net.vpc`. The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.
+- `tag_name` (String) Only return resources that carry this tag, whatever its value.
 
 ### Read-Only
 

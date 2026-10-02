@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -184,16 +185,23 @@ func TestFlattenTagValue(t *testing.T) {
 	}
 }
 
-// The value endpoint has no partial update: description always travels, and ""
-// is what clears it.
+// Description always travels, and "" is what clears it. The name only travels
+// when it changed, which renames the value.
 func TestBuildUpdateTagValueRequest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
+		state    tagValueResourceModel
 		plan     tagValueResourceModel
 		expected tagSDK.UpdateTagValueRequest
 	}{
+		{
+			name:     "name changed renames the value",
+			state:    tagValueResourceModel{Name: types.StringValue("producao")},
+			plan:     tagValueResourceModel{Name: types.StringValue("prod"), Description: types.StringValue("x")},
+			expected: tagSDK.UpdateTagValueRequest{Name: ptr("prod"), Description: ptr("x")},
+		},
 		{
 			name:     "description set",
 			plan:     tagValueResourceModel{Description: types.StringValue("ambiente produtivo")},
@@ -215,7 +223,7 @@ func TestBuildUpdateTagValueRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.expected, buildUpdateTagValueRequest(tt.plan))
+			assert.Equal(t, tt.expected, buildUpdateTagValueRequest(tt.state, tt.plan))
 		})
 	}
 }
@@ -238,12 +246,17 @@ func TestTagValueResourceSchema(t *testing.T) {
 		assert.Contains(t, valueSchema.Attributes, attribute)
 	}
 
-	// Neither the tag nor the value can be renamed, so both force a replacement.
+	// Renaming the tag or the value happens in place, so neither forces a
+	// replacement, and the id follows both names.
 	for _, attribute := range []string{"tag_name", "name"} {
 		field := valueSchema.Attributes[attribute].(schema.StringAttribute)
 		assert.True(t, field.Required, attribute)
-		assert.Len(t, field.PlanModifiers, 1, attribute)
+		assert.Empty(t, field.PlanModifiers, attribute)
 	}
+
+	id := valueSchema.Attributes["id"].(schema.StringAttribute)
+	require.Len(t, id.PlanModifiers, 1)
+	assert.Equal(t, []string{"tag_name", "name"}, id.PlanModifiers[0].(idFromAttributes).attributes)
 
 	updatedAt := valueSchema.Attributes["updated_at"].(schema.StringAttribute)
 	assert.Empty(t, updatedAt.PlanModifiers)
@@ -387,6 +400,152 @@ func TestTagValueResourceUpdate(t *testing.T) {
 
 	assert.True(t, state.Description.IsNull(), "an emptied description stays null in the state")
 	assert.Equal(t, "2026-08-03T01:14:56Z", state.UpdatedAt.ValueString())
+	mockSvc.AssertExpectations(t)
+}
+
+// valueUpdateRequest builds the Update request of a value moving from one pair of
+// names to another, with the description kept.
+func valueUpdateRequest(t *testing.T, valueSchema schema.Schema, from, to [2]string) resource.UpdateRequest {
+	t.Helper()
+	ctx := context.Background()
+
+	model := func(names [2]string) *tagValueResourceModel {
+		return &tagValueResourceModel{
+			ID:          types.StringValue(tagValueID(names[0], names[1])),
+			TagName:     types.StringValue(names[0]),
+			Name:        types.StringValue(names[1]),
+			Description: types.StringValue("mesma"),
+			CreatedAt:   types.StringValue("2026-08-03T00:58:38Z"),
+			UpdatedAt:   types.StringNull(),
+		}
+	}
+
+	state := tfsdk.State{Schema: valueSchema}
+	require.False(t, state.Set(ctx, model(from)).HasError())
+	plan := tfsdk.Plan{Schema: valueSchema}
+	require.False(t, plan.Set(ctx, model(to)).HasError())
+
+	return resource.UpdateRequest{Plan: plan, State: state}
+}
+
+func TestTagValueResourceUpdateRename(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	renamed := tagValueFromJSON(t, `{
+		"name": "prod",
+		"description": "mesma",
+		"created_at": "2026-08-03T00:58:38.215088",
+		"updated_at": "2026-08-03T01:14:56.834488"
+	}`)
+
+	mockSvc := new(mocks.TagValueService)
+	mockSvc.On("Update", ctx, "ambiente", "producao", tagSDK.UpdateTagValueRequest{Name: ptr("prod"), Description: ptr("mesma")}).
+		Return(&renamed, nil)
+
+	r, valueSchema := newTestTagValueResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"ambiente", "prod"}), resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+	var state tagValueResourceModel
+	resp.State.Get(ctx, &state)
+	assert.Equal(t, "ambiente,prod", state.ID.ValueString())
+	mockSvc.AssertExpectations(t)
+}
+
+// Renaming the tag takes its values along: the value is found under the new tag
+// name and is only updated there, never recreated.
+func TestTagValueResourceUpdateFollowsTagRename(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	value := tagValueFromJSON(t, `{
+		"name": "producao",
+		"description": "mesma",
+		"created_at": "2026-08-03T00:58:38.215088",
+		"updated_at": null
+	}`)
+
+	mockSvc := new(mocks.TagValueService)
+	mockSvc.On("Get", ctx, "env", "producao").Return(&value, nil)
+	mockSvc.On("Update", ctx, "env", "producao", tagSDK.UpdateTagValueRequest{Description: ptr("mesma")}).
+		Return(&value, nil)
+
+	r, valueSchema := newTestTagValueResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"env", "producao"}), resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+	var state tagValueResourceModel
+	resp.State.Get(ctx, &state)
+	assert.Equal(t, "env,producao", state.ID.ValueString())
+	assert.Equal(t, "env", state.TagName.ValueString())
+	mockSvc.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	mockSvc.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
+	mockSvc.AssertExpectations(t)
+}
+
+// Pointing the value to a tag that does not have it moves the value: created in
+// the new tag, deleted from the old one.
+func TestTagValueResourceUpdateMovesToAnotherTag(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	created := tagValueFromJSON(t, `{
+		"name": "producao",
+		"description": "mesma",
+		"created_at": "2026-08-03T02:00:00.000000",
+		"updated_at": null
+	}`)
+
+	mockSvc := new(mocks.TagValueService)
+	mockSvc.On("Get", ctx, "time", "producao").Return(nil, httpError(http.StatusNotFound, ""))
+	mockSvc.On("Create", ctx, "time", tagSDK.CreateTagValueRequest{Name: "producao", Description: ptr("mesma")}).
+		Return(&created, nil)
+	mockSvc.On("Delete", ctx, "ambiente", "producao").Return(nil)
+
+	r, valueSchema := newTestTagValueResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"time", "producao"}), resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+	var state tagValueResourceModel
+	resp.State.Get(ctx, &state)
+	assert.Equal(t, "time,producao", state.ID.ValueString())
+	assert.Equal(t, "2026-08-03T02:00:00Z", state.CreatedAt.ValueString(), "the moved value is a new one")
+	mockSvc.AssertExpectations(t)
+}
+
+// A failed delete of the old value still records the new one, which exists.
+func TestTagValueResourceUpdateMoveDeleteFails(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	created := tagValueFromJSON(t, `{
+		"name": "producao",
+		"description": "mesma",
+		"created_at": "2026-08-03T02:00:00.000000",
+		"updated_at": null
+	}`)
+
+	mockSvc := new(mocks.TagValueService)
+	mockSvc.On("Get", ctx, "time", "producao").Return(nil, httpError(http.StatusNotFound, ""))
+	mockSvc.On("Create", ctx, "time", mock.Anything).Return(&created, nil)
+	mockSvc.On("Delete", ctx, "ambiente", "producao").Return(httpError(http.StatusInternalServerError, ""))
+
+	r, valueSchema := newTestTagValueResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: valueSchema}}
+	r.Update(ctx, valueUpdateRequest(t, valueSchema, [2]string{"ambiente", "producao"}, [2]string{"time", "producao"}), resp)
+
+	assert.True(t, resp.Diagnostics.HasError(), "the failed delete has to reach the user")
+
+	var state tagValueResourceModel
+	resp.State.Get(ctx, &state)
+	assert.Equal(t, "time,producao", state.ID.ValueString())
 	mockSvc.AssertExpectations(t)
 }
 

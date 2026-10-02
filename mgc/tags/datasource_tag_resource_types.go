@@ -1,6 +1,6 @@
 package tags
 
-//go:generate go run github.com/vektra/mockery/v2@v2.53.6 --name=ResourceTypeService --srcpkg=github.com/MagaluCloud/mgc-sdk-go/tag --output=../internal/mocks --outpkg=mocks
+//go:generate go run github.com/vektra/mockery/v2@v2.53.6 --name=ResourceTypeLister --srcpkg=github.com/MagaluCloud/mgc-sdk-go/tag --output=../internal/mocks --outpkg=mocks
 
 import (
 	"context"
@@ -28,7 +28,7 @@ type tagResourceTypesModel struct {
 }
 
 type tagResourceTypesDataSource struct {
-	resourceTypes tagSDK.ResourceTypeService
+	resourceTypes tagSDK.ResourceTypeLister
 }
 
 func NewTagResourceTypesDataSource() datasource.DataSource {

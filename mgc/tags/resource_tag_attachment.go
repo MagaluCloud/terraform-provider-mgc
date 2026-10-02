@@ -8,6 +8,7 @@ import (
 
 	tagSDK "github.com/MagaluCloud/mgc-sdk-go/tag"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -79,6 +81,9 @@ func (r *tagAttachmentResource) Schema(_ context.Context, _ resource.SchemaReque
 					"`(mgc_tag.env.name) = mgc_tag_value.prod.name` (the parentheses make the key an expression).",
 				Required:    true,
 				ElementType: types.StringType,
+				Validators: []validator.Map{
+					mapvalidator.SizeAtLeast(1),
+				},
 			},
 			"resource_type": schema.StringAttribute{
 				Description: "Type of the tagged resource, as classified by the API, such as `k8s.cluster`.",
@@ -255,11 +260,47 @@ func (r *tagAttachmentResource) applyTagChanges(ctx context.Context, resourceID 
 	}
 
 	attached, err := r.resources.AttachTags(ctx, resourceID, attachRequest(attach))
+	if isConflict(err) {
+		return r.attachMissing(ctx, resourceID, attach, err)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	return attached, nil
+}
+
+// attachMissing handles a 409 on attach. Renaming a tag or a value in place
+// renames it on every resource that carries it, so the tag this update attaches
+// can already be there. Only the tags the resource does not carry with the
+// planned value are attached again; if none is missing the update is done, and
+// if all are, the conflict is real.
+func (r *tagAttachmentResource) attachMissing(ctx context.Context, resourceID string, attach map[string]string, conflict error) (*tagSDK.Resource, error) {
+	current, err := r.resources.Get(ctx, resourceID)
+	if err != nil {
+		return nil, conflict
+	}
+
+	carried := make(map[string]string, len(current.Tags))
+	for _, tag := range current.Tags {
+		carried[tag.Name] = tag.Value
+	}
+
+	missing := make(map[string]string)
+	for name, value := range attach {
+		if carried[name] != value {
+			missing[name] = value
+		}
+	}
+
+	switch len(missing) {
+	case 0:
+		return current, nil
+	case len(attach):
+		return nil, conflict
+	}
+
+	return r.resources.AttachTags(ctx, resourceID, attachRequest(missing))
 }
 
 // diffTags reports what has to be attached and what has to be detached to take

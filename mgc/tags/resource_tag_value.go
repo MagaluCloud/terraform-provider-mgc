@@ -20,8 +20,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// idSeparator is safe because the name pattern of the API accepts spaces and
-// brackets but never a comma.
 const idSeparator = ","
 
 type tagValueResourceModel struct {
@@ -68,28 +66,22 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "Identifier of the value, in the form `<tag_name>,<name>`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					tagValueIDFromNames(),
 				},
 			},
 			"tag_name": schema.StringAttribute{
-				Description: "Name of the tag that owns this value. Renaming the tag replaces its values as well.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Description: "Name of the tag that owns this value. Renaming the tag takes the value along, so this only follows " +
+					"the new name. Pointing it to a different tag moves the value: it is created in that tag and deleted from the old one.",
+				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
 					stringvalidator.RegexMatches(tagNameRule, "must contain only letters, digits, spaces or the characters _-[]().:"),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the value, unique within the tag. Names are case sensitive, and the API has no rename, " +
-					"so changing this replaces the value. While the value is attached to a resource that replacement fails with a " +
-					"conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag`.",
+				Description: "Name of the value, unique within the tag. Names are case sensitive. " +
+					"Changing this renames the value in place, and the resources that carry it follow the new name.",
 				Required: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
 					stringvalidator.RegexMatches(tagNameRule, "must contain only letters, digits, spaces or the characters _-[]().:"),
@@ -152,8 +144,6 @@ func (r *tagValueResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	// A deleted parent tag takes its values with it, and the API reports it the
-	// same way as a missing value.
 	value, err := r.values.Get(ctx, data.TagName.ValueString(), data.Name.ValueString())
 	if err != nil {
 		if isNotFound(err) {
@@ -180,19 +170,64 @@ func (r *tagValueResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	if !plan.TagName.Equal(state.TagName) {
+		_, err := r.values.Get(ctx, plan.TagName.ValueString(), state.Name.ValueString())
+		if isNotFound(err) {
+			r.move(ctx, state, plan, resp)
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddError(utils.ParseSDKError(err))
+			return
+		}
+	}
+
 	updated, err := r.values.Update(
 		ctx,
-		state.TagName.ValueString(),
+		plan.TagName.ValueString(),
 		state.Name.ValueString(),
-		buildUpdateTagValueRequest(plan),
+		buildUpdateTagValueRequest(state, plan),
 	)
 	if err != nil {
+		if isConflict(err) {
+			resp.Diagnostics.AddError(
+				"Tag value already exists",
+				"Cannot rename the value: the tag already has a value named "+plan.Name.ValueString()+".",
+			)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
 	plan = flattenTagValue(plan, *updated)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *tagValueResource) move(ctx context.Context, state, plan tagValueResourceModel, resp *resource.UpdateResponse) {
+	created, err := r.values.Create(ctx, plan.TagName.ValueString(), tagSDK.CreateTagValueRequest{
+		Name:        plan.Name.ValueString(),
+		Description: utils.KnownStringPointer(plan.Description),
+	})
+	if err != nil {
+		if isConflict(err) {
+			resp.Diagnostics.AddError(
+				"Tag value already exists",
+				"Cannot move the value: the tag "+plan.TagName.ValueString()+" already has a value named "+plan.Name.ValueString()+".",
+			)
+			return
+		}
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		return
+	}
+
+	plan = flattenTagValue(plan, *created)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+
+	err = r.values.Delete(ctx, state.TagName.ValueString(), state.Name.ValueString())
+	if err != nil && !isNotFound(err) {
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+	}
 }
 
 func (r *tagValueResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -229,15 +264,18 @@ func flattenTagValue(tfData tagValueResourceModel, value tagSDK.TagValue) tagVal
 	return tfData
 }
 
-// buildUpdateTagValueRequest always states the desired description: the endpoint
-// requires the field, and "" is what clears it.
-func buildUpdateTagValueRequest(plan tagValueResourceModel) tagSDK.UpdateTagValueRequest {
+func buildUpdateTagValueRequest(state, plan tagValueResourceModel) tagSDK.UpdateTagValueRequest {
 	description := ""
 	if planned := utils.KnownStringPointer(plan.Description); planned != nil {
 		description = *planned
 	}
 
-	return tagSDK.UpdateTagValueRequest{Description: &description}
+	request := tagSDK.UpdateTagValueRequest{Description: &description}
+	if !plan.Name.Equal(state.Name) {
+		request.Name = utils.KnownStringPointer(plan.Name)
+	}
+
+	return request
 }
 
 func tagValueID(tagName, valueName string) string {

@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestResourceTypesDataSource(t *testing.T, service tagSDK.ResourceTypeService) (*tagResourceTypesDataSource, schema.Schema) {
+func newTestResourceTypesDataSource(t *testing.T, service tagSDK.ResourceTypeLister) (*tagResourceTypesDataSource, schema.Schema) {
 	t.Helper()
 
 	dataSource := &tagResourceTypesDataSource{resourceTypes: service}
@@ -104,7 +104,7 @@ func TestResourceTypesDataSourceRead(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	service := new(mocks.ResourceTypeService)
+	service := new(mocks.ResourceTypeLister)
 	service.On("List", ctx, tagSDK.ListResourceTypesOptions{Limit: ptr(maxPageSize), Offset: ptr(0)}).
 		Return([]tagSDK.ResourceType{
 			resourceTypeFromJSON(t, `{"name": "net.vpc", "product": "network", "created_at": "2026-08-03T00:57:47.908658"}`),
@@ -134,7 +134,7 @@ func TestResourceTypesDataSourceReadPagesThroughEveryType(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	service := new(mocks.ResourceTypeService)
+	service := new(mocks.ResourceTypeLister)
 	service.On("List", ctx, tagSDK.ListResourceTypesOptions{Limit: ptr(maxPageSize), Offset: ptr(0)}).
 		Return(resourceTypePage(maxPageSize), nil)
 	service.On("List", ctx, tagSDK.ListResourceTypesOptions{Limit: ptr(maxPageSize), Offset: ptr(maxPageSize)}).
@@ -160,7 +160,7 @@ func TestResourceTypesDataSourceReadFilters(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	service := new(mocks.ResourceTypeService)
+	service := new(mocks.ResourceTypeLister)
 	service.On("List", ctx, tagSDK.ListResourceTypesOptions{
 		Product: ptr(tagSDK.Product("network")),
 		Limit:   ptr(maxPageSize),
@@ -192,7 +192,7 @@ func TestResourceTypesDataSourceReadError(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	service := new(mocks.ResourceTypeService)
+	service := new(mocks.ResourceTypeLister)
 	service.On("List", ctx, tagSDK.ListResourceTypesOptions{Limit: ptr(maxPageSize), Offset: ptr(0)}).
 		Return(nil, errors.New("connection refused"))
 

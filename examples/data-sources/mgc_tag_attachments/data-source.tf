@@ -12,10 +12,15 @@ output "tagged_vpc_ids" {
   value = [for attachment in data.mgc_tag_attachments.vpcs.attachments : attachment.resource_id]
 }
 
-# The API takes no filter by tag, so narrowing by tag is done over the result.
+# Only the resources that carry the environment tag. The API filters by tag
+# name only, so narrowing by the value is done over the result.
+data "mgc_tag_attachments" "environment" {
+  tag_name = "environment"
+}
+
 output "production_resources" {
   value = [
-    for attachment in data.mgc_tag_attachments.all.attachments :
-    attachment.resource_id if lookup(attachment.tags, "environment", "") == "production"
+    for attachment in data.mgc_tag_attachments.environment.attachments :
+    attachment.resource_id if attachment.tags["environment"] == "production"
   ]
 }

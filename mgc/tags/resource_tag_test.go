@@ -334,6 +334,20 @@ func TestBuildUpdateTagRequest(t *testing.T) {
 			},
 		},
 		{
+			name:  "name changed renames the tag",
+			state: withDescription("mesmo"),
+			plan: tagResourceModel{
+				Name:        types.StringValue("finops"),
+				Description: types.StringValue("mesmo"),
+				Color:       newCaseInsensitiveString("0086ff"),
+				Kinds:       kindsSet("finops"),
+			},
+			expected: tagSDK.UpdateTagRequest{
+				Name:        ptr("finops"),
+				Description: ptr("mesmo"),
+			},
+		},
+		{
 			name:  "color changed",
 			state: withDescription("mesmo"),
 			plan: tagResourceModel{
@@ -448,8 +462,12 @@ func TestTagResourceSchema(t *testing.T) {
 	}
 
 	name := tagSchema.Attributes["name"].(schema.StringAttribute)
-	assert.True(t, name.Required, "the API has no rename")
-	assert.Len(t, name.PlanModifiers, 1, "name must require replacement")
+	assert.True(t, name.Required)
+	assert.Empty(t, name.PlanModifiers, "a new name renames the tag in place")
+
+	id := tagSchema.Attributes["id"].(schema.StringAttribute)
+	require.Len(t, id.PlanModifiers, 1)
+	assert.Equal(t, []string{"name"}, id.PlanModifiers[0].(idFromAttributes).attributes, "the id has to follow a rename")
 
 	color := tagSchema.Attributes["color"].(schema.StringAttribute)
 	assert.True(t, color.Optional)
@@ -686,6 +704,95 @@ func TestTagResourceUpdate(t *testing.T) {
 
 	assert.Equal(t, "novo", state.Description.ValueString())
 	assert.Equal(t, "2026-08-03T01:14:56Z", state.UpdatedAt.ValueString(), "updated_at must not stay unknown")
+	mockSvc.AssertExpectations(t)
+}
+
+func TestTagResourceUpdateRename(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	renamed := tagFromJSON(t, `{
+		"name": "finops",
+		"description": "mesmo",
+		"color": "0086ff",
+		"kinds": ["finops"],
+		"created_at": "2026-08-03T00:57:47.908658",
+		"updated_at": "2026-08-03T01:14:56.834488",
+		"values": []
+	}`)
+
+	mockSvc := new(mocks.TagService)
+	mockSvc.On("Update", ctx, "tagfin", tagSDK.UpdateTagRequest{Name: ptr("finops"), Description: ptr("mesmo")}).
+		Return(&renamed, nil)
+
+	r, tagSchema := newTestTagResource(t, mockSvc)
+
+	priorState := tfsdk.State{Schema: tagSchema}
+	require.False(t, priorState.Set(ctx, &tagResourceModel{
+		ID:          types.StringValue("tagfin"),
+		Name:        types.StringValue("tagfin"),
+		Description: types.StringValue("mesmo"),
+		Color:       newCaseInsensitiveString("0086ff"),
+		Kinds:       kindsSet("finops"),
+		CreatedAt:   types.StringValue("2026-08-03T00:57:47Z"),
+		UpdatedAt:   types.StringNull(),
+	}).HasError())
+
+	plan := tfsdk.Plan{Schema: tagSchema}
+	require.False(t, plan.Set(ctx, &tagResourceModel{
+		ID:          types.StringValue("finops"),
+		Name:        types.StringValue("finops"),
+		Description: types.StringValue("mesmo"),
+		Color:       newCaseInsensitiveString("0086ff"),
+		Kinds:       kindsSet("finops"),
+		CreatedAt:   types.StringValue("2026-08-03T00:57:47Z"),
+		UpdatedAt:   types.StringUnknown(),
+	}).HasError())
+
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: tagSchema}}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: priorState}, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+	var state tagResourceModel
+	resp.State.Get(ctx, &state)
+
+	assert.Equal(t, "finops", state.ID.ValueString(), "the id follows the new name")
+	assert.Equal(t, "finops", state.Name.ValueString())
+	mockSvc.AssertExpectations(t)
+}
+
+func TestTagResourceUpdateRenameConflict(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mockSvc := new(mocks.TagService)
+	mockSvc.On("Update", ctx, "tagfin", mock.Anything).
+		Return(nil, httpError(http.StatusConflict, `{"message":"Conflict","detail":"Entity already exists"}`))
+
+	r, tagSchema := newTestTagResource(t, mockSvc)
+
+	model := tagResourceModel{
+		ID:          types.StringValue("tagfin"),
+		Name:        types.StringValue("tagfin"),
+		Description: types.StringNull(),
+		Color:       newCaseInsensitiveString("0086ff"),
+		Kinds:       kindsSet("finops"),
+		CreatedAt:   types.StringValue("2026-08-03T00:57:47Z"),
+		UpdatedAt:   types.StringNull(),
+	}
+	priorState := tfsdk.State{Schema: tagSchema}
+	require.False(t, priorState.Set(ctx, &model).HasError())
+
+	model.ID, model.Name = types.StringValue("finops"), types.StringValue("finops")
+	plan := tfsdk.Plan{Schema: tagSchema}
+	require.False(t, plan.Set(ctx, &model).HasError())
+
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: tagSchema}}
+	r.Update(ctx, resource.UpdateRequest{Plan: plan, State: priorState}, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.Equal(t, "Tag already exists", resp.Diagnostics.Errors()[0].Summary())
 	mockSvc.AssertExpectations(t)
 }
 

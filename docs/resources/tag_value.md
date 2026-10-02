@@ -30,8 +30,8 @@ resource "mgc_tag_value" "production" {
 
 ### Required
 
-- `name` (String) Name of the value, unique within the tag. Names are case sensitive, and the API has no rename, so changing this replaces the value. While the value is attached to a resource that replacement fails with a conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag`.
-- `tag_name` (String) Name of the tag that owns this value. Renaming the tag replaces its values as well.
+- `name` (String) Name of the value, unique within the tag. Names are case sensitive. Changing this renames the value in place, and the resources that carry it follow the new name.
+- `tag_name` (String) Name of the tag that owns this value. Renaming the tag takes the value along, so this only follows the new name. Pointing it to a different tag moves the value: it is created in that tag and deleted from the old one.
 
 ### Optional
 

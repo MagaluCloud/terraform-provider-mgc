@@ -119,6 +119,7 @@ func TestAttachmentsDataSourceReadFilters(t *testing.T) {
 	service.On("List", ctx, tagSDK.ListResourcesOptions{
 		ResourceTypeName: ptr(tagSDK.ResourceTypeName("net.vpc")),
 		Region:           ptr("br-se1"),
+		TagName:          ptr("ambiente"),
 		Limit:            ptr(maxPageSize),
 		Offset:           ptr(0),
 	}).Return([]tagSDK.Resource{
@@ -138,6 +139,7 @@ func TestAttachmentsDataSourceReadFilters(t *testing.T) {
 		Config: newDataSourceConfig(t, attachmentsSchema, map[string]tftypes.Value{
 			"resource_type": tftypes.NewValue(tftypes.String, "net.vpc"),
 			"region":        tftypes.NewValue(tftypes.String, "br-se1"),
+			"tag_name":      tftypes.NewValue(tftypes.String, "ambiente"),
 		}),
 	}, resp)
 
@@ -149,6 +151,7 @@ func TestAttachmentsDataSourceReadFilters(t *testing.T) {
 	require.Len(t, state.Attachments, 1)
 	assert.Equal(t, "net.vpc", state.ResourceType.ValueString(), "the filter stays in the state as the user wrote it")
 	assert.Equal(t, "br-se1", state.Region.ValueString())
+	assert.Equal(t, "ambiente", state.TagName.ValueString())
 	service.AssertExpectations(t)
 }
 

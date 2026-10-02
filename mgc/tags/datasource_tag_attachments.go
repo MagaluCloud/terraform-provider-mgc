@@ -15,6 +15,7 @@ var _ datasource.DataSource = &tagAttachmentsDataSource{}
 type tagAttachmentsModel struct {
 	ResourceType types.String         `tfsdk:"resource_type"`
 	Region       types.String         `tfsdk:"region"`
+	TagName      types.String         `tfsdk:"tag_name"`
 	Attachments  []tagAttachmentModel `tfsdk:"attachments"`
 }
 
@@ -46,9 +47,9 @@ func (d *tagAttachmentsDataSource) Configure(_ context.Context, req datasource.C
 
 func (d *tagAttachmentsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Reads every resource of the tenant that carries at least one tag, optionally narrowed by type or region. " +
-			"The API takes no filter by tag, so narrowing by tag is done over the result, as in " +
-			"`[for attachment in data.mgc_tag_attachments.all.attachments : attachment if contains(keys(attachment.tags), \"finops\")]`.",
+		Description: "Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. " +
+			"The API filters by tag name only, so narrowing by the value is done over the result, as in " +
+			"`[for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags[\"finops\"] == \"test-labs\"]`.",
 		Attributes: map[string]schema.Attribute{
 			"resource_type": schema.StringAttribute{
 				Description: "Only return resources of this type, such as `net.vpc`. " +
@@ -57,6 +58,10 @@ func (d *tagAttachmentsDataSource) Schema(_ context.Context, _ datasource.Schema
 			},
 			"region": schema.StringAttribute{
 				Description: "Only return resources of this region.",
+				Optional:    true,
+			},
+			"tag_name": schema.StringAttribute{
+				Description: "Only return resources that carry this tag, whatever its value.",
 				Optional:    true,
 			},
 			"attachments": schema.ListNestedAttribute{
@@ -80,6 +85,7 @@ func (d *tagAttachmentsDataSource) Read(ctx context.Context, req datasource.Read
 	options := tagSDK.ListResourcesOptions{
 		ResourceTypeName: namedStringPointer[tagSDK.ResourceTypeName](data.ResourceType),
 		Region:           utils.KnownStringPointer(data.Region),
+		TagName:          utils.KnownStringPointer(data.TagName),
 	}
 
 	taggedResources, err := listAllPages(func(limit, offset int) ([]tagSDK.Resource, error) {

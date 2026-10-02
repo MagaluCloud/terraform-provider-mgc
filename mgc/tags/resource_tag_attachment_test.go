@@ -437,6 +437,122 @@ func TestAttachmentResourceUpdatePartialFailure(t *testing.T) {
 	mockSvc.AssertExpectations(t)
 }
 
+// attachmentUpdateRequest builds the Update request of an attachment going from
+// one set of tags to another.
+func attachmentUpdateRequest(t *testing.T, attachmentSchema schema.Schema, from, to map[string]string) resource.UpdateRequest {
+	t.Helper()
+	ctx := context.Background()
+
+	model := func(tags map[string]string) *tagAttachmentResourceModel {
+		return &tagAttachmentResourceModel{
+			ID:           types.StringValue(testExternalID),
+			ResourceID:   types.StringValue(testExternalID),
+			Tags:         tagsMap(tags),
+			ResourceType: types.StringValue("k8s.cluster"),
+			Region:       types.StringValue("br-se1"),
+		}
+	}
+
+	state := tfsdk.State{Schema: attachmentSchema}
+	require.False(t, state.Set(ctx, model(from)).HasError())
+	plan := tfsdk.Plan{Schema: attachmentSchema}
+	require.False(t, plan.Set(ctx, model(to)).HasError())
+
+	return resource.UpdateRequest{Plan: plan, State: state}
+}
+
+func carrying(t *testing.T, tags string) tagSDK.Resource {
+	t.Helper()
+
+	return resourceFromJSON(t, `{
+		"created_at": "2026-08-03T01:19:31.655927",
+		"external_id": "`+testExternalID+`",
+		"region": "br-se1",
+		"resource_type": {"name": "k8s.cluster", "product": "kubernetes"},
+		"tags": `+tags+`
+	}`)
+}
+
+// Renaming a tag in place renames it on the resource too: the old name is
+// already gone (detach answers 404) and the new one is already there (attach
+// answers 409). Neither is a failure.
+func TestAttachmentResourceUpdateFollowsTagRename(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	renamed := carrying(t, `[{"name": "env", "value": "producao"}]`)
+
+	mockSvc := new(mocks.ResourceService)
+	mockSvc.On("DetachTag", ctx, testExternalID, "ambiente").Return(httpError(http.StatusNotFound, ""))
+	mockSvc.On("AttachTags", ctx, testExternalID, attachRequest(map[string]string{"env": "producao"})).
+		Return(nil, httpError(http.StatusConflict, `{"detail":"already attached"}`))
+	mockSvc.On("Get", ctx, testExternalID).Return(&renamed, nil)
+
+	r, attachmentSchema := newTestAttachmentResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: attachmentSchema}}
+	r.Update(ctx, attachmentUpdateRequest(t, attachmentSchema,
+		map[string]string{"ambiente": "producao"},
+		map[string]string{"env": "producao"},
+	), resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+
+	var state tagAttachmentResourceModel
+	resp.State.Get(ctx, &state)
+	assert.Equal(t, tagsMap(map[string]string{"env": "producao"}), state.Tags)
+	mockSvc.AssertExpectations(t)
+}
+
+// Only what the resource does not carry yet is attached again after a 409.
+func TestAttachmentResourceUpdateAttachesWhatIsMissing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	partial := carrying(t, `[{"name": "env", "value": "producao"}]`)
+	complete := carrying(t, `[{"name": "env", "value": "producao"}, {"name": "time", "value": "plataforma"}]`)
+
+	mockSvc := new(mocks.ResourceService)
+	mockSvc.On("DetachTag", ctx, testExternalID, "ambiente").Return(httpError(http.StatusNotFound, ""))
+	mockSvc.On("AttachTags", ctx, testExternalID, attachRequest(map[string]string{"env": "producao", "time": "plataforma"})).
+		Return(nil, httpError(http.StatusConflict, ""))
+	mockSvc.On("Get", ctx, testExternalID).Return(&partial, nil)
+	mockSvc.On("AttachTags", ctx, testExternalID, attachRequest(map[string]string{"time": "plataforma"})).
+		Return(&complete, nil)
+
+	r, attachmentSchema := newTestAttachmentResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: attachmentSchema}}
+	r.Update(ctx, attachmentUpdateRequest(t, attachmentSchema,
+		map[string]string{"ambiente": "producao"},
+		map[string]string{"env": "producao", "time": "plataforma"},
+	), resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "Update returned errors: %v", resp.Diagnostics)
+	mockSvc.AssertExpectations(t)
+}
+
+// A 409 for a tag the resource carries with another value is a real conflict.
+func TestAttachmentResourceUpdateRealConflict(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	other := carrying(t, `[{"name": "env", "value": "homologacao"}]`)
+
+	mockSvc := new(mocks.ResourceService)
+	mockSvc.On("AttachTags", ctx, testExternalID, attachRequest(map[string]string{"env": "producao"})).
+		Return(nil, httpError(http.StatusConflict, ""))
+	mockSvc.On("Get", ctx, testExternalID).Return(&other, nil)
+
+	r, attachmentSchema := newTestAttachmentResource(t, mockSvc)
+	resp := &resource.UpdateResponse{State: tfsdk.State{Schema: attachmentSchema}}
+	r.Update(ctx, attachmentUpdateRequest(t, attachmentSchema,
+		map[string]string{},
+		map[string]string{"env": "producao"},
+	), resp)
+
+	assert.True(t, resp.Diagnostics.HasError(), "the conflict has to reach the user")
+	mockSvc.AssertExpectations(t)
+}
+
 func TestAttachmentResourceDelete(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

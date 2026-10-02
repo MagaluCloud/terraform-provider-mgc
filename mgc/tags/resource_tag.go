@@ -74,17 +74,13 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Description: "The tag name, which is also its identifier.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					tagIDFromName(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. " +
-					"The API has no rename, so changing this replaces the tag. While the tag is attached to a resource that replacement " +
-					"fails with a conflict, unless `create_before_destroy` is set on this resource and on its `mgc_tag_value` resources.",
+					"Changing this renames the tag in place: its values and the resources that carry it follow the new name.",
 				Required: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
 					stringvalidator.RegexMatches(tagNameRule, "must contain only letters, digits, spaces or the characters _-[]().:"),
@@ -194,6 +190,13 @@ func (r *tagResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	updated, err := r.tags.Update(ctx, state.Name.ValueString(), buildUpdateTagRequest(state, plan))
 	if err != nil {
+		if isConflict(err) {
+			resp.Diagnostics.AddError(
+				"Tag already exists",
+				fmt.Sprintf("Cannot rename the tag: a tag named %q already exists in this tenant.", plan.Name.ValueString()),
+			)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
@@ -209,7 +212,6 @@ func (r *tagResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	// Deleting a tag deletes its values as well.
 	if err := r.tags.Delete(ctx, data.Name.ValueString()); err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 	}
@@ -224,18 +226,12 @@ func (r *tagResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
 }
 
-// flattenTag merges the API response into the current model. Color is written
-// as returned: its custom type already holds the case-insensitive comparison,
-// so merging it here would apply the same rule twice.
 func flattenTag(tfData tagResourceModel, tag tagSDK.Tag) tagResourceModel {
 	tfData.ID = types.StringValue(tag.Name)
 	tfData.Name = utils.FlattenStringValue(tfData.Name, &tag.Name)
 	tfData.Description = utils.FlattenStringValue(tfData.Description, tag.Description)
 	tfData.Color = flattenColor(tag.Color)
 	tfData.Kinds = utils.FlattenTypeSetStringArray(tfData.Kinds, kindsToStrings(tag.Kinds))
-
-	// The timestamp type of the SDK lives in an internal package and cannot be
-	// named here, but it converts to time.Time.
 	tfData.CreatedAt = types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(&tag.CreatedAt)))
 	tfData.UpdatedAt = types.StringPointerValue(utils.ConvertTimeToRFC3339((*time.Time)(tag.UpdatedAt)))
 
@@ -251,11 +247,6 @@ func buildCreateTagRequest(plan tagResourceModel) tagSDK.CreateTagRequest {
 	}
 }
 
-// buildUpdateTagRequest always states the desired description, sending "" to
-// clear it: an omitted field means "keep" on the wire, which reads like a
-// removal and is the ambiguity to avoid. Color is the exception the API forces:
-// it accepts neither null nor "" on update, so an unset color is left out and
-// the tag keeps the one it has.
 func buildUpdateTagRequest(state, plan tagResourceModel) tagSDK.UpdateTagRequest {
 	description := ""
 	if planned := utils.KnownStringPointer(plan.Description); planned != nil {
@@ -264,6 +255,10 @@ func buildUpdateTagRequest(state, plan tagResourceModel) tagSDK.UpdateTagRequest
 
 	request := tagSDK.UpdateTagRequest{
 		Description: &description,
+	}
+
+	if !plan.Name.Equal(state.Name) {
+		request.Name = utils.KnownStringPointer(plan.Name)
 	}
 
 	if !plan.Color.Equal(state.Color) {
