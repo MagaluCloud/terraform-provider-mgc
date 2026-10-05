@@ -251,12 +251,13 @@ func TestBuildCreateTagRequest(t *testing.T) {
 				Name:        "tagfin",
 				Description: ptr("monitoramento"),
 				Color:       ptr("FF0000"),
-				Kinds:       []tagSDK.TagKind{"finops"},
+				Kinds:       &[]tagSDK.TagKind{"finops"},
 			},
 		},
 		{
 			// color is Optional+Computed, so it is unknown when absent from the
-			// config; sending nil lets the API apply its own default.
+			// config; sending nil lets the API apply its own default. Null kinds
+			// are the same as [], so they are sent to skip the API default.
 			name: "only the required name",
 			plan: tagResourceModel{
 				Name:        types.StringValue("tagfin"),
@@ -265,7 +266,8 @@ func TestBuildCreateTagRequest(t *testing.T) {
 				Kinds:       types.SetNull(types.StringType),
 			},
 			expected: tagSDK.CreateTagRequest{
-				Name: "tagfin",
+				Name:  "tagfin",
+				Kinds: &[]tagSDK.TagKind{},
 			},
 		},
 		{
@@ -279,6 +281,20 @@ func TestBuildCreateTagRequest(t *testing.T) {
 			expected: tagSDK.CreateTagRequest{
 				Name:        "tagfin",
 				Description: ptr(""),
+				Kinds:       &[]tagSDK.TagKind{},
+			},
+		},
+		{
+			name: "empty kinds are sent as empty, not dropped",
+			plan: tagResourceModel{
+				Name:        types.StringValue("tagfin"),
+				Description: types.StringNull(),
+				Color:       caseInsensitiveStringValue{StringValue: types.StringUnknown()},
+				Kinds:       kindsSet(),
+			},
+			expected: tagSDK.CreateTagRequest{
+				Name:  "tagfin",
+				Kinds: &[]tagSDK.TagKind{},
 			},
 		},
 	}
@@ -474,6 +490,11 @@ func TestTagResourceSchema(t *testing.T) {
 	assert.True(t, color.Computed, "the API assigns a color when none is given")
 	assert.Equal(t, caseInsensitiveStringType{}, color.CustomType)
 
+	kinds := tagSchema.Attributes["kinds"].(schema.SetAttribute)
+	assert.True(t, kinds.Optional)
+	assert.False(t, kinds.Computed, "null kinds mean no kinds, not the API default")
+	assert.Empty(t, kinds.PlanModifiers)
+
 	// updated_at changes on every update, so freezing it with the state value
 	// would break an in-place update.
 	updatedAt := tagSchema.Attributes["updated_at"].(schema.StringAttribute)
@@ -498,7 +519,7 @@ func TestTagResourceCreate(t *testing.T) {
 	mockSvc.On("Create", ctx, tagSDK.CreateTagRequest{
 		Name:        "tagfin",
 		Description: ptr("monitoramento"),
-		Kinds:       []tagSDK.TagKind{"finops"},
+		Kinds:       &[]tagSDK.TagKind{"finops"},
 	}).Return(&created, nil)
 
 	r, tagSchema := newTestTagResource(t, mockSvc)

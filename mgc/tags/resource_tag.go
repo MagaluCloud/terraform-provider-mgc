@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -106,16 +105,11 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"kinds": schema.SetAttribute{
-				Description: "Kinds of the tag, such as `finops` for cost reporting. Values other than `finops` cause a warning. " +
-					"Removing it keeps the current kinds. Set `[]` to clear them.",
+				Description: "Kinds of the tag, such as `finops` for cost reporting.",
 				Optional:    true,
-				Computed:    true,
 				ElementType: types.StringType,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(kindValidator{}),
-				},
-				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -246,7 +240,7 @@ func buildCreateTagRequest(plan tagResourceModel) tagSDK.CreateTagRequest {
 		Name:        plan.Name.ValueString(),
 		Description: utils.KnownStringPointer(plan.Description),
 		Color:       utils.KnownStringPointer(plan.Color.StringValue),
-		Kinds:       toKinds(utils.ConvertTypeSetToStringArray(plan.Kinds)),
+		Kinds:       kindsRequest(plan.Kinds),
 	}
 }
 
@@ -269,11 +263,7 @@ func buildUpdateTagRequest(state, plan tagResourceModel) tagSDK.UpdateTagRequest
 	}
 
 	if !plan.Kinds.Equal(state.Kinds) {
-		kinds := toKinds(utils.ConvertTypeSetToStringArray(plan.Kinds))
-		if kinds == nil {
-			kinds = []tagSDK.TagKind{}
-		}
-		request.Kinds = &kinds
+		request.Kinds = kindsRequest(plan.Kinds)
 	}
 
 	return request
@@ -284,6 +274,14 @@ func flattenColor(color *string) caseInsensitiveStringValue {
 		return caseInsensitiveStringValue{StringValue: types.StringNull()}
 	}
 	return newCaseInsensitiveString(*color)
+}
+
+func kindsRequest(kinds types.Set) *[]tagSDK.TagKind {
+	converted := toKinds(utils.ConvertTypeSetToStringArray(kinds))
+	if converted == nil {
+		converted = []tagSDK.TagKind{}
+	}
+	return &converted
 }
 
 func toKinds(kinds *[]string) []tagSDK.TagKind {
