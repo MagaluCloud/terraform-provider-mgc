@@ -3,12 +3,12 @@
 page_title: "mgc_tag Resource - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  A tag that can be attached to cloud resources, to organize and report on them. Tags are global: they are not bound to a region. Attaching a tag to a resource also requires a value (mgc_tag_value) and an attachment (mgc_tag_attachment).
+  Tag to organize cloud resources. Tags are global, with no region. To tag a resource, also create a mgc_tag_value and a mgc_tag_attachment.
 ---
 
 # mgc_tag (Resource)
 
-A tag that can be attached to cloud resources, to organize and report on them. Tags are global: they are not bound to a region. Attaching a tag to a resource also requires a value (`mgc_tag_value`) and an attachment (`mgc_tag_attachment`).
+Tag to organize cloud resources. Tags are global, with no region. To tag a resource, also create a `mgc_tag_value` and a `mgc_tag_attachment`.
 
 ## Example Usage
 
@@ -26,19 +26,19 @@ resource "mgc_tag" "environment" {
 
 ### Required
 
-- `name` (String) Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. Changing this renames the tag in place: its values and the resources that carry it follow the new name.
+- `name` (String) Name of the tag. Unique in the tenant. Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. Changing it renames the tag in place and keeps its values and attachments.
 
 ### Optional
 
-- `color` (String) Color of the tag, as a 6-digit hex RGB code without the `#` prefix. Case insensitive: the API stores it lowercased. When omitted, the API assigns a color, which is why this value is kept in state. The API has no way to clear a color, so removing this from the configuration keeps the current one.
-- `description` (String) A brief description of the tag.
-- `kinds` (Set of String) Kinds that describe what the tag is for, such as `finops`.
+- `color` (String) Color of the tag, as a 6-digit hex code without `#`, such as `0086ff`. Case insensitive. Assigned automatically when omitted. Removing it keeps the current color.
+- `description` (String) Description of the tag. Up to 500 characters.
+- `kinds` (Set of String) Kinds of the tag, such as `finops` for cost reporting. Values other than `finops` cause a warning. Removing it keeps the current kinds. Set `[]` to clear them.
 
 ### Read-Only
 
 - `created_at` (String) Creation date of the tag.
-- `id` (String) The tag name, which is also its identifier.
-- `updated_at` (String) Last update date of the tag, null while it was never updated.
+- `id` (String) Same as `name`.
+- `updated_at` (String) Last update date of the tag. Null if never updated.
 
 ## Import
 

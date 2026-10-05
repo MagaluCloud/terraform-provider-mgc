@@ -55,33 +55,31 @@ func (d *tagResourceTypesDataSource) Configure(_ context.Context, req datasource
 
 func (d *tagResourceTypesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Reads the types of resource that can be tagged, and the product that owns each one. " +
-			"The list grows as products adopt tagging, so this is what tells whether a resource can carry tags at all.",
+		Description: "Reads the resource types that accept tags.",
 		Attributes: map[string]schema.Attribute{
 			"product": schema.StringAttribute{
-				Description: "Only return the types owned by this product, such as `network`.",
+				Description: "Filter by product, such as `network`.",
 				Optional:    true,
 			},
 			"resource_types": schema.ListNestedAttribute{
-				Description: "The resource types found, in the order the API returned them.",
+				Description: "Resource types found.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
-							Description: "Name of the type, prefixed by the product that owns it, as in `net.vpc`. " +
-								"This is what the `resource_type` attribute of a tag attachment reports.",
-							Computed: true,
+							Description: "Name of the type, such as `net.vpc`. Matches `resource_type` in `mgc_tag_attachment`.",
+							Computed:    true,
 						},
 						"product": schema.StringAttribute{
 							Description: "Product that owns the type.",
 							Computed:    true,
 						},
 						"created_at": schema.StringAttribute{
-							Description: "Date the type became known to the tags service.",
+							Description: "Creation date of the type.",
 							Computed:    true,
 						},
 						"updated_at": schema.StringAttribute{
-							Description: "Last update date of the type, null while it was never updated.",
+							Description: "Last update date of the type. Null if never updated.",
 							Computed:    true,
 						},
 					},

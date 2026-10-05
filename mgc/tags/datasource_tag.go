@@ -54,12 +54,12 @@ func (d *tagDataSource) Configure(_ context.Context, req datasource.ConfigureReq
 func (d *tagDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	attributes := tagAttributes()
 	attributes["name"] = schema.StringAttribute{
-		Description: "Name of the tag to look up. Names are case sensitive: `finops` and `FinOps` are different tags.",
+		Description: "Name of the tag. Case sensitive.",
 		Required:    true,
 	}
 
 	resp.Schema = schema.Schema{
-		Description: "Reads a tag of the tenant by name, along with the values defined for it.",
+		Description: "Reads a tag and its values.",
 		Attributes:  attributes,
 	}
 }
@@ -94,28 +94,28 @@ func (d *tagDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 func tagAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Description: "The tag name, which is also its identifier.",
+			Description: "Same as `name`.",
 			Computed:    true,
 		},
 		"name": schema.StringAttribute{
-			Description: "Name of the tag, unique within the tenant.",
+			Description: "Name of the tag.",
 			Computed:    true,
 		},
 		"description": schema.StringAttribute{
-			Description: "A brief description of the tag.",
+			Description: "Description of the tag.",
 			Computed:    true,
 		},
 		"color": schema.StringAttribute{
-			Description: "Color of the tag, as a 6-digit hex RGB code without the `#` prefix, stored lowercased.",
+			Description: "Color of the tag, as a 6-digit lowercase hex code without `#`.",
 			Computed:    true,
 		},
 		"kinds": schema.SetAttribute{
-			Description: "Kinds that describe what the tag is for, such as `finops`.",
+			Description: "Kinds of the tag, such as `finops`.",
 			Computed:    true,
 			ElementType: types.StringType,
 		},
 		"values": schema.ListNestedAttribute{
-			Description: "The values defined for the tag, as the API embedded them in the answer.",
+			Description: "Values of the tag.",
 			Computed:    true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: tagValueAttributes(),
@@ -126,7 +126,7 @@ func tagAttributes() map[string]schema.Attribute {
 			Computed:    true,
 		},
 		"updated_at": schema.StringAttribute{
-			Description: "Last update date of the tag, null while it was never updated.",
+			Description: "Last update date of the tag. Null if never updated.",
 			Computed:    true,
 		},
 	}

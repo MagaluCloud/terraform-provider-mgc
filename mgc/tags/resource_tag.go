@@ -65,20 +65,20 @@ func (r *tagResource) Configure(_ context.Context, req resource.ConfigureRequest
 
 func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A tag that can be attached to cloud resources, to organize and report on them. " +
-			"Tags are global: they are not bound to a region. " +
-			"Attaching a tag to a resource also requires a value (`mgc_tag_value`) and an attachment (`mgc_tag_attachment`).",
+		Description: "Tag to organize cloud resources. Tags are global, with no region. " +
+			"To tag a resource, also create a `mgc_tag_value` and a `mgc_tag_attachment`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The tag name, which is also its identifier.",
+				Description: "Same as `name`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					tagIDFromName(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the tag, unique within the tenant. Names are case sensitive: `finops` and `FinOps` are different tags. " +
-					"Changing this renames the tag in place: its values and the resources that carry it follow the new name.",
+				Description: "Name of the tag. Unique in the tenant. " +
+					"Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. " +
+					"Changing it renames the tag in place and keeps its values and attachments.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
@@ -86,16 +86,15 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"description": schema.StringAttribute{
-				Description: "A brief description of the tag.",
+				Description: "Description of the tag. Up to 500 characters.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtMost(500),
 				},
 			},
 			"color": schema.StringAttribute{
-				Description: "Color of the tag, as a 6-digit hex RGB code without the `#` prefix. Case insensitive: the API stores it lowercased. " +
-					"When omitted, the API assigns a color, which is why this value is kept in state. " +
-					"The API has no way to clear a color, so removing this from the configuration keeps the current one.",
+				Description: "Color of the tag, as a 6-digit hex code without `#`, such as `0086ff`. Case insensitive. " +
+					"Assigned automatically when omitted. Removing it keeps the current color.",
 				Optional:   true,
 				Computed:   true,
 				CustomType: caseInsensitiveStringType{},
@@ -107,7 +106,8 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"kinds": schema.SetAttribute{
-				Description: "Kinds that describe what the tag is for, such as `finops`.",
+				Description: "Kinds of the tag, such as `finops` for cost reporting. Values other than `finops` cause a warning. " +
+					"Removing it keeps the current kinds. Set `[]` to clear them.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -126,7 +126,7 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "Last update date of the tag, null while it was never updated.",
+				Description: "Last update date of the tag. Null if never updated.",
 				Computed:    true,
 			},
 		},

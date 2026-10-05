@@ -3,12 +3,12 @@
 page_title: "mgc_tag_value Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads a single value of a tag by name.
+  Reads a value of a tag.
 ---
 
 # mgc_tag_value (Data Source)
 
-Reads a single value of a tag by name.
+Reads a value of a tag.
 
 ## Example Usage
 
@@ -28,12 +28,12 @@ output "production_description" {
 
 ### Required
 
-- `name` (String) Name of the value to look up. Names are case sensitive.
-- `tag_name` (String) Name of the tag that owns the value.
+- `name` (String) Name of the value. Case sensitive.
+- `tag_name` (String) Name of the tag.
 
 ### Read-Only
 
 - `created_at` (String) Creation date of the value.
-- `description` (String) A brief description of the value.
-- `id` (String) Identifier of the value, in the form `<tag_name>,<name>`.
-- `updated_at` (String) Last update date of the value, null while it was never updated.
+- `description` (String) Description of the value.
+- `id` (String) Identifier in the form `<tag_name>,<name>`.
+- `updated_at` (String) Last update date of the value. Null if never updated.

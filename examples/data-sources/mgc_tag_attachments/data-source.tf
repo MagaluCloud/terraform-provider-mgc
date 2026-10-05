@@ -12,8 +12,6 @@ output "tagged_vpc_ids" {
   value = [for attachment in data.mgc_tag_attachments.vpcs.attachments : attachment.resource_id]
 }
 
-# Only the resources that carry the environment tag. The API filters by tag
-# name only, so narrowing by the value is done over the result.
 data "mgc_tag_attachments" "environment" {
   tag_name = "environment"
 }

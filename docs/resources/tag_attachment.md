@@ -3,12 +3,12 @@
 page_title: "mgc_tag_attachment Resource - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  The tags attached to a cloud resource. This resource is authoritative: it owns every tag of resource_id, so a tag attached outside Terraform is removed on the next apply, and two configurations must not manage the same resource. The tag and the value have to exist before being attached.
+  Tags of a cloud resource. Authoritative: tags attached outside Terraform are removed on the next apply. Manage each resource in one configuration only. If the resource already has tags, import it instead of creating it.
 ---
 
 # mgc_tag_attachment (Resource)
 
-The tags attached to a cloud resource. **This resource is authoritative**: it owns every tag of `resource_id`, so a tag attached outside Terraform is removed on the next apply, and two configurations must not manage the same resource. The tag and the value have to exist before being attached.
+Tags of a cloud resource. **Authoritative**: tags attached outside Terraform are removed on the next apply. Manage each resource in one configuration only. If the resource already has tags, import it instead of creating it.
 
 ## Example Usage
 
@@ -42,14 +42,14 @@ resource "mgc_tag_attachment" "vpc" {
 
 ### Required
 
-- `resource_id` (String) Id of the resource being tagged, as used by its own product, such as the id of a cluster or of a VPC.
-- `tags` (Map of String) Tags attached to the resource, as a map of tag name to value. Reference the tag and the value instead of writing them as literals, so Terraform creates them first: `(mgc_tag.env.name) = mgc_tag_value.prod.name` (the parentheses make the key an expression).
+- `resource_id` (String) ID of the resource to tag, such as a VPC or cluster ID. The `mgc_tag_resource_types` data source lists the types that accept tags.
+- `tags` (Map of String) Map of tag name to value, with at least one entry. To remove every tag, delete this resource. Reference the tag and the value, so Terraform creates them first: `(mgc_tag.env.name) = mgc_tag_value.prod.name`. The parentheses make the key an expression.
 
 ### Read-Only
 
-- `id` (String) Identifier of the attachment, which is the id of the tagged resource.
-- `region` (String) Region of the tagged resource.
-- `resource_type` (String) Type of the tagged resource, as classified by the API, such as `k8s.cluster`.
+- `id` (String) Same as `resource_id`.
+- `region` (String) Region of the resource.
+- `resource_type` (String) Type of the resource, such as `net.vpc`.
 
 ## Import
 

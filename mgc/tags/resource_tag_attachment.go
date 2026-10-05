@@ -56,29 +56,30 @@ func (r *tagAttachmentResource) Configure(_ context.Context, req resource.Config
 
 func (r *tagAttachmentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "The tags attached to a cloud resource. " +
-			"**This resource is authoritative**: it owns every tag of `resource_id`, so a tag attached outside Terraform " +
-			"is removed on the next apply, and two configurations must not manage the same resource. " +
-			"The tag and the value have to exist before being attached.",
+		Description: "Tags of a cloud resource. " +
+			"**Authoritative**: tags attached outside Terraform are removed on the next apply. " +
+			"Manage each resource in one configuration only. " +
+			"If the resource already has tags, import it instead of creating it.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Identifier of the attachment, which is the id of the tagged resource.",
+				Description: "Same as `resource_id`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"resource_id": schema.StringAttribute{
-				Description: "Id of the resource being tagged, as used by its own product, such as the id of a cluster or of a VPC.",
-				Required:    true,
+				Description: "ID of the resource to tag, such as a VPC or cluster ID. " +
+					"The `mgc_tag_resource_types` data source lists the types that accept tags.",
+				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"tags": schema.MapAttribute{
-				Description: "Tags attached to the resource, as a map of tag name to value. Reference the tag and the value " +
-					"instead of writing them as literals, so Terraform creates them first: " +
-					"`(mgc_tag.env.name) = mgc_tag_value.prod.name` (the parentheses make the key an expression).",
+				Description: "Map of tag name to value, with at least one entry. To remove every tag, delete this resource. " +
+					"Reference the tag and the value, so Terraform creates them first: " +
+					"`(mgc_tag.env.name) = mgc_tag_value.prod.name`. The parentheses make the key an expression.",
 				Required:    true,
 				ElementType: types.StringType,
 				Validators: []validator.Map{
@@ -86,14 +87,14 @@ func (r *tagAttachmentResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"resource_type": schema.StringAttribute{
-				Description: "Type of the tagged resource, as classified by the API, such as `k8s.cluster`.",
+				Description: "Type of the resource, such as `net.vpc`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"region": schema.StringAttribute{
-				Description: "Region of the tagged resource.",
+				Description: "Region of the resource.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -122,7 +123,7 @@ func (r *tagAttachmentResource) Create(ctx context.Context, req resource.CreateR
 		if isConflict(err) {
 			resp.Diagnostics.AddError(
 				"Tag already attached to the resource",
-				"The resource already carries one of these tags, and the API does not allow attaching it twice. "+
+				"The resource already carries one of these tags and does not allow it to be assigned twice. "+
 					"Adopt the existing tags instead: terraform import <resource address> "+resourceID,
 			)
 			return

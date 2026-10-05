@@ -3,12 +3,12 @@
 page_title: "mgc_tag_attachments Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. The API filters by tag name only, so narrowing by the value is done over the result, as in [for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags["finops"] == "test-labs"].
+  Reads the tagged resources, optionally filtered by type, region or tag.
 ---
 
 # mgc_tag_attachments (Data Source)
 
-Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. The API filters by tag name only, so narrowing by the value is done over the result, as in `[for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags["finops"] == "test-labs"]`.
+Reads the tagged resources, optionally filtered by type, region or tag.
 
 ## Example Usage
 
@@ -27,8 +27,6 @@ output "tagged_vpc_ids" {
   value = [for attachment in data.mgc_tag_attachments.vpcs.attachments : attachment.resource_id]
 }
 
-# Only the resources that carry the environment tag. The API filters by tag
-# name only, so narrowing by the value is done over the result.
 data "mgc_tag_attachments" "environment" {
   tag_name = "environment"
 }
@@ -46,25 +44,25 @@ output "production_resources" {
 
 ### Optional
 
-- `region` (String) Only return resources of this region.
-- `resource_type` (String) Only return resources of this type, such as `net.vpc`. The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.
-- `tag_name` (String) Only return resources that carry this tag, whatever its value.
+- `region` (String) Filter by region.
+- `resource_type` (String) Filter by resource type, such as `net.vpc`.
+- `tag_name` (String) Filter by tag name. To filter by value, use a `for` expression over `attachments`.
 
 ### Read-Only
 
-- `attachments` (Attributes List) The tagged resources found, in the order the API returned them. (see [below for nested schema](#nestedatt--attachments))
+- `attachments` (Attributes List) Tagged resources found. (see [below for nested schema](#nestedatt--attachments))
 
 <a id="nestedatt--attachments"></a>
 ### Nested Schema for `attachments`
 
 Read-Only:
 
-- `created_at` (String) Date the resource became known to the tags service.
-- `id` (String) Identifier of the attachment, which is the id of the tagged resource.
-- `last_tag_associated_at` (String) Date of the last attach or detach on the resource, null while no tag was ever attached. The `mgc_tag_attachment` resource does not expose this, because it changes whenever any tag moves and would show up as permanent drift.
+- `created_at` (String) Creation date of the attachment.
+- `id` (String) Same as `resource_id`.
+- `last_tag_associated_at` (String) Date of the last tag attach or detach. Null if no tag was ever attached.
 - `product` (String) Product that owns the resource type, such as `network`.
 - `region` (String) Region of the resource.
-- `resource_id` (String) Id of the tagged resource, as used by its own product.
-- `resource_type` (String) Type of the resource, as classified by the API, such as `net.vpc`. The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.
-- `tags` (Map of String) Every tag the resource carries, as a map of tag name to value.
-- `updated_at` (String) Last update date of the resource, null while it was never updated.
+- `resource_id` (String) ID of the tagged resource.
+- `resource_type` (String) Type of the resource, such as `net.vpc`.
+- `tags` (Map of String) Map of tag name to value.
+- `updated_at` (String) Last update date of the attachment. Null if never updated.

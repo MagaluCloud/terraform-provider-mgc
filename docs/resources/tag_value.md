@@ -3,12 +3,12 @@
 page_title: "mgc_tag_value Resource - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  A value of a tag. A resource carries a single value per tag, and both the tag and the value have to exist before they can be attached to a resource with mgc_tag_attachment.
+  Value of a tag, such as production for the tag environment. A resource carries one value per tag. A value attached to a resource cannot be deleted: detach it first, in a separate apply.
 ---
 
 # mgc_tag_value (Resource)
 
-A value of a tag. A resource carries a single value per tag, and both the tag and the value have to exist before they can be attached to a resource with `mgc_tag_attachment`.
+Value of a tag, such as `production` for the tag `environment`. A resource carries one value per tag. A value attached to a resource cannot be deleted: detach it first, in a separate apply.
 
 ## Example Usage
 
@@ -30,18 +30,18 @@ resource "mgc_tag_value" "production" {
 
 ### Required
 
-- `name` (String) Name of the value, unique within the tag. Names are case sensitive. Changing this renames the value in place, and the resources that carry it follow the new name.
-- `tag_name` (String) Name of the tag that owns this value. Renaming the tag takes the value along, so this only follows the new name.
+- `name` (String) Name of the value. Unique in the tag. Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. Changing it renames the value in place and keeps its attachments.
+- `tag_name` (String) Name of the tag that owns the value. Reference `mgc_tag.<name>.name` to follow tag renames. Moving the value to another tag is not supported.
 
 ### Optional
 
-- `description` (String) A brief description of the value.
+- `description` (String) Description of the value. Up to 500 characters.
 
 ### Read-Only
 
 - `created_at` (String) Creation date of the value.
-- `id` (String) Identifier of the value, in the form `<tag_name>,<name>`.
-- `updated_at` (String) Last update date of the value, null while it was never updated.
+- `id` (String) Identifier in the form `<tag_name>,<name>`.
+- `updated_at` (String) Last update date of the value. Null if never updated.
 
 ## Import
 

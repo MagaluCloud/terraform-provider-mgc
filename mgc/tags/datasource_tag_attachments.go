@@ -47,25 +47,22 @@ func (d *tagAttachmentsDataSource) Configure(_ context.Context, req datasource.C
 
 func (d *tagAttachmentsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Reads every resource of the tenant that carries at least one tag, optionally narrowed by type, region or tag. " +
-			"The API filters by tag name only, so narrowing by the value is done over the result, as in " +
-			"`[for attachment in data.mgc_tag_attachments.finops.attachments : attachment if attachment.tags[\"finops\"] == \"test-labs\"]`.",
+		Description: "Reads the tagged resources, optionally filtered by type, region or tag.",
 		Attributes: map[string]schema.Attribute{
 			"resource_type": schema.StringAttribute{
-				Description: "Only return resources of this type, such as `net.vpc`. " +
-					"The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.",
-				Optional: true,
+				Description: "Filter by resource type, such as `net.vpc`.",
+				Optional:    true,
 			},
 			"region": schema.StringAttribute{
-				Description: "Only return resources of this region.",
+				Description: "Filter by region.",
 				Optional:    true,
 			},
 			"tag_name": schema.StringAttribute{
-				Description: "Only return resources that carry this tag, whatever its value.",
+				Description: "Filter by tag name. To filter by value, use a `for` expression over `attachments`.",
 				Optional:    true,
 			},
 			"attachments": schema.ListNestedAttribute{
-				Description: "The tagged resources found, in the order the API returned them.",
+				Description: "Tagged resources found.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: attachmentAttributes(),

@@ -46,14 +46,14 @@ func (d *tagValuesDataSource) Configure(_ context.Context, req datasource.Config
 
 func (d *tagValuesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Reads every value defined for a tag.",
+		Description: "Reads the values of a tag.",
 		Attributes: map[string]schema.Attribute{
 			"tag_name": schema.StringAttribute{
-				Description: "Name of the tag whose values are read.",
+				Description: "Name of the tag.",
 				Required:    true,
 			},
 			"values": schema.ListNestedAttribute{
-				Description: "The values of the tag, in the order the API returned them.",
+				Description: "Values of the tag.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: tagValueAttributes(),

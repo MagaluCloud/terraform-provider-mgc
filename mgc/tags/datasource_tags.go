@@ -47,15 +47,21 @@ func (d *tagsDataSource) Configure(_ context.Context, req datasource.ConfigureRe
 }
 
 func (d *tagsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	// The listing does not embed the values of each tag.
+	tagItem := tagAttributes()
+	values := tagItem["values"].(schema.ListNestedAttribute)
+	values.Description = "Always empty. Read the values with `mgc_tag` or `mgc_tag_values`."
+	tagItem["values"] = values
+
 	resp.Schema = schema.Schema{
-		Description: "Reads the tags of the tenant, optionally narrowed by color or kind.",
+		Description: "Reads the tags, optionally filtered by color or kind.",
 		Attributes: map[string]schema.Attribute{
 			"color": schema.StringAttribute{
-				Description: "Only return tags of this color, as a 6-digit hex RGB code without the `#` prefix.",
+				Description: "Filter by color, as a 6-digit hex code without `#`.",
 				Optional:    true,
 			},
 			"kinds": schema.SetAttribute{
-				Description: "Only return tags that have at least one of these kinds.",
+				Description: "Filter by kind. Returns tags with at least one of these kinds.",
 				Optional:    true,
 				ElementType: types.StringType,
 				Validators: []validator.Set{
@@ -63,10 +69,10 @@ func (d *tagsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				},
 			},
 			"tags": schema.ListNestedAttribute{
-				Description: "The tags found, in the order the API returned them.",
+				Description: "Tags found.",
 				Computed:    true,
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: tagAttributes(),
+					Attributes: tagItem,
 				},
 			},
 		},

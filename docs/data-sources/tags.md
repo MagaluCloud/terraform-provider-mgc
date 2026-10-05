@@ -3,12 +3,12 @@
 page_title: "mgc_tags Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads the tags of the tenant, optionally narrowed by color or kind.
+  Reads the tags, optionally filtered by color or kind.
 ---
 
 # mgc_tags (Data Source)
 
-Reads the tags of the tenant, optionally narrowed by color or kind.
+Reads the tags, optionally filtered by color or kind.
 
 ## Example Usage
 
@@ -32,26 +32,26 @@ output "finops_tag_names" {
 
 ### Optional
 
-- `color` (String) Only return tags of this color, as a 6-digit hex RGB code without the `#` prefix.
-- `kinds` (Set of String) Only return tags that have at least one of these kinds.
+- `color` (String) Filter by color, as a 6-digit hex code without `#`.
+- `kinds` (Set of String) Filter by kind. Returns tags with at least one of these kinds.
 
 ### Read-Only
 
-- `tags` (Attributes List) The tags found, in the order the API returned them. (see [below for nested schema](#nestedatt--tags))
+- `tags` (Attributes List) Tags found. (see [below for nested schema](#nestedatt--tags))
 
 <a id="nestedatt--tags"></a>
 ### Nested Schema for `tags`
 
 Read-Only:
 
-- `color` (String) Color of the tag, as a 6-digit hex RGB code without the `#` prefix, stored lowercased.
+- `color` (String) Color of the tag, as a 6-digit lowercase hex code without `#`.
 - `created_at` (String) Creation date of the tag.
-- `description` (String) A brief description of the tag.
-- `id` (String) The tag name, which is also its identifier.
-- `kinds` (Set of String) Kinds that describe what the tag is for, such as `finops`.
-- `name` (String) Name of the tag, unique within the tenant.
-- `updated_at` (String) Last update date of the tag, null while it was never updated.
-- `values` (Attributes List) The values defined for the tag, as the API embedded them in the answer. (see [below for nested schema](#nestedatt--tags--values))
+- `description` (String) Description of the tag.
+- `id` (String) Same as `name`.
+- `kinds` (Set of String) Kinds of the tag, such as `finops`.
+- `name` (String) Name of the tag.
+- `updated_at` (String) Last update date of the tag. Null if never updated.
+- `values` (Attributes List) Always empty. Read the values with `mgc_tag` or `mgc_tag_values`. (see [below for nested schema](#nestedatt--tags--values))
 
 <a id="nestedatt--tags--values"></a>
 ### Nested Schema for `tags.values`
@@ -59,8 +59,8 @@ Read-Only:
 Read-Only:
 
 - `created_at` (String) Creation date of the value.
-- `description` (String) A brief description of the value.
-- `id` (String) Identifier of the value, in the form `<tag_name>,<name>`.
-- `name` (String) Name of the value, unique within the tag.
+- `description` (String) Description of the value.
+- `id` (String) Identifier in the form `<tag_name>,<name>`.
+- `name` (String) Name of the value.
 - `tag_name` (String) Name of the tag that owns the value.
-- `updated_at` (String) Last update date of the value, null while it was never updated.
+- `updated_at` (String) Last update date of the value. Null if never updated.

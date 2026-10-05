@@ -3,12 +3,12 @@
 page_title: "mgc_tag_resource_types Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads the types of resource that can be tagged, and the product that owns each one. The list grows as products adopt tagging, so this is what tells whether a resource can carry tags at all.
+  Reads the resource types that accept tags.
 ---
 
 # mgc_tag_resource_types (Data Source)
 
-Reads the types of resource that can be tagged, and the product that owns each one. The list grows as products adopt tagging, so this is what tells whether a resource can carry tags at all.
+Reads the resource types that accept tags.
 
 ## Example Usage
 
@@ -32,18 +32,18 @@ output "taggable_types" {
 
 ### Optional
 
-- `product` (String) Only return the types owned by this product, such as `network`.
+- `product` (String) Filter by product, such as `network`.
 
 ### Read-Only
 
-- `resource_types` (Attributes List) The resource types found, in the order the API returned them. (see [below for nested schema](#nestedatt--resource_types))
+- `resource_types` (Attributes List) Resource types found. (see [below for nested schema](#nestedatt--resource_types))
 
 <a id="nestedatt--resource_types"></a>
 ### Nested Schema for `resource_types`
 
 Read-Only:
 
-- `created_at` (String) Date the type became known to the tags service.
-- `name` (String) Name of the type, prefixed by the product that owns it, as in `net.vpc`. This is what the `resource_type` attribute of a tag attachment reports.
+- `created_at` (String) Creation date of the type.
+- `name` (String) Name of the type, such as `net.vpc`. Matches `resource_type` in `mgc_tag_attachment`.
 - `product` (String) Product that owns the type.
-- `updated_at` (String) Last update date of the type, null while it was never updated.
+- `updated_at` (String) Last update date of the type. Null if never updated.

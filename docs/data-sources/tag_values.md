@@ -3,12 +3,12 @@
 page_title: "mgc_tag_values Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads every value defined for a tag.
+  Reads the values of a tag.
 ---
 
 # mgc_tag_values (Data Source)
 
-Reads every value defined for a tag.
+Reads the values of a tag.
 
 ## Example Usage
 
@@ -27,11 +27,11 @@ output "environment_values" {
 
 ### Required
 
-- `tag_name` (String) Name of the tag whose values are read.
+- `tag_name` (String) Name of the tag.
 
 ### Read-Only
 
-- `values` (Attributes List) The values of the tag, in the order the API returned them. (see [below for nested schema](#nestedatt--values))
+- `values` (Attributes List) Values of the tag. (see [below for nested schema](#nestedatt--values))
 
 <a id="nestedatt--values"></a>
 ### Nested Schema for `values`
@@ -39,8 +39,8 @@ output "environment_values" {
 Read-Only:
 
 - `created_at` (String) Creation date of the value.
-- `description` (String) A brief description of the value.
-- `id` (String) Identifier of the value, in the form `<tag_name>,<name>`.
-- `name` (String) Name of the value, unique within the tag.
+- `description` (String) Description of the value.
+- `id` (String) Identifier in the form `<tag_name>,<name>`.
+- `name` (String) Name of the value.
 - `tag_name` (String) Name of the tag that owns the value.
-- `updated_at` (String) Last update date of the value, null while it was never updated.
+- `updated_at` (String) Last update date of the value. Null if never updated.

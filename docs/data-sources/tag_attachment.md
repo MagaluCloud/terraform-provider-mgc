@@ -3,12 +3,12 @@
 page_title: "mgc_tag_attachment Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads the tags attached to a cloud resource. Unlike the resource of the same name, this only reads: it takes no ownership of the tags, so it is the way to look at a resource whose tags are managed elsewhere.
+  Reads the tags of a cloud resource, without managing them. Fails if the resource has no tags.
 ---
 
 # mgc_tag_attachment (Data Source)
 
-Reads the tags attached to a cloud resource. Unlike the resource of the same name, this only reads: it takes no ownership of the tags, so it is the way to look at a resource whose tags are managed elsewhere.
+Reads the tags of a cloud resource, without managing them. Fails if the resource has no tags.
 
 ## Example Usage
 
@@ -33,15 +33,15 @@ output "vpc_resource_type" {
 
 ### Required
 
-- `resource_id` (String) Id of the tagged resource, as used by its own product, such as the id of a cluster or of a VPC.
+- `resource_id` (String) ID of the tagged resource, such as a VPC or cluster ID.
 
 ### Read-Only
 
-- `created_at` (String) Date the resource became known to the tags service.
-- `id` (String) Identifier of the attachment, which is the id of the tagged resource.
-- `last_tag_associated_at` (String) Date of the last attach or detach on the resource, null while no tag was ever attached. The `mgc_tag_attachment` resource does not expose this, because it changes whenever any tag moves and would show up as permanent drift.
+- `created_at` (String) Creation date of the attachment.
+- `id` (String) Same as `resource_id`.
+- `last_tag_associated_at` (String) Date of the last tag attach or detach. Null if no tag was ever attached.
 - `product` (String) Product that owns the resource type, such as `network`.
 - `region` (String) Region of the resource.
-- `resource_type` (String) Type of the resource, as classified by the API, such as `net.vpc`. The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.
-- `tags` (Map of String) Every tag the resource carries, as a map of tag name to value.
-- `updated_at` (String) Last update date of the resource, null while it was never updated.
+- `resource_type` (String) Type of the resource, such as `net.vpc`.
+- `tags` (Map of String) Map of tag name to value.
+- `updated_at` (String) Last update date of the attachment. Null if never updated.

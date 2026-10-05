@@ -3,12 +3,12 @@
 page_title: "mgc_tag Data Source - terraform-provider-mgc"
 subcategory: "Tags"
 description: |-
-  Reads a tag of the tenant by name, along with the values defined for it.
+  Reads a tag and its values.
 ---
 
 # mgc_tag (Data Source)
 
-Reads a tag of the tenant by name, along with the values defined for it.
+Reads a tag and its values.
 
 ## Example Usage
 
@@ -21,7 +21,6 @@ output "environment_color" {
   value = data.mgc_tag.environment.color
 }
 
-# The answer already embeds the values defined for the tag.
 output "environment_values" {
   value = [for value in data.mgc_tag.environment.values : value.name]
 }
@@ -32,17 +31,17 @@ output "environment_values" {
 
 ### Required
 
-- `name` (String) Name of the tag to look up. Names are case sensitive: `finops` and `FinOps` are different tags.
+- `name` (String) Name of the tag. Case sensitive.
 
 ### Read-Only
 
-- `color` (String) Color of the tag, as a 6-digit hex RGB code without the `#` prefix, stored lowercased.
+- `color` (String) Color of the tag, as a 6-digit lowercase hex code without `#`.
 - `created_at` (String) Creation date of the tag.
-- `description` (String) A brief description of the tag.
-- `id` (String) The tag name, which is also its identifier.
-- `kinds` (Set of String) Kinds that describe what the tag is for, such as `finops`.
-- `updated_at` (String) Last update date of the tag, null while it was never updated.
-- `values` (Attributes List) The values defined for the tag, as the API embedded them in the answer. (see [below for nested schema](#nestedatt--values))
+- `description` (String) Description of the tag.
+- `id` (String) Same as `name`.
+- `kinds` (Set of String) Kinds of the tag, such as `finops`.
+- `updated_at` (String) Last update date of the tag. Null if never updated.
+- `values` (Attributes List) Values of the tag. (see [below for nested schema](#nestedatt--values))
 
 <a id="nestedatt--values"></a>
 ### Nested Schema for `values`
@@ -50,8 +49,8 @@ output "environment_values" {
 Read-Only:
 
 - `created_at` (String) Creation date of the value.
-- `description` (String) A brief description of the value.
-- `id` (String) Identifier of the value, in the form `<tag_name>,<name>`.
-- `name` (String) Name of the value, unique within the tag.
+- `description` (String) Description of the value.
+- `id` (String) Identifier in the form `<tag_name>,<name>`.
+- `name` (String) Name of the value.
 - `tag_name` (String) Name of the tag that owns the value.
-- `updated_at` (String) Last update date of the value, null while it was never updated.
+- `updated_at` (String) Last update date of the value. Null if never updated.

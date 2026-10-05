@@ -60,19 +60,20 @@ func (r *tagValueResource) Configure(_ context.Context, req resource.ConfigureRe
 
 func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A value of a tag. A resource carries a single value per tag, and both the tag and the value " +
-			"have to exist before they can be attached to a resource with `mgc_tag_attachment`.",
+		Description: "Value of a tag, such as `production` for the tag `environment`. " +
+			"A resource carries one value per tag. " +
+			"A value attached to a resource cannot be deleted: detach it first, in a separate apply.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "Identifier of the value, in the form `<tag_name>,<name>`.",
+				Description: "Identifier in the form `<tag_name>,<name>`.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					tagValueIDFromNames(),
 				},
 			},
 			"tag_name": schema.StringAttribute{
-				Description: "Name of the tag that owns this value. Renaming the tag takes the value along, so this only follows " +
-					"the new name.",
+				Description: "Name of the tag that owns the value. Reference `mgc_tag.<name>.name` to follow tag renames. " +
+					"Moving the value to another tag is not supported.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
@@ -80,8 +81,9 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the value, unique within the tag. Names are case sensitive. " +
-					"Changing this renames the value in place, and the resources that carry it follow the new name.",
+				Description: "Name of the value. Unique in the tag. " +
+					"Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. " +
+					"Changing it renames the value in place and keeps its attachments.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
@@ -89,7 +91,7 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"description": schema.StringAttribute{
-				Description: "A brief description of the value.",
+				Description: "Description of the value. Up to 500 characters.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtMost(500),
@@ -103,7 +105,7 @@ func (r *tagValueResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "Last update date of the value, null while it was never updated.",
+				Description: "Last update date of the value. Null if never updated.",
 				Computed:    true,
 			},
 		},
@@ -178,7 +180,7 @@ func (r *tagValueResource) Update(ctx context.Context, req resource.UpdateReques
 		if err == nil {
 			resp.Diagnostics.AddError(
 				"Moving a tag value is not supported",
-				fmt.Sprintf("The value %q still exists in the tag %q, so it cannot follow tag_name to %q: the API has no move, "+
+				fmt.Sprintf("The value %q still exists in the tag %q, so it cannot follow tag_name to %q: move are not supported, "+
 					"and deleting a value attached to a resource fails. Declare a new mgc_tag_value in %q, point the attachments to it, "+
 					"and remove this one in a later apply.",
 					state.Name.ValueString(), state.TagName.ValueString(), plan.TagName.ValueString(), plan.TagName.ValueString()),

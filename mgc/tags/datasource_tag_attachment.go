@@ -57,15 +57,13 @@ func (d *tagAttachmentDataSource) Configure(_ context.Context, req datasource.Co
 func (d *tagAttachmentDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	attributes := attachmentAttributes()
 	attributes["resource_id"] = schema.StringAttribute{
-		Description: "Id of the tagged resource, as used by its own product, such as the id of a cluster or of a VPC.",
+		Description: "ID of the tagged resource, such as a VPC or cluster ID.",
 		Required:    true,
 	}
 
 	resp.Schema = schema.Schema{
-		Description: "Reads the tags attached to a cloud resource. " +
-			"Unlike the resource of the same name, this only reads: it takes no ownership of the tags, " +
-			"so it is the way to look at a resource whose tags are managed elsewhere.",
-		Attributes: attributes,
+		Description: "Reads the tags of a cloud resource, without managing them. Fails if the resource has no tags.",
+		Attributes:  attributes,
 	}
 }
 
@@ -101,22 +99,21 @@ func (d *tagAttachmentDataSource) Read(ctx context.Context, req datasource.ReadR
 func attachmentAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Description: "Identifier of the attachment, which is the id of the tagged resource.",
+			Description: "Same as `resource_id`.",
 			Computed:    true,
 		},
 		"resource_id": schema.StringAttribute{
-			Description: "Id of the tagged resource, as used by its own product.",
+			Description: "ID of the tagged resource.",
 			Computed:    true,
 		},
 		"tags": schema.MapAttribute{
-			Description: "Every tag the resource carries, as a map of tag name to value.",
+			Description: "Map of tag name to value.",
 			Computed:    true,
 			ElementType: types.StringType,
 		},
 		"resource_type": schema.StringAttribute{
-			Description: "Type of the resource, as classified by the API, such as `net.vpc`. " +
-				"The types that support tagging are the ones listed by the `mgc_tag_resource_types` data source.",
-			Computed: true,
+			Description: "Type of the resource, such as `net.vpc`.",
+			Computed:    true,
 		},
 		"product": schema.StringAttribute{
 			Description: "Product that owns the resource type, such as `network`.",
@@ -127,18 +124,16 @@ func attachmentAttributes() map[string]schema.Attribute {
 			Computed:    true,
 		},
 		"created_at": schema.StringAttribute{
-			Description: "Date the resource became known to the tags service.",
+			Description: "Creation date of the attachment.",
 			Computed:    true,
 		},
 		"updated_at": schema.StringAttribute{
-			Description: "Last update date of the resource, null while it was never updated.",
+			Description: "Last update date of the attachment. Null if never updated.",
 			Computed:    true,
 		},
 		"last_tag_associated_at": schema.StringAttribute{
-			Description: "Date of the last attach or detach on the resource, null while no tag was ever attached. " +
-				"The `mgc_tag_attachment` resource does not expose this, because it changes whenever any tag moves " +
-				"and would show up as permanent drift.",
-			Computed: true,
+			Description: "Date of the last tag attach or detach. Null if no tag was ever attached.",
+			Computed:    true,
 		},
 	}
 }

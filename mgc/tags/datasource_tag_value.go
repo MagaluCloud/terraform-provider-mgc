@@ -54,16 +54,16 @@ func (d *tagValueDataSource) Configure(_ context.Context, req datasource.Configu
 func (d *tagValueDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	attributes := tagValueAttributes()
 	attributes["tag_name"] = schema.StringAttribute{
-		Description: "Name of the tag that owns the value.",
+		Description: "Name of the tag.",
 		Required:    true,
 	}
 	attributes["name"] = schema.StringAttribute{
-		Description: "Name of the value to look up. Names are case sensitive.",
+		Description: "Name of the value. Case sensitive.",
 		Required:    true,
 	}
 
 	resp.Schema = schema.Schema{
-		Description: "Reads a single value of a tag by name.",
+		Description: "Reads a value of a tag.",
 		Attributes:  attributes,
 	}
 }
@@ -100,7 +100,7 @@ func (d *tagValueDataSource) Read(ctx context.Context, req datasource.ReadReques
 func tagValueAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Description: "Identifier of the value, in the form `<tag_name>,<name>`.",
+			Description: "Identifier in the form `<tag_name>,<name>`.",
 			Computed:    true,
 		},
 		"tag_name": schema.StringAttribute{
@@ -108,11 +108,11 @@ func tagValueAttributes() map[string]schema.Attribute {
 			Computed:    true,
 		},
 		"name": schema.StringAttribute{
-			Description: "Name of the value, unique within the tag.",
+			Description: "Name of the value.",
 			Computed:    true,
 		},
 		"description": schema.StringAttribute{
-			Description: "A brief description of the value.",
+			Description: "Description of the value.",
 			Computed:    true,
 		},
 		"created_at": schema.StringAttribute{
@@ -120,7 +120,7 @@ func tagValueAttributes() map[string]schema.Attribute {
 			Computed:    true,
 		},
 		"updated_at": schema.StringAttribute{
-			Description: "Last update date of the value, null while it was never updated.",
+			Description: "Last update date of the value. Null if never updated.",
 			Computed:    true,
 		},
 	}
