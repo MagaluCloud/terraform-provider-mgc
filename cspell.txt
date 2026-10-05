@@ -7,6 +7,7 @@ dbadmin
 ethertype
 examplepassword
 fasdfaaa
+finops
 healthcheck
 healthchecks
 hugepages
