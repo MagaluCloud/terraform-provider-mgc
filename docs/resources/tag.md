@@ -32,7 +32,7 @@ resource "mgc_tag" "environment" {
 
 - `color` (String) Color of the tag, as a 6-digit hex code without `#`, such as `0086ff`. Case insensitive. Assigned automatically when omitted. Removing it keeps the current color.
 - `description` (String) Description of the tag. Up to 500 characters.
-- `kinds` (Set of String) Kinds of the tag, such as `finops` for cost reporting. Values other than `finops` cause a warning. Removing it keeps the current kinds. Set `[]` to clear them.
+- `kinds` (Set of String) Kinds of the tag, such as `finops` for cost reporting.
 
 ### Read-Only
 
