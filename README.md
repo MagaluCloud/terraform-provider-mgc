@@ -44,6 +44,12 @@ The MGC provider gives you comprehensive control over your Magalu Cloud resource
 - **VM Volume Attachment** - Connect storage to your virtual machines
 - **Object Storage** - S3-compatible storage for unstructured data
 
+## Requirements
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.11 or [OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.11
+
+Several resources use [write-only arguments](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only) (for example `password` in `mgc_dbaas_instances` and `allocate_public_ipv4` in `mgc_virtual_machine_instances`), which are only supported starting with Terraform 1.11 and OpenTofu 1.11. Older versions fail with `WriteOnly Attribute Not Allowed`.
+
 ## Usage Example
 
 ```hcl
