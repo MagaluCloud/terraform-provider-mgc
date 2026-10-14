@@ -15,6 +15,7 @@ const (
 	ServiceNetwork           = "network"
 	ServiceObjectStorage     = "object_storage"
 	ServiceSSH               = "ssh"
+	ServiceTags              = "tags"
 	ServiceVirtualMachine    = "virtual_machine"
 )
 
