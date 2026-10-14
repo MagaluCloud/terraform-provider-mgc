@@ -1,0 +1,62 @@
+name: Acceptance Tests
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acctest-replay-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  MGC_VCR_PATH: ${{ github.workspace }}/.cassettes
+  MGC_REGION: br-ne1
+  TERRAFORM_VERSION: "1.15.4"
+
+jobs:
+  replay:
+    name: Replay acceptance tests
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.RUNNER_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Name the checkout after the PR branch
+        run: git switch -C "$GITHUB_HEAD_REF"
+
+      - name: Set up Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #v5.3.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
+
+      - name: Install Terraform
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION"
+          zip="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -O "$base/$zip"
+          curl -fsSL -O "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          grep " $zip$" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c -
+          unzip -o -q "$zip" -d tf
+          echo "TF_ACC_TERRAFORM_PATH=$RUNNER_TEMP/tf/terraform" >> "$GITHUB_ENV"
+          tf/terraform version
+
+      - name: Download published cassettes
+        env:
+          MGC_CASSETTE_KEY_PAIR_ID: ${{ secrets.MGC_CASSETTE_KEY_PAIR_ID }}
+          MGC_CASSETTE_KEY_PAIR_SECRET: ${{ secrets.MGC_CASSETTE_KEY_PAIR_SECRET }}
+        run: |
+          make cassettes-download
+          make cassettes-download SET="$GITHUB_HEAD_REF"
+
+      - name: Replay
+        run: make testacc-replay

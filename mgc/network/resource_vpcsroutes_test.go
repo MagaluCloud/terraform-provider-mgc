@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
@@ -139,7 +140,11 @@ func TestNetworkVpcsRouteResource_Create(t *testing.T) {
 				&netSDK.VpcsRoutesCreateResponse{ID: "route-123", Status: netSDK.RouteStatusPending}, nil)
 			mockSvc.On("Get", mock.Anything, "vpc-1", "route-123").Return(tt.routeFromAPI, nil)
 
-			r := &NetworkVpcsRouteResource{networkRoute: mockSvc}
+			r := &NetworkVpcsRouteResource{
+				networkRoute:    mockSvc,
+				pollingInterval: time.Millisecond,
+				pollingTimeout:  time.Second,
+			}
 
 			plan := tfsdk.Plan{Schema: routeTestSchema()}
 			plan.Set(context.Background(), tt.plan)
@@ -214,7 +219,11 @@ func TestNetworkVpcsRouteResource_Read(t *testing.T) {
 			mockSvc := &mockVpcsRoutesService{}
 			mockSvc.On("Get", mock.Anything, "vpc-1", "route-123").Return(tt.routeFromAPI, nil)
 
-			r := &NetworkVpcsRouteResource{networkRoute: mockSvc}
+			r := &NetworkVpcsRouteResource{
+				networkRoute:    mockSvc,
+				pollingInterval: time.Millisecond,
+				pollingTimeout:  time.Second,
+			}
 
 			state := tfsdk.State{Schema: routeTestSchema()}
 			state.Set(context.Background(), NetworkVpcsRouteModel{

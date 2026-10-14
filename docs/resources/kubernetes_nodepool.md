@@ -3,12 +3,12 @@
 page_title: "mgc_kubernetes_nodepool Resource - terraform-provider-mgc"
 subcategory: "Kubernetes"
 description: |-
-  An array representing a set of nodes within a Kubernetes cluster.
+  An array representing a set of nodes within a Kubernetes cluster. Provisioning time. Node pool creation is asynchronous: terraform apply blocks until the nodes reach the running state. The provider keeps waiting up to the default polling_timeout of 1h30 before giving up. This deadline is configurable on the provider block (polling_timeout = "2h"); the setting is global.
 ---
 
 # mgc_kubernetes_nodepool (Resource)
 
-An array representing a set of nodes within a Kubernetes cluster.
+An array representing a set of nodes within a Kubernetes cluster. **Provisioning time.** Node pool creation is asynchronous: `terraform apply` blocks until the nodes reach the `running` state. The provider keeps waiting up to the default `polling_timeout` of **1h30** before giving up. This deadline is configurable on the provider block (`polling_timeout = "2h"`); the setting is global.
 
 ## Example Usage
 

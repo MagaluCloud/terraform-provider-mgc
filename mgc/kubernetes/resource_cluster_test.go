@@ -6,20 +6,23 @@ import (
 	"time"
 
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
-	t.Run("should return nil for nil input", func(t *testing.T) {
-		result := convertSDKCreateResultToTerraformCreateClusterModel(nil)
-		assert.Nil(t, result)
-	})
+// flattenNewCluster flattens an SDK cluster onto an empty model, mirroring how
+// Read/Create build state for a freshly seen cluster (no prior tfData to carry).
+func flattenNewCluster(cluster *k8sSDK.Cluster) KubernetesClusterCreateResourceModel {
+	return flattenCluster(KubernetesClusterCreateResourceModel{}, *cluster)
+}
 
+func TestFlattenCluster(t *testing.T) {
 	t.Run("should handle minimal SDK input correctly", func(t *testing.T) {
 		sdkResult := &k8sSDK.Cluster{
 			ID:      "cluster-123",
@@ -27,9 +30,8 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Version: "1.28.0",
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+		result := flattenNewCluster(sdkResult)
 
-		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("cluster-123"), result.ID)
 		assert.Equal(t, types.StringValue("test-cluster"), result.Name)
 		assert.Equal(t, types.StringValue("1.28.0"), result.Version)
@@ -65,10 +67,9 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &[]string{"192.168.1.0/24", "10.0.0.0/8"},
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+		result := flattenNewCluster(sdkResult)
 		expectedTime := types.StringValue(now.Format(time.RFC3339))
 
-		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("cluster-456"), result.ID)
 		assert.Equal(t, types.StringValue("prod-cluster"), result.Name)
 		assert.Equal(t, types.StringValue("1.29.0"), result.Version)
@@ -80,9 +81,28 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 		assert.Equal(t, types.StringValue("10.244.0.0/16"), result.ClusterIPv4CIDR)
 		assert.Equal(t, types.StringValue("external"), result.MachineTypesSource)
 		assert.Equal(t, types.StringValue("2.1.0"), result.PlatformVersion)
-		assert.Len(t, result.AllowedCidrs, 2)
-		assert.Equal(t, types.StringValue("192.168.1.0/24"), result.AllowedCidrs[0])
-		assert.Equal(t, types.StringValue("10.0.0.0/8"), result.AllowedCidrs[1])
+		require.False(t, result.AllowedCidrs.IsNull())
+		assert.ElementsMatch(t, []attr.Value{
+			types.StringValue("192.168.1.0/24"),
+			types.StringValue("10.0.0.0/8"),
+		}, result.AllowedCidrs.Elements())
+	})
+
+	t.Run("should distinguish updated_at from created_at", func(t *testing.T) {
+		created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		updated := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+		sdkResult := &k8sSDK.Cluster{
+			ID:        "cluster-times",
+			Name:      "times-cluster",
+			Version:   "1.28.0",
+			CreatedAt: &created,
+			UpdatedAt: &updated,
+		}
+
+		result := flattenNewCluster(sdkResult)
+
+		assert.Equal(t, types.StringValue(created.Format(time.RFC3339)), result.CreatedAt)
+		assert.Equal(t, types.StringValue(updated.Format(time.RFC3339)), result.UpdatedAt)
 	})
 
 	t.Run("should handle machine types source internal", func(t *testing.T) {
@@ -94,9 +114,8 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			MachineTypesSource: &machineTypesSource,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+		result := flattenNewCluster(sdkResult)
 
-		assert.NotNil(t, result)
 		assert.Equal(t, types.StringValue("internal"), result.MachineTypesSource)
 	})
 
@@ -112,11 +131,10 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			AllowedCIDRs: &emptyCIDRs,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+		result := flattenNewCluster(sdkResult)
 
-		assert.NotNil(t, result)
 		assert.True(t, result.Description.IsNull())
-		assert.Nil(t, result.AllowedCidrs)
+		assert.True(t, result.AllowedCidrs.IsNull())
 	})
 
 	t.Run("should handle nil platform", func(t *testing.T) {
@@ -127,66 +145,128 @@ func TestConvertSDKCreateResultToTerraformCreateClusterModel(t *testing.T) {
 			Platform: nil,
 		}
 
-		result := convertSDKCreateResultToTerraformCreateClusterModel(sdkResult)
+		result := flattenNewCluster(sdkResult)
 
-		assert.NotNil(t, result)
 		assert.True(t, result.PlatformVersion.IsNull())
 	})
 }
 
-func TestConvertStringSliceToTypesStringSlice(t *testing.T) {
-	t.Run("should convert empty slice", func(t *testing.T) {
+func TestStringSliceToTypesSet(t *testing.T) {
+	t.Run("returns a null set for nil input", func(t *testing.T) {
+		result := utils.StringSliceToTypesSet(nil)
+		assert.True(t, result.IsNull())
+	})
+
+	t.Run("returns an empty (non-null) set for an empty slice", func(t *testing.T) {
 		input := []string{}
-		result := convertStringSliceToTypesStringSlice(input)
-		assert.Empty(t, result)
+		result := utils.StringSliceToTypesSet(&input)
+
+		assert.False(t, result.IsNull())
+		assert.Empty(t, result.Elements())
 	})
 
-	t.Run("should convert slice with values", func(t *testing.T) {
+	t.Run("converts values into a set of strings", func(t *testing.T) {
 		input := []string{"value1", "value2", "value3"}
-		result := convertStringSliceToTypesStringSlice(input)
+		result := utils.StringSliceToTypesSet(&input)
 
-		assert.Len(t, result, 3)
-		assert.Equal(t, types.StringValue("value1"), result[0])
-		assert.Equal(t, types.StringValue("value2"), result[1])
-		assert.Equal(t, types.StringValue("value3"), result[2])
-	})
-
-	t.Run("should handle slice with empty strings", func(t *testing.T) {
-		input := []string{"", "value", ""}
-		result := convertStringSliceToTypesStringSlice(input)
-
-		assert.Len(t, result, 3)
-		assert.Equal(t, types.StringValue(""), result[0])
-		assert.Equal(t, types.StringValue("value"), result[1])
-		assert.Equal(t, types.StringValue(""), result[2])
+		assert.ElementsMatch(t, []attr.Value{
+			types.StringValue("value1"),
+			types.StringValue("value2"),
+			types.StringValue("value3"),
+		}, result.Elements())
 	})
 }
 
-func TestCreateAllowedCidrs(t *testing.T) {
-	t.Run("should return nil for empty slice", func(t *testing.T) {
-		input := []types.String{}
-		result := createAllowedCidrs(input)
+func TestConvertTypeSetToStringArray(t *testing.T) {
+	t.Run("returns nil for a null set", func(t *testing.T) {
+		result := utils.ConvertTypeSetToStringArray(types.SetNull(types.StringType))
 		assert.Nil(t, result)
 	})
 
-	t.Run("should convert types.String slice to string slice", func(t *testing.T) {
-		input := []types.String{
+	t.Run("returns nil for an unknown set", func(t *testing.T) {
+		result := utils.ConvertTypeSetToStringArray(types.SetUnknown(types.StringType))
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns an empty slice for an empty set", func(t *testing.T) {
+		result := utils.ConvertTypeSetToStringArray(types.SetValueMust(types.StringType, []attr.Value{}))
+
+		require.NotNil(t, result)
+		assert.Empty(t, *result)
+	})
+
+	t.Run("converts a populated set into a string slice", func(t *testing.T) {
+		set := types.SetValueMust(types.StringType, []attr.Value{
 			types.StringValue("192.168.1.0/24"),
 			types.StringValue("10.0.0.0/8"),
-		}
-		result := createAllowedCidrs(input)
+		})
+		result := utils.ConvertTypeSetToStringArray(set)
 
-		assert.NotNil(t, result)
-		assert.Len(t, *result, 2)
-		assert.Equal(t, "192.168.1.0/24", (*result)[0])
-		assert.Equal(t, "10.0.0.0/8", (*result)[1])
+		require.NotNil(t, result)
+		assert.ElementsMatch(t, []string{"192.168.1.0/24", "10.0.0.0/8"}, *result)
 	})
+}
 
-	t.Run("should handle nil input", func(t *testing.T) {
-		var input []types.String
-		result := createAllowedCidrs(input)
-		assert.Nil(t, result)
-	})
+func TestBuildPatchClusterRequest(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    types.Set
+		plan     types.Set
+		expected *[]string
+	}{
+		{
+			name:     "unchanged cidrs are not resent when another field changes",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			expected: nil,
+		},
+		{
+			name:     "reordered cidrs are the same set and are not resent",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"10.0.0.0/16", "192.168.0.0/24"}),
+			expected: nil,
+		},
+		{
+			name:     "changed cidrs send the planned list",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24"}),
+			plan:     utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24", "10.0.0.0/16"}),
+			expected: &[]string{"192.168.0.0/24", "10.0.0.0/16"},
+		},
+		{
+			name:     "removed cidrs send an empty list to clear them",
+			state:    utils.StringSliceToTypesSet(&[]string{"192.168.0.0/24"}),
+			plan:     types.SetNull(types.StringType),
+			expected: &[]string{},
+		},
+		{
+			name:     "going from an empty list to null still sends an empty list",
+			state:    utils.StringSliceToTypesSet(&[]string{}),
+			plan:     types.SetNull(types.StringType),
+			expected: &[]string{},
+		},
+		{
+			name:     "null on both sides sends nothing",
+			state:    types.SetNull(types.StringType),
+			plan:     types.SetNull(types.StringType),
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			patch := buildPatchClusterRequest(
+				KubernetesClusterCreateResourceModel{AllowedCidrs: tc.state, Description: types.StringValue("old")},
+				KubernetesClusterCreateResourceModel{AllowedCidrs: tc.plan, Description: types.StringValue("new")},
+			)
+
+			if tc.expected == nil {
+				assert.Nil(t, patch.AllowedCIDRs)
+				return
+			}
+			require.NotNil(t, patch.AllowedCIDRs)
+			assert.ElementsMatch(t, *tc.expected, *patch.AllowedCIDRs)
+		})
+	}
 }
 
 func TestClusterResourceValidation(t *testing.T) {
@@ -212,7 +292,7 @@ func TestClusterResourceValidation(t *testing.T) {
 		}
 
 		// Convert to Terraform model
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
+		tfModel := flattenNewCluster(sdkCluster)
 
 		// Validate all new fields are correctly mapped
 		assert.Equal(t, types.StringValue("us-east-1"), tfModel.Region)
@@ -232,7 +312,7 @@ func TestClusterResourceValidation(t *testing.T) {
 			// All optional fields are nil
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
+		tfModel := flattenNewCluster(sdkCluster)
 
 		// All new optional fields should be null
 		assert.True(t, tfModel.Region.IsNull())
@@ -272,7 +352,7 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 					MachineTypesSource: &tc.enumValue,
 				}
 
-				tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
+				tfModel := flattenNewCluster(sdkCluster)
 				assert.Equal(t, types.StringValue(tc.expected), tfModel.MachineTypesSource)
 			})
 		}
@@ -282,6 +362,18 @@ func TestMachineTypesSourceEnum(t *testing.T) {
 func TestCreateKubernetesSDKNetworkRequest(t *testing.T) {
 	t.Run("returns nil when the configured set is null so the API uses the default VPC", func(t *testing.T) {
 		request := CreateKubernetesSDKNetworkRequest(types.SetNull(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("returns nil when the set is unknown, as it is on a create that omits subnet_ids", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetUnknown(types.StringType))
+
+		assert.Nil(t, request)
+	})
+
+	t.Run("returns nil for an empty set, since a cluster cannot run on no subnet", func(t *testing.T) {
+		request := CreateKubernetesSDKNetworkRequest(types.SetValueMust(types.StringType, []attr.Value{}))
 
 		assert.Nil(t, request)
 	})
@@ -354,7 +446,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &zeroTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
+		tfModel := flattenNewCluster(sdkCluster)
 
 		// Should handle zero time gracefully
 		assert.False(t, tfModel.CreatedAt.IsNull())
@@ -371,7 +463,7 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 			UpdatedAt: &futureTime,
 		}
 
-		tfModel := convertSDKCreateResultToTerraformCreateClusterModel(sdkCluster)
+		tfModel := flattenNewCluster(sdkCluster)
 
 		expectedTime := types.StringValue(futureTime.Format(time.RFC3339))
 		assert.Equal(t, expectedTime, tfModel.CreatedAt)

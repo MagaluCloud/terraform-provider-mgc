@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	RoutePoolingTimeout = 100 * time.Minute
+	RoutePoolingTimeout         = 100 * time.Minute
+	defaultRoutePollingInterval = 30 * time.Second
 
 	// Target type values accepted by the routes API (TargetSchema.type).
 	routeTargetTypePortID     = "port_id"
@@ -45,7 +46,9 @@ type NetworkVpcsRouteModel struct {
 }
 
 type NetworkVpcsRouteResource struct {
-	networkRoute netSDK.VpcsRoutesService
+	networkRoute    netSDK.VpcsRoutesService
+	pollingInterval time.Duration
+	pollingTimeout  time.Duration
 }
 
 func NewNetworkVpcsRouteResource() resource.Resource {
@@ -67,6 +70,8 @@ func (r *NetworkVpcsRouteResource) Configure(ctx context.Context, req resource.C
 	}
 
 	r.networkRoute = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).VpcsRoutes()
+	r.pollingInterval = dataConfig.PollingIntervalOr(defaultRoutePollingInterval)
+	r.pollingTimeout = dataConfig.PollingTimeoutOr(RoutePoolingTimeout)
 }
 
 func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -247,8 +252,8 @@ func (r *NetworkVpcsRouteResource) WaitUntilRouteStatusMatches(ctx context.Conte
 	var result *netSDK.VpcsRoute
 	var err error
 
-	time.Sleep(5 * time.Second)
-	for startTime := time.Now(); time.Since(startTime) < RoutePoolingTimeout; {
+	for startTime := time.Now(); time.Since(startTime) < r.pollingTimeout; {
+		time.Sleep(r.pollingInterval)
 		result, err = r.networkRoute.Get(ctx, vpcID, routeID)
 		if err != nil {
 			return nil, err
@@ -264,7 +269,6 @@ func (r *NetworkVpcsRouteResource) WaitUntilRouteStatusMatches(ctx context.Conte
 		}
 
 		tflog.Debug(ctx, fmt.Sprintf("current route status: [%s]", status))
-		time.Sleep(30 * time.Second)
 	}
 
 	return result, errors.New("timeout waiting for route to provision")
