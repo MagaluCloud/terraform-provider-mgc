@@ -34,10 +34,6 @@ output "lbs_network_healthcheck" {
 - `id` (String) The Health Check ID.
 - `lb_id` (String) The Network Load Balancer ID.
 
-### Optional
-
-- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
-
 ### Read-Only
 
 - `description` (String) The description of the health check.

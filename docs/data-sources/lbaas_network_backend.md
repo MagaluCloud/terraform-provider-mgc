@@ -33,10 +33,6 @@ output "lbs_network_backends" {
 - `id` (String) The Backend ID.
 - `lb_id` (String) The Network Load Balancer ID.
 
-### Optional
-
-- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
-
 ### Read-Only
 
 - `balance_algorithm` (String) The load balancing algorithm.

@@ -18,9 +18,8 @@ Only these products are scoped by project:
 | Block Storage    | `mgc_block_storage_*` (except `mgc_block_storage_volume_types`)                               |
 | Virtual Machines | `mgc_virtual_machine_*` (except `mgc_virtual_machine_images` and `mgc_virtual_machine_types`) |
 | Kubernetes       | `mgc_kubernetes_*` (except `mgc_kubernetes_flavor` and `mgc_kubernetes_version`)              |
-| Load Balancer    | `mgc_lbaas_*`                                                                                 |
 
-Other products, such as networks, SSH keys, databases and container registries, belong to the tenant and have no `project_id`. A virtual machine in a project can use a VPC, subnet or SSH key normally.
+Other products, such as networks, load balancers, SSH keys, databases and container registries, belong to the tenant and have no `project_id`. A virtual machine in a project can use a VPC, subnet or SSH key normally.
 
 ## Creating resources in a project
 

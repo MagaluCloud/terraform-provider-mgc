@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	lbSDK "github.com/MagaluCloud/mgc-sdk-go/lbaas"
-	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -44,7 +43,6 @@ func (r *DataSourceLbaasNetworkHealthChecks) Schema(_ context.Context, _ datasou
 	resp.Schema = schema.Schema{
 		Description: experimentalWarning + "List Health Checks for a Network Load Balancer.",
 		Attributes: map[string]schema.Attribute{
-			"project_id": project.DataSourceAttribute(),
 			"lb_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The Network Load Balancer ID.",
@@ -112,25 +110,22 @@ func (r *DataSourceLbaasNetworkHealthChecks) Schema(_ context.Context, _ datasou
 type healthCheckListState struct {
 	LBID         types.String       `tfsdk:"lb_id"`
 	HealthChecks []HealthCheckModel `tfsdk:"health_checks"`
-	ProjectID    types.String       `tfsdk:"project_id"`
 }
 
 func (r *DataSourceLbaasNetworkHealthChecks) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var lbID, projectID types.String
+	var lbID types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("lb_id"), &lbID)...)
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("project_id"), &projectID)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	lb, err := r.lbNetworkHeathCheck.ListAll(ctx, project.CallOptions(projectID), lbID.ValueString())
+	lb, err := r.lbNetworkHeathCheck.ListAll(ctx, lbID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(project.ParseSDKError(err, projectID))
+		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
 	state := healthCheckListState{
-		ProjectID:    projectID,
 		LBID:         lbID,
 		HealthChecks: make([]HealthCheckModel, 0, len(lb)),
 	}

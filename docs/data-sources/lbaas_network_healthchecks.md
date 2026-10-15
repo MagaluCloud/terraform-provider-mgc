@@ -32,10 +32,6 @@ output "lbs_network_healthchecks" {
 
 - `lb_id` (String) The Network Load Balancer ID.
 
-### Optional
-
-- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
-
 ### Read-Only
 
 - `health_checks` (Attributes List) List of health checks. (see [below for nested schema](#nestedatt--health_checks))

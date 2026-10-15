@@ -32,10 +32,6 @@ output "basic_http_lb_output" {
 
 - `id` (String) The unique identifier of the load balancer.
 
-### Optional
-
-- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
-
 ### Read-Only
 
 - `acls` (Attributes List) Access Control Lists for the load balancer. (see [below for nested schema](#nestedatt--acls))
