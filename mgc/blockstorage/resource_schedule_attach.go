@@ -178,7 +178,7 @@ func (r *bsScheduleAttach) ImportState(ctx context.Context, req resource.ImportS
 		}
 		input := strings.Split(parsed.ID, ",")
 		if len(input) != 2 {
-			resp.Diagnostics.AddError("Invalid ID", "ID must be in the format [project/{project_id}/]schedule_id,volume_id")
+			resp.Diagnostics.AddError("Invalid ID", "ID must be in the format [project/{project_id}/resource/]schedule_id,volume_id")
 			return
 		}
 		identity = scheduleAttachIdentityModel{

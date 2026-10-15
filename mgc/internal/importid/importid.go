@@ -24,14 +24,21 @@ func (p Parsed) Value(ns Namespace) types.String {
 	return types.StringNull()
 }
 
+// resourceKey names the pair that carries the resource id; it always closes
+// the import ID, after any namespace pairs.
+const resourceKey = "resource"
+
 func Parse(raw string, accepted ...Namespace) (Parsed, error) {
 	segments := strings.Split(raw, "/")
-	id := segments[len(segments)-1]
-	pairs := segments[:len(segments)-1]
-
-	if len(pairs)%2 != 0 {
-		return Parsed{}, fmt.Errorf("invalid import ID %q: expected {id} optionally prefixed by namespace/value pairs, accepted namespaces: %s", raw, names(accepted))
+	if len(segments) == 1 {
+		segments = []string{resourceKey, raw}
 	}
+
+	last := len(segments) - 2
+	if len(segments)%2 != 0 || segments[last] != resourceKey {
+		return Parsed{}, fmt.Errorf("invalid import ID %q: expected {id} or namespace/value pairs ending in %s/{id}, accepted namespaces: %s", raw, resourceKey, names(accepted))
+	}
+	id, pairs := segments[last+1], segments[:last]
 	if id == "" {
 		return Parsed{}, fmt.Errorf("invalid import ID %q: empty resource id", raw)
 	}
@@ -40,6 +47,9 @@ func Parse(raw string, accepted ...Namespace) (Parsed, error) {
 	for i := 0; i < len(pairs); i += 2 {
 		name, value := pairs[i], pairs[i+1]
 
+		if name == resourceKey {
+			return Parsed{}, fmt.Errorf("invalid import ID %q: %q must be the last pair", raw, resourceKey)
+		}
 		ns, ok := find(accepted, name)
 		if !ok {
 			return Parsed{}, fmt.Errorf("invalid import ID %q: unknown namespace %q, accepted namespaces: %s", raw, name, names(accepted))

@@ -38,7 +38,7 @@ func TestResolveImport(t *testing.T) {
 		},
 		{
 			name:     "Import ID with project",
-			req:      resource.ImportStateRequest{ID: "project/" + testProjectID + "/abc-123"},
+			req:      resource.ImportStateRequest{ID: "project/" + testProjectID + "/resource/abc-123"},
 			expected: IdentityModel{ID: types.StringValue("abc-123"), ProjectID: types.StringValue(testProjectID)},
 		},
 		{

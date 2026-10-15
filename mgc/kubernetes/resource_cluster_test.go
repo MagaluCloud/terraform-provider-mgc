@@ -418,7 +418,7 @@ func TestClusterImportStateWithProject(t *testing.T) {
 	}{
 		{
 			name:            "Import ID with project",
-			req:             resource.ImportStateRequest{ID: "project/" + clusterTestProjectID + "/cluster-uuid"},
+			req:             resource.ImportStateRequest{ID: "project/" + clusterTestProjectID + "/resource/cluster-uuid"},
 			expectedProject: types.StringValue(clusterTestProjectID),
 		},
 		{
@@ -537,7 +537,7 @@ func TestClusterReadKeepsProject(t *testing.T) {
 		r.Read(ctx, resource.ReadRequest{State: current}, resp)
 
 		assert.True(t, resp.Diagnostics.HasError())
-		assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "project/{project_id}/{id}")
+		assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "project/{project_id}/resource/{id}")
 	})
 }
 

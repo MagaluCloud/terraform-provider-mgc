@@ -526,7 +526,7 @@ func TestNodePoolImportStateWithProject(t *testing.T) {
 	}{
 		{
 			name:            "Import ID with project",
-			req:             resource.ImportStateRequest{ID: "project/" + nodePoolTestProjectID + "/cluster-1,pool-1"},
+			req:             resource.ImportStateRequest{ID: "project/" + nodePoolTestProjectID + "/resource/cluster-1,pool-1"},
 			expectedProject: types.StringValue(nodePoolTestProjectID),
 		},
 		{
@@ -570,7 +570,12 @@ func TestNodePoolImportStateWithProject(t *testing.T) {
 		})
 	}
 
-	for _, raw := range []string{"project/" + nodePoolTestProjectID + "/pool-1", "cluster-1,pool-1,extra", "region/br-ne1/cluster-1,pool-1"} {
+	for _, raw := range []string{
+		"project/" + nodePoolTestProjectID + "/resource/pool-1",
+		"project/" + nodePoolTestProjectID + "/cluster-1,pool-1",
+		"cluster-1,pool-1,extra",
+		"region/br-ne1/resource/cluster-1,pool-1",
+	} {
 		t.Run("Rejects "+raw, func(t *testing.T) {
 			resp := newResp()
 			r.ImportState(ctx, resource.ImportStateRequest{ID: raw}, resp)

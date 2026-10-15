@@ -53,11 +53,11 @@ func TestIDValidator(t *testing.T) {
 }
 
 func TestNamespaceValidatesProjectID(t *testing.T) {
-	parsed, err := importid.Parse("project/"+testProjectID+"/abc-123", Namespace)
+	parsed, err := importid.Parse("project/"+testProjectID+"/resource/abc-123", Namespace)
 	assert.NoError(t, err)
 	assert.Equal(t, types.StringValue(testProjectID), parsed.Value(Namespace))
 
-	_, err = importid.Parse("project/my-project/abc-123", Namespace)
+	_, err = importid.Parse("project/my-project/resource/abc-123", Namespace)
 	assert.ErrorContains(t, err, "valid project ID")
 }
 
@@ -125,7 +125,7 @@ func TestParseSDKError(t *testing.T) {
 		projectID    types.String
 		expectedHint string
 	}{
-		{name: "Not found in the default project suggests a project", err: httpErr(http.StatusNotFound), projectID: types.StringNull(), expectedHint: "project/{project_id}/{id}"},
+		{name: "Not found in the default project suggests a project", err: httpErr(http.StatusNotFound), projectID: types.StringNull(), expectedHint: "project/{project_id}/resource/{id}"},
 		{name: "Not found in a project names the project", err: httpErr(http.StatusNotFound), projectID: types.StringValue(testProjectID), expectedHint: `project "` + testProjectID + `"`},
 		{name: "Other status codes are left untouched", err: httpErr(http.StatusInternalServerError), projectID: types.StringNull()},
 		{name: "Non HTTP errors are left untouched", err: &clientSDK.ValidationError{Field: "id", Message: "empty"}, projectID: types.StringNull()},

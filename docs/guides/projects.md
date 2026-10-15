@@ -65,18 +65,18 @@ data "mgc_kubernetes_cluster" "main" {
 
 ### With an import ID
 
-Prefix the ID with `project/{project_id}/`. An ID without the prefix is looked up in the default project.
+Use `project/{project_id}/resource/{id}`. A bare `{id}`, or `resource/{id}`, is looked up in the default project.
 
 ```shell
-terraform import mgc_kubernetes_cluster.main project/550e8400-e29b-41d4-a716-446655440000/ac9709ae-b298-41c6-bc58-92a6b8b92d8b
+terraform import mgc_kubernetes_cluster.main project/550e8400-e29b-41d4-a716-446655440000/resource/ac9709ae-b298-41c6-bc58-92a6b8b92d8b
 ```
 
-Resources imported with a composite ID keep their format after the prefix:
+Resources imported with a composite ID keep it, comma-separated, after `resource/`:
 
-| Resource                            | Import ID                                          |
-| ----------------------------------- | -------------------------------------------------- |
-| `mgc_kubernetes_nodepool`           | `project/{project_id}/{cluster_id},{node_pool_id}` |
-| `mgc_block_storage_schedule_attach` | `project/{project_id}/{schedule_id},{volume_id}`   |
+| Resource                            | Import ID                                                   |
+| ----------------------------------- | ----------------------------------------------------------- |
+| `mgc_kubernetes_nodepool`           | `project/{project_id}/resource/{cluster_id},{node_pool_id}` |
+| `mgc_block_storage_schedule_attach` | `project/{project_id}/resource/{schedule_id},{volume_id}`   |
 
 ### With an import block and identity
 
@@ -96,4 +96,4 @@ import {
 
 ## Troubleshooting
 
-When a resource is not found, the error names the project that was used. If a resource exists but is reported as missing, check that `project_id` matches the project it belongs to, or that the import ID includes the `project/{project_id}/` prefix.
+When a resource is not found, the error names the project that was used. If a resource exists but is reported as missing, check that `project_id` matches the project it belongs to, or that the import ID has the form `project/{project_id}/resource/{id}`.

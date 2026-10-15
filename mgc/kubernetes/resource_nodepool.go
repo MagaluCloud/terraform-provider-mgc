@@ -466,7 +466,7 @@ func (r *NewNodePoolResource) ImportState(ctx context.Context, req resource.Impo
 		}
 		ids := strings.Split(parsed.ID, ",")
 		if len(ids) != 2 {
-			resp.Diagnostics.AddError("Invalid import ID", "Expected format: [project/{project_id}/]cluster_id,node_pool_id")
+			resp.Diagnostics.AddError("Invalid import ID", "Expected format: [project/{project_id}/resource/]cluster_id,node_pool_id")
 			return
 		}
 		identity = nodePoolIdentityModel{

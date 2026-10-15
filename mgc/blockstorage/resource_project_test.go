@@ -143,7 +143,7 @@ func TestBlockStorageImportStateWithProject(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := importResp(t, tc.r)
-			tc.r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/abc-1"}, resp)
+			tc.r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/resource/abc-1"}, resp)
 			assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
 
 			assert.Equal(t, types.StringValue("abc-1"), attribute(resp, "id"))
@@ -159,7 +159,7 @@ func TestBlockStorageImportStateWithProject(t *testing.T) {
 		r := &bsScheduleAttach{}
 
 		resp := importResp(t, r)
-		r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/sch-1,vol-1"}, resp)
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/resource/sch-1,vol-1"}, resp)
 		assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
 		assert.Equal(t, types.StringValue("sch-1"), attribute(resp, "schedule_id"))
 		assert.Equal(t, types.StringValue("vol-1"), attribute(resp, "volume_id"))
@@ -183,7 +183,7 @@ func TestBlockStorageImportStateWithProject(t *testing.T) {
 		assert.Equal(t, types.StringNull(), attribute(resp, "project_id"))
 
 		resp = importResp(t, r)
-		r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/sch-1"}, resp)
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + bsTestProjectID + "/resource/sch-1"}, resp)
 		assert.True(t, resp.Diagnostics.HasError())
 	})
 }

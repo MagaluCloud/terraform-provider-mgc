@@ -35,58 +35,89 @@ func TestParse(t *testing.T) {
 			expectedProject: types.StringNull(),
 		},
 		{
+			name:            "Explicit resource without namespaces",
+			raw:             "resource/abc-123",
+			accepted:        []Namespace{testProject},
+			expectedID:      "abc-123",
+			expectedProject: types.StringNull(),
+		},
+		{
 			name:            "Accepted namespace",
-			raw:             "project/p-1/abc-123",
+			raw:             "project/p-1/resource/abc-123",
 			accepted:        []Namespace{testProject},
 			expectedID:      "abc-123",
 			expectedProject: types.StringValue("p-1"),
 		},
 		{
 			name:            "Composite resource id is kept whole",
-			raw:             "project/p-1/cluster-1,pool-1",
+			raw:             "project/p-1/resource/cluster-1,pool-1",
 			accepted:        []Namespace{testProject},
 			expectedID:      "cluster-1,pool-1",
 			expectedProject: types.StringValue("p-1"),
 		},
 		{
-			name:          "Namespace without an id",
+			name:          "Namespace followed by a bare id",
+			raw:           "project/p-1/abc-123",
+			accepted:      []Namespace{testProject},
+			expectedError: "resource/{id}",
+		},
+		{
+			name:          "Namespace without resource",
 			raw:           "project/p-1",
 			accepted:      []Namespace{testProject},
-			expectedError: "accepted namespaces: project",
+			expectedError: "resource/{id}",
+		},
+		{
+			name:          "Resource must be the last pair",
+			raw:           "resource/abc-123/project/p-1",
+			accepted:      []Namespace{testProject},
+			expectedError: "resource/{id}",
+		},
+		{
+			name:          "Resource repeated before the last pair",
+			raw:           "resource/x/resource/abc-123",
+			accepted:      []Namespace{testProject},
+			expectedError: `"resource" must be the last pair`,
+		},
+		{
+			name:          "Leading slash",
+			raw:           "/project/p-1/resource/abc-123",
+			accepted:      []Namespace{testProject},
+			expectedError: "resource/{id}",
 		},
 		{
 			name:          "Namespace not accepted by this resource fails closed",
-			raw:           "region/br-ne1/abc-123",
+			raw:           "region/br-ne1/resource/abc-123",
 			accepted:      []Namespace{testProject},
 			expectedError: `unknown namespace "region"`,
 		},
 		{
 			name:          "No namespaces accepted",
-			raw:           "project/p-1/abc-123",
+			raw:           "project/p-1/resource/abc-123",
 			accepted:      nil,
 			expectedError: "accepted namespaces: none",
 		},
 		{
 			name:          "Repeated namespace",
-			raw:           "project/p-1/project/p-2/abc-123",
+			raw:           "project/p-1/project/p-2/resource/abc-123",
 			accepted:      []Namespace{testProject},
 			expectedError: `namespace "project" repeated`,
 		},
 		{
 			name:          "Value rejected by the namespace",
-			raw:           "project/bad/abc-123",
+			raw:           "project/bad/resource/abc-123",
 			accepted:      []Namespace{testProject},
 			expectedError: "bad project",
 		},
 		{
 			name:          "Empty namespace value",
-			raw:           "project//abc-123",
+			raw:           "project//resource/abc-123",
 			accepted:      []Namespace{testProject},
 			expectedError: `namespace "project" has no value`,
 		},
 		{
-			name:          "Empty id",
-			raw:           "project/p-1/",
+			name:          "Empty id after resource",
+			raw:           "project/p-1/resource/",
 			accepted:      []Namespace{testProject},
 			expectedError: "empty resource id",
 		},
@@ -115,7 +146,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseSeveralNamespacesInAnyOrder(t *testing.T) {
-	for _, raw := range []string{"project/p-1/region/br-ne1/abc-123", "region/br-ne1/project/p-1/abc-123"} {
+	for _, raw := range []string{"project/p-1/region/br-ne1/resource/abc-123", "region/br-ne1/project/p-1/resource/abc-123"} {
 		t.Run(raw, func(t *testing.T) {
 			parsed, err := Parse(raw, testProject, testRegion)
 

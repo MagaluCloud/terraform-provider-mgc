@@ -125,7 +125,7 @@ func TestVmInstancesImportStateWithProject(t *testing.T) {
 		State:    tfsdk.State{Schema: s.Schema, Raw: tftypes.NewValue(s.Schema.Type().TerraformType(ctx), nil)},
 		Identity: &tfsdk.ResourceIdentity{Schema: i.IdentitySchema, Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), nil)},
 	}
-	r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + vmTestProjectID + "/inst-1"}, resp)
+	r.ImportState(ctx, resource.ImportStateRequest{ID: "project/" + vmTestProjectID + "/resource/inst-1"}, resp)
 	assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
 
 	var id, projectID types.String

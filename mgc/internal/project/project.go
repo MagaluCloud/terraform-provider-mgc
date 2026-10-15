@@ -78,7 +78,7 @@ func ParseSDKError(err error, projectID types.String) (msg, detail string) {
 
 	if projectID.IsNull() || projectID.IsUnknown() || strings.TrimSpace(projectID.ValueString()) == "" {
 		return msg, detail + "\n\nThe resource was not found in the tenant's default project. " +
-			"If it belongs to a project, set project_id, or import it as project/{project_id}/{id}."
+			"If it belongs to a project, set project_id, or import it as project/{project_id}/resource/{id}."
 	}
 	return msg, detail + fmt.Sprintf("\n\nThe resource was not found in project %q. "+
 		"Check that project_id is the project the resource belongs to.", projectID.ValueString())
