@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -24,28 +25,28 @@ type mockInstanceService struct {
 	computeSdk.InstanceService
 }
 
-func (m *mockInstanceService) Get(ctx context.Context, id string, expand []computeSdk.InstanceExpand) (*computeSdk.Instance, error) {
+func (m *mockInstanceService) Get(ctx context.Context, _ clientSDK.CallOptions, id string, expand []computeSdk.InstanceExpand) (*computeSdk.Instance, error) {
 	args := m.Called(ctx, id, expand)
 	res, _ := args.Get(0).(*computeSdk.Instance)
 	return res, args.Error(1)
 }
 
-func (m *mockInstanceService) Create(ctx context.Context, req computeSdk.CreateRequest) (string, error) {
+func (m *mockInstanceService) Create(ctx context.Context, _ clientSDK.CallOptions, req computeSdk.CreateRequest) (string, error) {
 	args := m.Called(ctx, req)
 	return args.String(0), args.Error(1)
 }
 
-func (m *mockInstanceService) Delete(ctx context.Context, id string, deletePublicIP bool) error {
+func (m *mockInstanceService) Delete(ctx context.Context, _ clientSDK.CallOptions, id string, deletePublicIP bool) error {
 	args := m.Called(ctx, id, deletePublicIP)
 	return args.Error(0)
 }
 
-func (m *mockInstanceService) Rename(ctx context.Context, id string, newName string) error {
+func (m *mockInstanceService) Rename(ctx context.Context, _ clientSDK.CallOptions, id string, newName string) error {
 	args := m.Called(ctx, id, newName)
 	return args.Error(0)
 }
 
-func (m *mockInstanceService) Retype(ctx context.Context, id string, req computeSdk.RetypeRequest) error {
+func (m *mockInstanceService) Retype(ctx context.Context, _ clientSDK.CallOptions, id string, req computeSdk.RetypeRequest) error {
 	args := m.Called(ctx, id, req)
 	return args.Error(0)
 }
@@ -412,7 +413,7 @@ func TestVirtualMachineInstancesResource_Delete_ErrorPropagation(t *testing.T) {
 	// Test that SDK errors are propagated
 	mockInst.On("Delete", mock.Anything, "vm-err", false).Return(errors.New("api error"))
 
-	err := mockInst.Delete(context.Background(), "vm-err", false)
+	err := mockInst.Delete(context.Background(), clientSDK.CallOptions{}, "vm-err", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "api error")
@@ -472,7 +473,7 @@ func TestVirtualMachineInstancesResource_Read_ExpectsID(t *testing.T) {
 	inst := buildTestInstance("vm-read", "test", "completed", "10.0.0.1", nil, "")
 	mockInst.On("Get", mock.Anything, "vm-read", imageExpands).Return(inst, nil)
 
-	result, err := r.vmInstances.Get(context.Background(), "vm-read", imageExpands)
+	result, err := r.vmInstances.Get(context.Background(), clientSDK.CallOptions{}, "vm-read", imageExpands)
 
 	require.NoError(t, err)
 	require.NotNil(t, result)

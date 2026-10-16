@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -14,6 +15,7 @@ import (
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -93,12 +95,14 @@ type bsVolumesResourceModel struct {
 	Size             types.Int64  `tfsdk:"size"`
 	Type             types.String `tfsdk:"type"`
 	Encrypted        types.Bool   `tfsdk:"encrypted"`
+	ProjectID        types.String `tfsdk:"project_id"`
 }
 
 func (r *bsVolumes) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Block storage volumes are storage devices that can be attached to virtual machines. They are used to store data and can be detached and attached to other virtual machines.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the volume.",
 				PlanModifiers: []planmodifier.String{
@@ -161,14 +165,15 @@ func (r *bsVolumes) Read(ctx context.Context, req resource.ReadRequest, resp *re
 	plan := &bsVolumesResourceModel{}
 	resp.Diagnostics.Append(req.State.Get(ctx, &plan)...)
 
-	getResult, err := r.bsVolumes.Get(ctx, plan.ID.ValueString(), []string{storageSDK.VolumeTypeExpand})
+	getResult, err := r.bsVolumes.Get(ctx, project.CallOptions(plan.ProjectID), plan.ID.ValueString(), []string{storageSDK.VolumeTypeExpand})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, plan.ProjectID))
 		return
 	}
 
-	convertedResult := r.toTerraformModel(*getResult, plan.SnapshotID.ValueStringPointer())
+	convertedResult := r.toTerraformModel(*getResult, plan.SnapshotID.ValueStringPointer(), plan.ProjectID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, convertedResult.ID, convertedResult.ProjectID)...)
 }
 
 func (r *bsVolumes) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -195,18 +200,20 @@ func (r *bsVolumes) Create(ctx context.Context, req resource.CreateRequest, resp
 		createParam.AvailabilityZone = state.AvailabilityZone.ValueStringPointer()
 	}
 
-	createResult, err := r.bsVolumes.Create(ctx, createParam)
+	callOpts := project.CallOptions(state.ProjectID)
+	createResult, err := r.bsVolumes.Create(ctx, callOpts, createParam)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	getResult, err := r.waitUntilVolumeStatusMatches(ctx, createResult, Completed)
+	getResult, err := r.waitUntilVolumeStatusMatches(ctx, callOpts, createResult, Completed)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	convertedResult := r.toTerraformModel(*getResult, state.SnapshotID.ValueStringPointer())
+	convertedResult := r.toTerraformModel(*getResult, state.SnapshotID.ValueStringPointer(), state.ProjectID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, convertedResult.ID, convertedResult.ProjectID)...)
 }
 
 func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -219,13 +226,15 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 		return
 	}
 
+	callOpts := project.CallOptions(state.ProjectID)
+
 	if planData.Name.ValueString() != state.Name.ValueString() {
-		err := r.bsVolumes.Rename(ctx, planData.ID.ValueString(), planData.Name.ValueString())
+		err := r.bsVolumes.Rename(ctx, callOpts, planData.ID.ValueString(), planData.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
+		_, err = r.waitUntilVolumeStatusMatches(ctx, callOpts, state.ID.ValueString(), Completed)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -233,7 +242,7 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 	}
 
 	if planData.Type.ValueString() != state.Type.ValueString() {
-		err := r.bsVolumes.Retype(ctx, planData.ID.ValueString(), storageSDK.RetypeVolumeRequest{
+		err := r.bsVolumes.Retype(ctx, callOpts, planData.ID.ValueString(), storageSDK.RetypeVolumeRequest{
 			NewType: storageSDK.IDOrName{
 				Name: planData.Type.ValueStringPointer(),
 			},
@@ -242,7 +251,7 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
+		_, err = r.waitUntilVolumeStatusMatches(ctx, callOpts, state.ID.ValueString(), Completed)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -250,14 +259,14 @@ func (r *bsVolumes) Update(ctx context.Context, req resource.UpdateRequest, resp
 	}
 
 	if planData.Size.ValueInt64() != state.Size.ValueInt64() {
-		err := r.bsVolumes.Extend(ctx, planData.ID.ValueString(), storageSDK.ExtendVolumeRequest{
+		err := r.bsVolumes.Extend(ctx, callOpts, planData.ID.ValueString(), storageSDK.ExtendVolumeRequest{
 			Size: int(planData.Size.ValueInt64()),
 		})
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
-		_, err = r.waitUntilVolumeStatusMatches(ctx, state.ID.ValueString(), Completed)
+		_, err = r.waitUntilVolumeStatusMatches(ctx, callOpts, state.ID.ValueString(), Completed)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -274,18 +283,29 @@ func (r *bsVolumes) Delete(ctx context.Context, req resource.DeleteRequest, resp
 		return
 	}
 
-	err := r.bsVolumes.Delete(ctx, data.ID.ValueString())
+	err := r.bsVolumes.Delete(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 	}
 }
 
-func (r *bsVolumes) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	data := &bsVolumesResourceModel{ID: types.StringValue(req.ID)}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+func (r *bsVolumes) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = project.IdentitySchema()
 }
 
-func (r *bsVolumes) toTerraformModel(volume storageSDK.Volume, snapshotId *string) bsVolumesResourceModel {
+func (r *bsVolumes) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	target, diags := project.ResolveImport(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	data := &bsVolumesResourceModel{ID: target.ID, ProjectID: target.ProjectID}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, target.ID, target.ProjectID)...)
+}
+
+func (r *bsVolumes) toTerraformModel(volume storageSDK.Volume, snapshotId *string, projectID types.String) bsVolumesResourceModel {
 	return bsVolumesResourceModel{
 		ID:               types.StringValue(volume.ID),
 		Name:             types.StringValue(volume.Name),
@@ -295,10 +315,11 @@ func (r *bsVolumes) toTerraformModel(volume storageSDK.Volume, snapshotId *strin
 		Type:             types.StringPointerValue(volume.Type.Name),
 		SnapshotID:       types.StringPointerValue(snapshotId),
 		Encrypted:        types.BoolPointerValue(volume.Encrypted),
+		ProjectID:        projectID,
 	}
 }
 
-func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID string, status VolumeStatus) (*storageSDK.Volume, error) {
+func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, callOpts clientSDK.CallOptions, volumeID string, status VolumeStatus) (*storageSDK.Volume, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, BsVolumeStatusTimeout)
 	defer cancel()
 
@@ -307,7 +328,7 @@ func (r *bsVolumes) waitUntilVolumeStatusMatches(ctx context.Context, volumeID s
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for volume %s to reach status %s", volumeID, status)
 		case <-time.After(10 * time.Second):
-			volume, err := r.bsVolumes.Get(ctx, volumeID, []string{storageSDK.VolumeTypeExpand})
+			volume, err := r.bsVolumes.Get(ctx, callOpts, volumeID, []string{storageSDK.VolumeTypeExpand})
 			if err != nil {
 				return nil, err
 			}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -15,6 +16,7 @@ type NodesDataSourceModel struct {
 	ClusterID  types.String      `tfsdk:"cluster_id"`
 	NodepoolID types.String      `tfsdk:"nodepool_id"`
 	Nodes      []NodesResultFlat `tfsdk:"nodes"`
+	ProjectID  types.String      `tfsdk:"project_id"`
 }
 
 type NodesResultFlat struct {
@@ -71,6 +73,7 @@ func (d *DataSourceKubernetesNode) Schema(ctx context.Context, req datasource.Sc
 	resp.Schema = schema.Schema{
 		Description: "Data source for Kubernetes cluster in MGC",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"cluster_id": schema.StringAttribute{
 				Description: "ID of the cluster.",
 				Required:    true,
@@ -260,9 +263,9 @@ func (d *DataSourceKubernetesNode) Read(ctx context.Context, req datasource.Read
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	nodes, err := d.sdkClient.Nodes(ctx, data.ClusterID.ValueString(), data.NodepoolID.ValueString())
+	nodes, err := d.sdkClient.Nodes(ctx, project.CallOptions(data.ProjectID), data.ClusterID.ValueString(), data.NodepoolID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

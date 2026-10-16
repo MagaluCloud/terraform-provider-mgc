@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -27,6 +29,7 @@ type VolumeAttach struct {
 type VolumeAttachResourceModel struct {
 	BlockStorageID   types.String `tfsdk:"block_storage_id"`
 	VirtualMachineID types.String `tfsdk:"virtual_machine_id"`
+	ProjectID        types.String `tfsdk:"project_id"`
 }
 
 func NewVolumeAttachResource() resource.Resource {
@@ -54,6 +57,7 @@ func (r *VolumeAttach) Schema(ctx context.Context, req resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "A block storage volume attachment.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"block_storage_id": schema.StringAttribute{
 				Description: "The ID of the block storage volume to attach.",
 				Required:    true,
@@ -79,13 +83,14 @@ func (r *VolumeAttach) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	err := r.blockStorageVolumes.Attach(ctx, model.BlockStorageID.ValueString(), model.VirtualMachineID.ValueString())
+	callOpts := project.CallOptions(model.ProjectID)
+	err := r.blockStorageVolumes.Attach(ctx, callOpts, model.BlockStorageID.ValueString(), model.VirtualMachineID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
+	err = r.waitForVolumeAvailability(ctx, callOpts, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -101,9 +106,9 @@ func (r *VolumeAttach) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	result, err := r.blockStorageVolumes.Get(ctx, model.BlockStorageID.ValueString(), []string{storageSDK.VolumeAttachExpand})
+	result, err := r.blockStorageVolumes.Get(ctx, project.CallOptions(model.ProjectID), model.BlockStorageID.ValueString(), []string{storageSDK.VolumeAttachExpand})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, model.ProjectID))
 		return
 	}
 
@@ -129,23 +134,24 @@ func (r *VolumeAttach) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.blockStorageVolumes.Detach(ctx, model.BlockStorageID.ValueString())
+	callOpts := project.CallOptions(model.ProjectID)
+	err := r.blockStorageVolumes.Detach(ctx, callOpts, model.BlockStorageID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	err = r.waitForVolumeAvailability(ctx, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
+	err = r.waitForVolumeAvailability(ctx, callOpts, model.BlockStorageID.ValueString(), AttachVolumeCompletedStatus)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 }
 
-func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, volumeID string, expectedStatus string) (err error) {
+func (r *VolumeAttach) waitForVolumeAvailability(ctx context.Context, callOpts clientSDK.CallOptions, volumeID string, expectedStatus string) (err error) {
 	for startTime := time.Now(); time.Since(startTime) < AttachVolumeTimeout; {
 		time.Sleep(10 * time.Second)
-		getResult, err := r.blockStorageVolumes.Get(ctx, volumeID, []string{})
+		getResult, err := r.blockStorageVolumes.Get(ctx, callOpts, volumeID, []string{})
 		if err != nil {
 			return err
 		}

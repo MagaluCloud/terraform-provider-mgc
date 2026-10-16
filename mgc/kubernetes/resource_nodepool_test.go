@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -22,10 +24,12 @@ import (
 
 type mockNodePoolService struct {
 	k8sSDK.NodePoolService
-	GetFunc func(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error)
+	GetFunc     func(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error)
+	gotCallOpts clientSDK.CallOptions
 }
 
-func (m *mockNodePoolService) Get(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error) {
+func (m *mockNodePoolService) Get(ctx context.Context, callOpts clientSDK.CallOptions, clusterID, nodepoolID string) (*k8sSDK.NodePool, error) {
+	m.gotCallOpts = callOpts
 	if m.GetFunc != nil {
 		return m.GetFunc(ctx, clusterID, nodepoolID)
 	}
@@ -47,7 +51,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.NoError(t, err)
 	})
 
@@ -68,7 +72,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.NoError(t, err)
 	})
 
@@ -82,7 +86,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "timeout waiting for node pool")
 	})
@@ -109,7 +113,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, newVersion, testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, newVersion, testTimeout, testInterval)
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, callCount, 3)
 	})
@@ -126,7 +130,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "v1.31.0", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, "v1.31.0", testTimeout, testInterval)
 		assert.Error(t, err)
 	})
 
@@ -139,7 +143,7 @@ func TestWaitNodePoolState(t *testing.T) {
 		}
 		r := &NewNodePoolResource{sdkNodepool: mockSvc}
 
-		err := r.waitNodePoolState(ctx, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
+		err := r.waitNodePoolState(ctx, clientSDK.CallOptions{}, "np-id", "cluster-id", NodepoolRunningState, "", testTimeout, testInterval)
 		assert.Error(t, err)
 		assert.Equal(t, expectedErr, err)
 	})
@@ -482,4 +486,100 @@ func TestNodePoolSchemaLabelsPlanModifiers(t *testing.T) {
 		assert.True(t, hasRequiresReplace)
 		assert.True(t, hasUseStateForUnknown)
 	})
+}
+
+const nodePoolTestProjectID = "550e8400-e29b-41d4-a716-446655440000"
+
+func TestWaitNodePoolStatePassesScope(t *testing.T) {
+	mockSvc := &mockNodePoolService{
+		GetFunc: func(ctx context.Context, clusterID, nodepoolID string) (*k8sSDK.NodePool, error) {
+			return &k8sSDK.NodePool{Status: k8sSDK.Status{State: NodepoolRunningState}}, nil
+		},
+	}
+	r := &NewNodePoolResource{sdkNodepool: mockSvc}
+	callOpts := clientSDK.CallOptions{ProjectID: nodePoolTestProjectID}
+
+	err := r.waitNodePoolState(context.Background(), callOpts, "np-id", "cluster-id", NodepoolRunningState, "", 100*time.Millisecond, 10*time.Millisecond)
+
+	assert.NoError(t, err)
+	assert.Equal(t, callOpts, mockSvc.gotCallOpts)
+}
+
+func TestNodePoolImportStateWithProject(t *testing.T) {
+	ctx := context.Background()
+	r := &NewNodePoolResource{}
+
+	s := testutils.GetResourceTestSchema(t, r)
+	i := testutils.GetResourceTestIdentitySchema(t, r)
+
+	newResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State:    tfsdk.State{Schema: s.Schema, Raw: tftypes.NewValue(s.Schema.Type().TerraformType(ctx), nil)},
+			Identity: &tfsdk.ResourceIdentity{Schema: i.IdentitySchema, Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), nil)},
+		}
+	}
+
+	testCases := []struct {
+		name            string
+		req             resource.ImportStateRequest
+		expectedProject types.String
+	}{
+		{
+			name:            "Import ID with project",
+			req:             resource.ImportStateRequest{ID: "project/" + nodePoolTestProjectID + "/resource/cluster-1,pool-1"},
+			expectedProject: types.StringValue(nodePoolTestProjectID),
+		},
+		{
+			name:            "Import ID in the default project",
+			req:             resource.ImportStateRequest{ID: "cluster-1,pool-1"},
+			expectedProject: types.StringNull(),
+		},
+		{
+			name: "Identity with project",
+			req: resource.ImportStateRequest{Identity: &tfsdk.ResourceIdentity{
+				Schema: i.IdentitySchema,
+				Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), map[string]tftypes.Value{
+					"cluster_id": tftypes.NewValue(tftypes.String, "cluster-1"),
+					"id":         tftypes.NewValue(tftypes.String, "pool-1"),
+					"project_id": tftypes.NewValue(tftypes.String, nodePoolTestProjectID),
+				}),
+			}},
+			expectedProject: types.StringValue(nodePoolTestProjectID),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := newResp()
+			r.ImportState(ctx, tc.req, resp)
+			assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+
+			var clusterID, id, projectID types.String
+			assert.False(t, resp.State.GetAttribute(ctx, path.Root("cluster_id"), &clusterID).HasError())
+			assert.False(t, resp.State.GetAttribute(ctx, path.Root("id"), &id).HasError())
+			assert.False(t, resp.State.GetAttribute(ctx, path.Root("project_id"), &projectID).HasError())
+			assert.Equal(t, types.StringValue("cluster-1"), clusterID)
+			assert.Equal(t, types.StringValue("pool-1"), id)
+			assert.Equal(t, tc.expectedProject, projectID)
+
+			var identity nodePoolIdentityModel
+			assert.False(t, resp.Identity.Get(ctx, &identity).HasError())
+			assert.Equal(t, types.StringValue("cluster-1"), identity.ClusterID)
+			assert.Equal(t, types.StringValue("pool-1"), identity.ID)
+			assert.Equal(t, tc.expectedProject, identity.ProjectID)
+		})
+	}
+
+	for _, raw := range []string{
+		"project/" + nodePoolTestProjectID + "/resource/pool-1",
+		"project/" + nodePoolTestProjectID + "/cluster-1,pool-1",
+		"cluster-1,pool-1,extra",
+		"region/br-ne1/resource/cluster-1,pool-1",
+	} {
+		t.Run("Rejects "+raw, func(t *testing.T) {
+			resp := newResp()
+			r.ImportState(ctx, resource.ImportStateRequest{ID: raw}, resp)
+			assert.True(t, resp.Diagnostics.HasError())
+		})
+	}
 }
