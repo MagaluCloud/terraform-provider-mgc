@@ -38,3 +38,15 @@ func (v CidrValidator) Description(ctx context.Context) string {
 func (v CidrValidator) MarkdownDescription(ctx context.Context) string {
 	return "value must be a valid CIDR notation"
 }
+
+func IsNilOrZeroValue[T comparable](ptr *T) bool {
+	if ptr == nil {
+		return true
+	}
+	var z T
+	return *ptr == z
+}
+
+func IsSliceNilOrEmpty[T any](ptr *[]T) bool {
+	return ptr == nil || len(*ptr) == 0
+}
