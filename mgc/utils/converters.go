@@ -201,3 +201,23 @@ func ConvertTypeSetToStringArray(set types.Set) *[]string {
 		return i.ValueString(), true
 	})
 }
+
+func KnownStringPointer(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueStringPointer()
+}
+
+func StringSliceToTypesSet(input *[]string) types.Set {
+	if input == nil {
+		return types.SetNull(types.StringType)
+	}
+
+	values := make([]attr.Value, len(*input))
+	for i, v := range *input {
+		values[i] = types.StringValue(v)
+	}
+
+	return types.SetValueMust(types.StringType, values)
+}
