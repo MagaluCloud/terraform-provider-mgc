@@ -46,22 +46,24 @@ resource "mgc_dbaas_clusters" "my_cluster_no_parameter_group" {
 
 ### Required
 
-> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
-
-- `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Cannot be changed after creation.
-- `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Cannot be changed after creation.
 - `instance_type` (String) Compute and memory capacity of the cluster determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `name` (String) Name of the DBaaS cluster. Must be unique. Cannot be changed after creation.
-- `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database cluster. Must be at least 8 characters long.  Cannot be changed after creation.
-- `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database cluster. Must start with a letter and contain only alphanumeric characters.  Cannot be changed after creation.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `backup_retention_days` (Number) Number of days to retain automated backups (1-35 days). Default is 7 days.
 - `backup_start_at` (String) Time to initiate the daily backup in UTC (format: 'HH:MM:SS'). Default is '04:00:00'.
 - `deletion_protected` (Boolean) Deletion protected.
-- `parameter_group` (String) ID of the parameter group to associate with the cluster.  Cannot be changed after creation.
+- `engine_name` (String) Type of database engine to use (e.g., 'mysql', 'postgresql'). Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.
+- `engine_version` (String) Version of the database engine (e.g., '8.0', '13.3'). Must be compatible with the selected engine_name. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set), in which case it's populated from the source cluster. Cannot be changed after creation.
+- `parameter_group` (String) ID of the parameter group to associate with the cluster. Can be changed after creation.
+- `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master password for the database cluster. Must be at least 8 characters long. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set). Cannot be changed after creation.
+- `snapshot_id` (String) ID of the cluster snapshot to restore. Set together with 'source_cluster_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.
+- `source_cluster_id` (String) ID of an existing cluster whose snapshot will be restored into this new cluster. Set together with 'snapshot_id' to create this cluster from a snapshot instead of from scratch. Cannot be changed after creation.
+- `user` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Master username for the database cluster. Must start with a letter and contain only alphanumeric characters. Required unless restoring from a snapshot (i.e., when 'source_cluster_id'/'snapshot_id' are not set). Cannot be changed after creation.
 - `volume_type` (String) Type of the storage volume (e.g., 'CLOUD_NVME15K' or 'CLOUD_NVME20K'). Cannot be changed after creation.
 
 ### Read-Only
