@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const NetworkPoolingTimeout = 5 * time.Minute
+const NetworkPoolingTimeout = 15 * time.Minute
 
 type NetworkVPCModel struct {
 	Id          types.String `tfsdk:"id"`
@@ -111,7 +111,7 @@ func (r *NetworkVPCResource) Create(ctx context.Context, req resource.CreateRequ
 			return
 		}
 		tflog.Info(ctx, "VPC is not yet created, waiting for 10 seconds",
-			map[string]interface{}{"status": res.Status})
+			map[string]any{"status": res.Status})
 		time.Sleep(10 * time.Second)
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -214,6 +215,42 @@ func TestConvertTaintsNP(t *testing.T) {
 	})
 }
 
+func TestConvertLabelsToSDK(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("returns nil for a null map so labels are omitted from the request", func(t *testing.T) {
+		result := convertLabelsToSDK(ctx, types.MapNull(types.StringType))
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns nil for an unknown map", func(t *testing.T) {
+		result := convertLabelsToSDK(ctx, types.MapUnknown(types.StringType))
+		assert.Nil(t, result)
+	})
+
+	t.Run("returns an empty map when the customer sets no pairs", func(t *testing.T) {
+		empty, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		assert.False(t, diags.HasError())
+
+		result := convertLabelsToSDK(ctx, empty)
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("converts the customer-chosen key/value pairs", func(t *testing.T) {
+		labels := map[string]string{
+			"environment": "staging",
+			"team":        "devX",
+			"tier":        "backend",
+		}
+		tfMap, diags := types.MapValueFrom(ctx, types.StringType, labels)
+		assert.False(t, diags.HasError())
+
+		result := convertLabelsToSDK(ctx, tfMap)
+		assert.Equal(t, labels, result)
+	})
+}
+
 func TestGetSubnetIDs(t *testing.T) {
 	t.Run("a network's subnets are exposed as the set of their IDs", func(t *testing.T) {
 		network := &k8sSDK.Network{
@@ -403,6 +440,41 @@ func TestNodePoolSchemaMaxPodsPerNodePlanModifiers(t *testing.T) {
 				hasRequiresReplace = true
 			}
 			if reflect.TypeOf(modifier) == reflect.TypeOf(int64planmodifier.UseStateForUnknown()) {
+				hasUseStateForUnknown = true
+			}
+		}
+
+		assert.True(t, hasRequiresReplace)
+		assert.True(t, hasUseStateForUnknown)
+	})
+}
+
+func TestNodePoolSchemaLabelsPlanModifiers(t *testing.T) {
+	r := &NewNodePoolResource{}
+	resp := &resource.SchemaResponse{}
+
+	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	attrRaw, ok := resp.Schema.Attributes["labels"]
+	assert.True(t, ok)
+
+	attr, ok := attrRaw.(schema.MapAttribute)
+	assert.True(t, ok)
+
+	t.Run("labels is optional and computed so customers can set it at creation", func(t *testing.T) {
+		assert.True(t, attr.Optional)
+		assert.True(t, attr.Computed)
+	})
+
+	t.Run("changing labels forces replacement and unknown falls back to state", func(t *testing.T) {
+		hasRequiresReplace := false
+		hasUseStateForUnknown := false
+
+		for _, modifier := range attr.PlanModifiers {
+			if reflect.TypeOf(modifier) == reflect.TypeOf(mapplanmodifier.RequiresReplace()) {
+				hasRequiresReplace = true
+			}
+			if reflect.TypeOf(modifier) == reflect.TypeOf(mapplanmodifier.UseStateForUnknown()) {
 				hasUseStateForUnknown = true
 			}
 		}

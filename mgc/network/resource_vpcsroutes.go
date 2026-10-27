@@ -13,23 +13,30 @@ import (
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 const (
 	RoutePoolingTimeout = 100 * time.Minute
+
+	// Target type values accepted by the routes API (TargetSchema.type).
+	routeTargetTypePortID     = "port_id"
+	routeTargetTypeVpcPeering = "vpc_peering"
 )
 
 type NetworkVpcsRouteModel struct {
 	ID              types.String `tfsdk:"id"`
 	VpcID           types.String `tfsdk:"vpc_id"`
 	PortID          types.String `tfsdk:"port_id"`
+	PeeringID       types.String `tfsdk:"peering_id"`
 	CIDRDestination types.String `tfsdk:"cidr_destination"`
 	Description     types.String `tfsdk:"description"`
 	NextHop         types.String `tfsdk:"next_hop"`
@@ -64,28 +71,46 @@ func (r *NetworkVpcsRouteResource) Configure(ctx context.Context, req resource.C
 
 func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Network VPC Route",
+		Description: "Adds a route to a VPC's route table.\n\n" +
+			"To let two peered VPCs reach each other, create one route on each VPC with the " +
+			"destinations crossed: on each side set `peering_id` to the VPC peering and " +
+			"`cidr_destination` to the CIDR of a subnet in the other VPC.\n\n" +
+			"The peering must be in status `completed` before its routes take effect, and after a " +
+			"route is created it can take a few minutes before connectivity is actually available.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The ID of the route.",
 				Computed:    true,
 			},
 			"vpc_id": schema.StringAttribute{
-				Description: "ID of the VPC where this route is associated.",
+				Description: "ID of the VPC being configured (the source side) whose route table receives this route.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"port_id": schema.StringAttribute{
-				Description: "ID of the port used as the next hop for this route.",
-				Required:    true,
+				Description: "ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.",
+				Optional:    true,
+				Validators: []validator.String{
+					routeTargetExactlyOneOf(),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"peering_id": schema.StringAttribute{
+				Description: "ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.",
+				Optional:    true,
+				Validators: []validator.String{
+					routeTargetExactlyOneOf(),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"cidr_destination": schema.StringAttribute{
-				Description: "Destination CIDR block that defines the traffic matched by this route.",
+				Description: "Destination CIDR block matched by this route. For a peering route, use the CIDR of a subnet in the other VPC.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -101,7 +126,7 @@ func (r *NetworkVpcsRouteResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"next_hop": schema.StringAttribute{
-				Description: "Resolved next hop for the route, derived from the associated port.",
+				Description: "Resolved next hop for the route, derived from the target.",
 				Computed:    true,
 			},
 			"type": schema.StringAttribute{
@@ -126,9 +151,9 @@ func (r *NetworkVpcsRouteResource) Create(ctx context.Context, req resource.Crea
 	vpcID := data.VpcID.ValueString()
 
 	createdRoute, err := r.networkRoute.Create(ctx, vpcID, netSDK.VpcsRoutesCreateRequest{
-		PortID:          data.PortID.ValueString(),
 		CIDRDestination: data.CIDRDestination.ValueString(),
 		Description:     data.Description.ValueStringPointer(),
+		Targets:         routeTargets(data),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -253,7 +278,8 @@ func convertSDKRouteResultToTerraformNetworkVpcsRouteModel(sdkResult *netSDK.Vpc
 	tfModel := &NetworkVpcsRouteModel{
 		ID:              types.StringValue(sdkResult.ID),
 		VpcID:           types.StringValue(sdkResult.VpcID),
-		PortID:          types.StringValue(sdkResult.PortID),
+		PortID:          routeTargetOrNull(sdkResult.PortID),
+		PeeringID:       routeTargetOrNull(sdkResult.VPCPeeringID),
 		CIDRDestination: types.StringValue(sdkResult.CIDRDestination),
 		NextHop:         types.StringValue(sdkResult.NextHop),
 		Type:            types.StringValue(sdkResult.Type),
@@ -262,4 +288,33 @@ func convertSDKRouteResultToTerraformNetworkVpcsRouteModel(sdkResult *netSDK.Vpc
 	tfModel.Description = types.StringValue(sdkResult.Description)
 
 	return tfModel
+}
+
+// routeTargetExactlyOneOf ties the next-hop attributes together: the API takes
+// exactly one target per route. Each attribute carries it so the constraint is
+// visible on both, and the validator deduplicates the merged self path.
+func routeTargetExactlyOneOf() validator.String {
+	return stringvalidator.ExactlyOneOf(
+		path.MatchRoot("port_id"),
+		path.MatchRoot("peering_id"),
+	)
+}
+
+// routeTargets maps whichever next-hop attribute is set to the API target pair.
+// The schema guarantees exactly one of them is configured.
+func routeTargets(data NetworkVpcsRouteModel) netSDK.TargetsRequest {
+	if !data.PeeringID.IsNull() {
+		return netSDK.TargetsRequest{ID: data.PeeringID.ValueString(), Type: routeTargetTypeVpcPeering}
+	}
+	return netSDK.TargetsRequest{ID: data.PortID.ValueString(), Type: routeTargetTypePortID}
+}
+
+// routeTargetOrNull maps the SDK zero value back to null: the API answers with
+// the target fields flattened and the one that does not apply to the route
+// comes back null, which is also what the config holds.
+func routeTargetOrNull(id string) types.String {
+	if id == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(id)
 }

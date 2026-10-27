@@ -7,8 +7,12 @@ import (
 	"time"
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
+	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,6 +58,27 @@ type mockSnapshotService struct {
 func (m *mockSnapshotService) Restore(ctx context.Context, id string, req computeSdk.RestoreSnapshotRequest) (string, error) {
 	args := m.Called(ctx, id, req)
 	return args.String(0), args.Error(1)
+}
+
+type mockPortService struct {
+	mock.Mock
+	netSDK.PortService
+}
+
+func (m *mockPortService) Get(ctx context.Context, id string) (*netSDK.PortResponse, error) {
+	args := m.Called(ctx, id)
+	res, _ := args.Get(0).(*netSDK.PortResponse)
+	return res, args.Error(1)
+}
+
+// portWithSubnets builds a port response whose addresses reference the given
+// subnet IDs, one address per ID.
+func portWithSubnets(subnetIDs ...string) *netSDK.PortResponse {
+	addrs := make([]netSDK.IpAddress, 0, len(subnetIDs))
+	for _, id := range subnetIDs {
+		addrs = append(addrs, netSDK.IpAddress{IPAddress: "10.0.0.5", SubnetID: id})
+	}
+	return &netSDK.PortResponse{IPAddress: &addrs}
 }
 
 // Helper: Build test instance
@@ -168,6 +193,146 @@ func TestVirtualMachineInstancesResource_Schema(t *testing.T) {
 	}
 }
 
+func TestVirtualMachineInstancesResource_Schema_CreationSubnets(t *testing.T) {
+	r := &vmInstances{}
+	resp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, resp)
+
+	attrRaw, ok := resp.Schema.Attributes["creation_subnets"]
+	require.True(t, ok)
+
+	attr, ok := attrRaw.(schema.ListAttribute)
+	require.True(t, ok)
+
+	t.Run("is a list of subnet IDs the customer sets at creation", func(t *testing.T) {
+		assert.True(t, attr.Optional)
+		assert.Equal(t, types.StringType, attr.ElementType)
+	})
+
+	t.Run("is stored and provider-recovered, unlike the write-only creation attributes", func(t *testing.T) {
+		// Computed (not write-only): the value is recovered from the primary port
+		// on read, so it is recorded in state and gives replace-on-change a
+		// previous value to compare against even for imported instances.
+		assert.False(t, attr.WriteOnly)
+		assert.True(t, attr.Computed)
+	})
+}
+
+func TestToNetworkInterfaceIDs(t *testing.T) {
+	t.Run("converts IDs into the SDK reference shape", func(t *testing.T) {
+		list := types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("id-1"),
+			types.StringValue("id-2"),
+		})
+
+		result, diags := toNetworkInterfaceIDs(context.Background(), list)
+
+		assert.False(t, diags.HasError())
+		require.NotNil(t, result)
+		assert.Equal(t, []computeSdk.CreateParametersNetworkInterfaceWithID{
+			{ID: "id-1"},
+			{ID: "id-2"},
+		}, *result)
+	})
+
+	t.Run("returns nil for an unset list so the field is omitted", func(t *testing.T) {
+		result, diags := toNetworkInterfaceIDs(context.Background(), types.ListNull(types.StringType))
+
+		assert.False(t, diags.HasError())
+		assert.Nil(t, result)
+	})
+}
+
+func TestResolveCreationSubnets(t *testing.T) {
+	ctx := context.Background()
+	fallback := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("fallback-subnet")})
+	oneSubnet := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-a")})
+
+	// buildTestInstance names the primary interface's port "eni-1".
+	const primaryPortID = "eni-1"
+
+	instanceWithoutPrimary := func() *computeSdk.Instance {
+		inst := buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, "")
+		notPrimary := false
+		(*inst.Network.Interfaces)[0].Primary = &notPrimary
+		return inst
+	}
+
+	t.Run("recovers the subnet when the primary port sits in exactly one", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got)
+		ports.AssertExpectations(t)
+	})
+
+	t.Run("recovers only the IPv4 subnet on a dual-stack port", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(&netSDK.PortResponse{
+			IPAddress: &[]netSDK.IpAddress{
+				{IPAddress: "10.0.0.5", SubnetID: "subnet-a"},
+				{IPAddress: "fd00::5", SubnetID: "subnet-b"},
+			},
+		}, nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got) // subnet-a, backing the IPv4 address
+	})
+
+	t.Run("treats duplicate subnet across addresses as one", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a", "subnet-a"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, oneSubnet, got)
+	})
+
+	t.Run("falls back when the primary port spans multiple subnets", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(portWithSubnets("subnet-a", "subnet-b"), nil)
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
+
+	t.Run("falls back when the port lookup fails", func(t *testing.T) {
+		ports := &mockPortService{}
+		ports.On("Get", mock.Anything, primaryPortID).Return(nil, errors.New("boom"))
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
+
+	t.Run("falls back without querying when there is no primary interface", func(t *testing.T) {
+		ports := &mockPortService{}
+		r := &vmInstances{networkPorts: ports}
+
+		got := r.resolveCreationSubnets(ctx, instanceWithoutPrimary(), fallback)
+
+		assert.Equal(t, fallback, got)
+		ports.AssertNotCalled(t, "Get", mock.Anything, mock.Anything)
+	})
+
+	t.Run("falls back when no ports service is wired", func(t *testing.T) {
+		r := &vmInstances{}
+
+		got := r.resolveCreationSubnets(ctx, buildTestInstance("vm-1", "n", "completed", "10.0.0.5", nil, ""), fallback)
+
+		assert.Equal(t, fallback, got)
+	})
+}
+
 func TestInstanceStatus_String(t *testing.T) {
 	assert.Equal(t, "creating_error", StatusCreatingError.String())
 	assert.Equal(t, "completed", StatusCompleted.String())
@@ -194,7 +359,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel(t *testing.T) {
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-123", "web-1", "completed", "10.0.0.5", ptrString("1.2.3.4"), "2001:db8::1")
 
-	model := r.toTerraformModel(context.Background(), inst)
+	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{})
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-123", model.ID.ValueString())
@@ -210,7 +375,7 @@ func TestVirtualMachineInstancesResource_ToTerraformModel_WithoutPublicIP(t *tes
 	r := &vmInstances{}
 	inst := buildTestInstance("vm-456", "db-1", "completed", "10.0.1.5", nil, "2001:db8::2")
 
-	model := r.toTerraformModel(context.Background(), inst)
+	model := r.toTerraformModel(context.Background(), inst, vmInstancesResourceModel{})
 
 	require.NotNil(t, model)
 	assert.Equal(t, "vm-456", model.ID.ValueString())

@@ -77,7 +77,7 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				MinReplicas:    types.Int64Value(2),
 				CreatedAt:      types.StringPointerValue(nowStr),
 				UpdatedAt:      types.StringPointerValue(nowStr),
-				Labels:         types.MapNull(types.StringType),
+				Labels:         types.MapValueMust(types.StringType, map[string]attr.Value{}),
 				SecurityGroups: types.SetNull(types.StringType),
 				Taints: &[]Taint{
 					{Key: types.StringValue("app"), Value: types.StringValue("blue"), Effect: types.StringValue("NoSchedule")},
@@ -119,7 +119,7 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				MinReplicas:       types.Int64Value(1),
 				CreatedAt:         types.StringPointerValue(nowStr),
 				UpdatedAt:         types.StringNull(),
-				Labels:            types.MapNull(types.StringType),
+				Labels:            types.MapValueMust(types.StringType, map[string]attr.Value{}),
 				SecurityGroups:    types.SetNull(types.StringType),
 				Taints:            nil,
 				MaxPodsPerNode:    types.Int64Null(),
@@ -143,7 +143,7 @@ func TestConvertToNodePoolToTFModel(t *testing.T) {
 				Flavor:            types.StringNull(),
 				CreatedAt:         types.StringNull(),
 				UpdatedAt:         types.StringNull(),
-				Labels:            types.MapNull(types.StringType),
+				Labels:            types.MapValueMust(types.StringType, map[string]attr.Value{}),
 				SecurityGroups:    types.SetNull(types.StringType),
 				MaxReplicas:       types.Int64Null(),
 				MinReplicas:       types.Int64Null(),
@@ -274,7 +274,7 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 				MinReplicas:       types.Int64Null(),
 				CreatedAt:         types.StringNull(),
 				UpdatedAt:         types.StringNull(),
-				Labels:            types.MapNull(types.StringType),
+				Labels:            types.MapValueMust(types.StringType, map[string]attr.Value{}),
 				SecurityGroups:    types.SetNull(types.StringType),
 				MaxPodsPerNode:    types.Int64Null(),
 				Taints:            nil,
@@ -353,20 +353,14 @@ func TestConvertToNodePoolToTFModelNewFields(t *testing.T) {
 			assert.Equal(t, tc.expected.AvailabilityZones, result.AvailabilityZones)
 
 			// Validate labels conversion
+			assert.False(t, result.Labels.IsNull())
+			var resultLabels map[string]string
+			diags := result.Labels.ElementsAs(context.Background(), &resultLabels, false)
+			assert.False(t, diags.HasError())
 			if len(tc.input.Labels) > 0 {
-				assert.False(t, result.Labels.IsNull())
-				var resultLabels map[string]string
-				diags := result.Labels.ElementsAs(context.Background(), &resultLabels, false)
-				assert.False(t, diags.HasError())
 				assert.Equal(t, tc.input.Labels, resultLabels)
 			} else {
-				// Labels should be null or empty map
-				if !result.Labels.IsNull() {
-					var resultLabels map[string]string
-					diags := result.Labels.ElementsAs(context.Background(), &resultLabels, false)
-					assert.False(t, diags.HasError())
-					assert.Empty(t, resultLabels)
-				}
+				assert.Empty(t, resultLabels)
 			}
 
 			// Validate security groups conversion
@@ -440,12 +434,12 @@ func TestConvertToNodePoolToTFModelEdgeCases(t *testing.T) {
 		assert.Contains(t, resultSGs, "sg-3")
 	})
 
-	t.Run("should_handle_nil_maps_correctly", func(t *testing.T) {
+	t.Run("labels absent from the API become an empty map, never null", func(t *testing.T) {
 		input := &k8sSDK.NodePool{
 			ID:       "np-nil-map",
 			Name:     "nil-map-pool",
 			Replicas: 1,
-			Labels:   nil, // nil map should be handled gracefully
+			Labels:   nil, // the API omits labels entirely when there are none
 			InstanceTemplate: k8sSDK.InstanceTemplate{
 				Flavor: k8sSDK.Flavor{Name: "test-flavor"},
 			},
@@ -453,13 +447,14 @@ func TestConvertToNodePoolToTFModelEdgeCases(t *testing.T) {
 
 		result := ConvertToNodePoolToTFModel(input, "us-east-1")
 
-		// For nil maps, len() returns 0, so Labels should be null or empty
-		if !result.Labels.IsNull() {
-			var resultLabels map[string]string
-			diags := result.Labels.ElementsAs(context.Background(), &resultLabels, false)
-			assert.False(t, diags.HasError())
-			assert.Empty(t, resultLabels)
-		}
+		// A `labels = {}` configuration must round-trip: projecting the absent
+		// labels as null would make the applied state differ from the config.
+		assert.False(t, result.Labels.IsNull())
+
+		var resultLabels map[string]string
+		diags := result.Labels.ElementsAs(context.Background(), &resultLabels, false)
+		assert.False(t, diags.HasError())
+		assert.Empty(t, resultLabels)
 	})
 
 }

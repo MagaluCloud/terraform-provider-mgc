@@ -105,7 +105,7 @@ For complete usage documentation and examples, visit:
 1. Clone the repository
 2. Install dependencies
 
-- Install [Go](https://golang.org/dl/) (version 1.24 or higher)
+- Install [Go](https://golang.org/dl/) (version 1.26.3 or higher)
 - Install [GoReleaser](https://goreleaser.com/)
 - Install [Terraform](https://www.terraform.io/downloads)
 - Install [Make](https://www.gnu.org/software/make/)

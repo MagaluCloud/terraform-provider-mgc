@@ -13,6 +13,7 @@ import (
 type NetworkListVpcsRouteModel struct {
 	ID              types.String `tfsdk:"id"`
 	PortID          types.String `tfsdk:"port_id"`
+	PeeringID       types.String `tfsdk:"peering_id"`
 	CIDRDestination types.String `tfsdk:"cidr_destination"`
 	Description     types.String `tfsdk:"description"`
 	NextHop         types.String `tfsdk:"next_hop"`
@@ -67,7 +68,11 @@ func (r *NetworkVpcsRoutesDatasource) Schema(_ context.Context, _ datasource.Sch
 							Computed:    true,
 						},
 						"port_id": schema.StringAttribute{
-							Description: "ID of the port used as the next hop for the route.",
+							Description: "ID of the port used as the next hop for the route, when the target is a port.",
+							Computed:    true,
+						},
+						"peering_id": schema.StringAttribute{
+							Description: "ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.",
 							Computed:    true,
 						},
 						"cidr_destination": schema.StringAttribute{
@@ -79,7 +84,7 @@ func (r *NetworkVpcsRoutesDatasource) Schema(_ context.Context, _ datasource.Sch
 							Computed:    true,
 						},
 						"next_hop": schema.StringAttribute{
-							Description: "Resolved next hop for the route, derived from the associated port.",
+							Description: "Resolved next hop for the route, derived from the target.",
 							Computed:    true,
 						},
 						"type": schema.StringAttribute{
@@ -121,7 +126,8 @@ func convertSDKListRouteResultToTerraformNetworkListVpcsRouteModel(sdkResult *ne
 
 	tfModel := &NetworkListVpcsRouteModel{
 		ID:              types.StringValue(sdkResult.ID),
-		PortID:          types.StringValue(sdkResult.PortID),
+		PortID:          routeTargetOrNull(sdkResult.PortID),
+		PeeringID:       routeTargetOrNull(sdkResult.VPCPeeringID),
 		CIDRDestination: types.StringValue(sdkResult.CIDRDestination),
 		NextHop:         types.StringValue(sdkResult.NextHop),
 		Type:            types.StringValue(sdkResult.Type),
