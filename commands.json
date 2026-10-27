@@ -7326,6 +7326,180 @@
       }
     ]
   },
+  "datasource.network_vpcs_peering": {
+    "command": "data \"mgc_network_vpcs_peering\" \"example\" {\n  id = \"your-peering-id\"\n}",
+    "attributes": [
+      {
+        "name": "id",
+        "description": "O ID do acordo de peering.",
+        "original_description": "The ID of the peering.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "accepter_vpc_id",
+        "description": "ID da VPC que recebeu o convite de peering.",
+        "original_description": "ID of the VPC that received the peering invitation.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data e hora da criação do acordo de peering.",
+        "original_description": "Timestamp of the peering creation.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "A descrição que ajuda a identificar o peering.",
+        "original_description": "The description to help identify the peering.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "name",
+        "description": "O nome do acordo de peering.",
+        "original_description": "The name of the peering.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "requester_vpc_id",
+        "description": "ID da VPC que solicitou o peering.",
+        "original_description": "ID of the VPC that requested the peering.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "status",
+        "description": "Situação atual do peering.",
+        "original_description": "Current status of the peering.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data e hora da última atualização de peering.",
+        "original_description": "Timestamp of the last peering update.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ]
+  },
+  "datasource.network_vpcs_peerings": {
+    "command": "# All peerings of the current tenant.\ndata \"mgc_network_vpcs_peerings\" \"all\" {}\n\n# Only the peerings a given VPC takes part in.\ndata \"mgc_network_vpcs_peerings\" \"by_vpc\" {\n  vpc_id = \"your-vpc-id\"\n}",
+    "attributes": [
+      {
+        "name": "vpc_id",
+        "description": "Quando essa opção estiver definida, serão retornadas apenas as conexões de peer-to-peer das quais esta VPC faz parte.",
+        "original_description": "When set, only the peerings this VPC takes part in are returned.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "items",
+        "description": "Lista de conexões entre VPCs.",
+        "original_description": "List of VPC peerings.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "accepter_vpc_id",
+            "description": "ID da VPC que recebeu o convite de peering.",
+            "original_description": "ID of the VPC that received the peering invitation.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "created_at",
+            "description": "Data e hora da criação do acordo de peering.",
+            "original_description": "Timestamp of the peering creation.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "description",
+            "description": "A descrição que ajuda a identificar o peering.",
+            "original_description": "The description to help identify the peering.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "id",
+            "description": "O ID do acordo de peering.",
+            "original_description": "The ID of the peering.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "name",
+            "description": "O nome do acordo de peering.",
+            "original_description": "The name of the peering.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "requester_vpc_id",
+            "description": "ID da VPC que solicitou o peering.",
+            "original_description": "ID of the VPC that requested the peering.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "status",
+            "description": "Situação atual do peering.",
+            "original_description": "Current status of the peering.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data e hora da última atualização de peering.",
+            "original_description": "Timestamp of the last peering update.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          }
+        ]
+      }
+    ]
+  },
   "datasource.network_vpcs_route": {
     "command": "data \"mgc_network_vpcs_route\" \"example\" {\n  id     = mgc_network_vpcs_route.example.id\n  vpc_id = mgc_network_vpcs_route.example.vpc_id\n}\n\noutput \"route_example\" {\n  value = data.mgc_network_vpcs_route.example\n}",
     "attributes": [
@@ -7367,8 +7541,17 @@
       },
       {
         "name": "next_hop",
-        "description": "Próximo salto da rota, determinado a partir da porta associada.",
-        "original_description": "Resolved next hop for the route, derived from the associated port.",
+        "description": "Próximo salto da rota, determinado a partir do destino.",
+        "original_description": "Resolved next hop for the route, derived from the target.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "peering_id",
+        "description": "ID do peering de VPC usado como próximo salto para a rota, quando o destino é um peering de VPC.",
+        "original_description": "ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.",
         "type": "string",
         "required": false,
         "read_only": true,
@@ -7376,8 +7559,8 @@
       },
       {
         "name": "port_id",
-        "description": "ID da porta usada como próximo salto para a rota.",
-        "original_description": "ID of the port used as the next hop for the route.",
+        "description": "ID da porta utilizada como próximo salto para a rota, quando o destino for uma porta.",
+        "original_description": "ID of the port used as the next hop for the route, when the target is a port.",
         "type": "string",
         "required": false,
         "read_only": true,
@@ -7453,8 +7636,17 @@
           },
           {
             "name": "next_hop",
-            "description": "Próximo salto da rota, determinado a partir da porta associada.",
-            "original_description": "Resolved next hop for the route, derived from the associated port.",
+            "description": "Próximo salto da rota, determinado a partir do destino.",
+            "original_description": "Resolved next hop for the route, derived from the target.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "peering_id",
+            "description": "ID do peering de VPC usado como próximo salto para a rota, quando o destino é um peering de VPC.",
+            "original_description": "ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.",
             "type": "string",
             "required": false,
             "read_only": true,
@@ -7462,8 +7654,8 @@
           },
           {
             "name": "port_id",
-            "description": "ID da porta usada como próximo salto para a rota.",
-            "original_description": "ID of the port used as the next hop for the route.",
+            "description": "ID da porta utilizada como próximo salto para a rota, quando o destino for uma porta.",
+            "original_description": "ID of the port used as the next hop for the route, when the target is a port.",
             "type": "string",
             "required": false,
             "read_only": true,
@@ -7920,6 +8112,710 @@
             "required": false,
             "read_only": true,
             "default_value": null
+          }
+        ]
+      }
+    ]
+  },
+  "datasource.tag": {
+    "command": "data \"mgc_tag\" \"environment\" {\n  name = \"environment\"\n}\n\noutput \"environment_color\" {\n  value = data.mgc_tag.environment.color\n}\n\noutput \"environment_values\" {\n  value = [for value in data.mgc_tag.environment.values : value.name]\n}",
+    "attributes": [
+      {
+        "name": "name",
+        "description": "Nome da tag. Distingue maiúsculas de minúsculas.",
+        "original_description": "Name of the tag. Case sensitive.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "color",
+        "description": "Cor da etiqueta, como um código hexadecimal de 6 dígitos em letras minúsculas, sem o símbolo `#`.",
+        "original_description": "Color of the tag, as a 6-digit lowercase hex code without `#`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data de criação da tag.",
+        "original_description": "Creation date of the tag.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "Descrição da tag.",
+        "original_description": "Description of the tag.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "Igual a `name`.",
+        "original_description": "Same as `name`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "kinds",
+        "description": "Tipos de tag, como `finops`.",
+        "original_description": "Kinds of the tag, such as `finops`.",
+        "type": "set(string)",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data da última atualização da tag. Nulo se nunca tiver sido atualizada.",
+        "original_description": "Last update date of the tag. Null if never updated.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "values",
+        "description": "Valores da tag.",
+        "original_description": "Values of the tag.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "created_at",
+            "description": "Data de criação do valor.",
+            "original_description": "Creation date of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "description",
+            "description": "Descrição do valor.",
+            "original_description": "Description of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "id",
+            "description": "Identificador no formato `<nome_da_tag>,<nome>`.",
+            "original_description": "Identifier in the form `<tag_name>,<name>`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "name",
+            "description": "Nome do valor.",
+            "original_description": "Name of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "tag_name",
+            "description": "Nome da tag à qual o valor pertence.",
+            "original_description": "Name of the tag that owns the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data da última atualização do valor. Nulo se nunca tiver sido atualizado.",
+            "original_description": "Last update date of the value. Null if never updated.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          }
+        ]
+      }
+    ]
+  },
+  "datasource.tag_attachment": {
+    "command": "# Reads the tags of a resource without taking ownership of them, which is what\n# the mgc_tag_attachment resource would do.\ndata \"mgc_tag_attachment\" \"vpc\" {\n  resource_id = \"b45659b5-2da2-4f60-9096-9d8dc7d96450\"\n}\n\noutput \"vpc_environment\" {\n  value = data.mgc_tag_attachment.vpc.tags[\"environment\"]\n}\n\noutput \"vpc_resource_type\" {\n  value = data.mgc_tag_attachment.vpc.resource_type\n}",
+    "attributes": [
+      {
+        "name": "resource_id",
+        "description": "ID do recurso marcado, como o ID de uma VPC ou de um cluster.",
+        "original_description": "ID of the tagged resource, such as a VPC or cluster ID.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data de criação do anexo.",
+        "original_description": "Creation date of the attachment.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "É igual a `resource_id`.",
+        "original_description": "Same as `resource_id`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "last_tag_associated_at",
+        "description": "Data da última vez em que a etiqueta foi anexada ou removida. Nulo se nunca tiver sido anexada nenhuma etiqueta.",
+        "original_description": "Date of the last tag attach or detach. Null if no tag was ever attached.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "product",
+        "description": "Produto que possui o tipo de recurso, como `rede`.",
+        "original_description": "Product that owns the resource type, such as `network`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "region",
+        "description": "Região do recurso.",
+        "original_description": "Region of the resource.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "resource_type",
+        "description": "Tipo do recurso, como `net.vpc`.",
+        "original_description": "Type of the resource, such as `net.vpc`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "tags",
+        "description": "Mapa de nomes de tags para valores.",
+        "original_description": "Map of tag name to value.",
+        "type": "map(string)",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data da última atualização do anexo. Nulo se nunca tiver sido atualizado.",
+        "original_description": "Last update date of the attachment. Null if never updated.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ]
+  },
+  "datasource.tag_attachments": {
+    "command": "# Every resource of the tenant that carries at least one tag.\ndata \"mgc_tag_attachments\" \"all\" {\n}\n\n# Only the tagged VPCs of one region.\ndata \"mgc_tag_attachments\" \"vpcs\" {\n  resource_type = \"net.vpc\"\n  region        = \"br-se1\"\n}\n\noutput \"tagged_vpc_ids\" {\n  value = [for attachment in data.mgc_tag_attachments.vpcs.attachments : attachment.resource_id]\n}\n\ndata \"mgc_tag_attachments\" \"environment\" {\n  tag_name = \"environment\"\n}\n\noutput \"production_resources\" {\n  value = [\n    for attachment in data.mgc_tag_attachments.environment.attachments :\n    attachment.resource_id if attachment.tags[\"environment\"] == \"production\"\n  ]\n}",
+    "attributes": [
+      {
+        "name": "region",
+        "description": "Filtrar por região.",
+        "original_description": "Filter by region.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "resource_type",
+        "description": "Filtre por tipo de recurso, como `net.vpc`.",
+        "original_description": "Filter by resource type, such as `net.vpc`.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "tag_name",
+        "description": "Filtre por nome da tag. Para filtrar por valor, use uma expressão `for` sobre `attachments`.",
+        "original_description": "Filter by tag name. To filter by value, use a `for` expression over `attachments`.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "attachments",
+        "description": "Recursos marcados encontrados.",
+        "original_description": "Tagged resources found.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "created_at",
+            "description": "Data de criação do anexo.",
+            "original_description": "Creation date of the attachment.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "id",
+            "description": "É igual a `resource_id`.",
+            "original_description": "Same as `resource_id`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "last_tag_associated_at",
+            "description": "Data da última vez em que a etiqueta foi anexada ou removida. Nulo se nunca tiver sido anexada nenhuma etiqueta.",
+            "original_description": "Date of the last tag attach or detach. Null if no tag was ever attached.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "product",
+            "description": "Produto que possui o tipo de recurso, como `rede`.",
+            "original_description": "Product that owns the resource type, such as `network`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "region",
+            "description": "Região do recurso.",
+            "original_description": "Region of the resource.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "resource_id",
+            "description": "ID do recurso marcado.",
+            "original_description": "ID of the tagged resource.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "resource_type",
+            "description": "Tipo do recurso, como `net.vpc`.",
+            "original_description": "Type of the resource, such as `net.vpc`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "tags",
+            "description": "Mapa de nomes de tags para valores.",
+            "original_description": "Map of tag name to value.",
+            "type": "map(string)",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data da última atualização do anexo. Nulo se nunca tiver sido atualizado.",
+            "original_description": "Last update date of the attachment. Null if never updated.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          }
+        ]
+      }
+    ]
+  },
+  "datasource.tag_resource_types": {
+    "command": "# Every type of resource that can be tagged.\ndata \"mgc_tag_resource_types\" \"all\" {\n}\n\n# Only the types owned by the network product.\ndata \"mgc_tag_resource_types\" \"network\" {\n  product = \"network\"\n}\n\noutput \"taggable_types\" {\n  value = [for type in data.mgc_tag_resource_types.all.resource_types : type.name]\n}",
+    "attributes": [
+      {
+        "name": "product",
+        "description": "Filtre por produto, como `rede`.",
+        "original_description": "Filter by product, such as `network`.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "resource_types",
+        "description": "Tipos de recursos encontrados.",
+        "original_description": "Resource types found.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "created_at",
+            "description": "Data de criação do tipo.",
+            "original_description": "Creation date of the type.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "name",
+            "description": "Nome do tipo, como `net.vpc`. Corresponde a `resource_type` em `mgc_tag_attachment`.",
+            "original_description": "Name of the type, such as `net.vpc`. Matches `resource_type` in `mgc_tag_attachment`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "product",
+            "description": "Produto que possui o tipo.",
+            "original_description": "Product that owns the type.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data da última atualização do tipo. Nulo se nunca tiver sido atualizado.",
+            "original_description": "Last update date of the type. Null if never updated.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          }
+        ]
+      }
+    ]
+  },
+  "datasource.tag_value": {
+    "command": "data \"mgc_tag_value\" \"production\" {\n  tag_name = \"environment\"\n  name     = \"production\"\n}\n\noutput \"production_description\" {\n  value = data.mgc_tag_value.production.description\n}",
+    "attributes": [
+      {
+        "name": "name",
+        "description": "Nome do valor. Distingue maiúsculas de minúsculas.",
+        "original_description": "Name of the value. Case sensitive.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "tag_name",
+        "description": "Nome da tag.",
+        "original_description": "Name of the tag.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data de criação do valor.",
+        "original_description": "Creation date of the value.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "Descrição do valor.",
+        "original_description": "Description of the value.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "Identificador no formato `<nome_da_tag>,<nome>`.",
+        "original_description": "Identifier in the form `<tag_name>,<name>`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data da última atualização do valor. Nulo se nunca tiver sido atualizado.",
+        "original_description": "Last update date of the value. Null if never updated.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ]
+  },
+  "datasource.tag_values": {
+    "command": "data \"mgc_tag_values\" \"environment\" {\n  tag_name = \"environment\"\n}\n\noutput \"environment_values\" {\n  value = [for value in data.mgc_tag_values.environment.values : value.name]\n}",
+    "attributes": [
+      {
+        "name": "tag_name",
+        "description": "Nome da tag.",
+        "original_description": "Name of the tag.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "values",
+        "description": "Valores da tag.",
+        "original_description": "Values of the tag.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "created_at",
+            "description": "Data de criação do valor.",
+            "original_description": "Creation date of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "description",
+            "description": "Descrição do valor.",
+            "original_description": "Description of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "id",
+            "description": "Identificador no formato `<nome_da_tag>,<nome>`.",
+            "original_description": "Identifier in the form `<tag_name>,<name>`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "name",
+            "description": "Nome do valor.",
+            "original_description": "Name of the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "tag_name",
+            "description": "Nome da tag à qual o valor pertence.",
+            "original_description": "Name of the tag that owns the value.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data da última atualização do valor. Nulo se nunca tiver sido atualizado.",
+            "original_description": "Last update date of the value. Null if never updated.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          }
+        ]
+      }
+    ]
+  },
+  "datasource.tags": {
+    "command": "# Every tag of the tenant.\ndata \"mgc_tags\" \"all\" {\n}\n\n# Only the tags used for cost reporting.\ndata \"mgc_tags\" \"finops\" {\n  kinds = [\"finops\"]\n}\n\noutput \"finops_tag_names\" {\n  value = [for tag in data.mgc_tags.finops.tags : tag.name]\n}",
+    "attributes": [
+      {
+        "name": "color",
+        "description": "Filtre por cor, usando um código hexadecimal de 6 dígitos sem o símbolo `#`.",
+        "original_description": "Filter by color, as a 6-digit hex code without `#`.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "kinds",
+        "description": "Filtrar por tipo. Retorna tags que tenham pelo menos um desses tipos.",
+        "original_description": "Filter by kind. Returns tags with at least one of these kinds.",
+        "type": "set(string)",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "tags",
+        "description": "Tags encontradas.",
+        "original_description": "Tags found.",
+        "type": "array(object)",
+        "required": false,
+        "read_only": true,
+        "default_value": null,
+        "nested_attributes": [
+          {
+            "name": "color",
+            "description": "Cor da etiqueta, como um código hexadecimal de 6 dígitos em letras minúsculas, sem o símbolo `#`.",
+            "original_description": "Color of the tag, as a 6-digit lowercase hex code without `#`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "created_at",
+            "description": "Data de criação da tag.",
+            "original_description": "Creation date of the tag.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "description",
+            "description": "Descrição da tag.",
+            "original_description": "Description of the tag.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "id",
+            "description": "Igual a `name`.",
+            "original_description": "Same as `name`.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "kinds",
+            "description": "Tipos de tag, como `finops`.",
+            "original_description": "Kinds of the tag, such as `finops`.",
+            "type": "set(string)",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "name",
+            "description": "Nome da tag.",
+            "original_description": "Name of the tag.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "updated_at",
+            "description": "Data da última atualização da tag. Nulo se nunca tiver sido atualizada.",
+            "original_description": "Last update date of the tag. Null if never updated.",
+            "type": "string",
+            "required": false,
+            "read_only": true,
+            "default_value": null
+          },
+          {
+            "name": "values",
+            "description": "Sempre vazio. Leia os valores com `mgc_tag` ou `mgc_tag_values`.",
+            "original_description": "Always empty. Read the values with `mgc_tag` or `mgc_tag_values`.",
+            "type": "array(object)",
+            "required": false,
+            "read_only": true,
+            "default_value": null,
+            "nested_attributes": [
+              {
+                "name": "created_at",
+                "description": "Data de criação do valor.",
+                "original_description": "Creation date of the value.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              },
+              {
+                "name": "description",
+                "description": "Descrição do valor.",
+                "original_description": "Description of the value.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              },
+              {
+                "name": "id",
+                "description": "Identificador no formato `<nome_da_tag>,<nome>`.",
+                "original_description": "Identifier in the form `<tag_name>,<name>`.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              },
+              {
+                "name": "name",
+                "description": "Nome do valor.",
+                "original_description": "Name of the value.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              },
+              {
+                "name": "tag_name",
+                "description": "Nome da tag à qual o valor pertence.",
+                "original_description": "Name of the tag that owns the value.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              },
+              {
+                "name": "updated_at",
+                "description": "Data da última atualização do valor. Nulo se nunca tiver sido atualizado.",
+                "original_description": "Last update date of the value. Null if never updated.",
+                "type": "string",
+                "required": false,
+                "read_only": true,
+                "default_value": null
+              }
+            ]
           }
         ]
       }
@@ -8697,8 +9593,8 @@
       },
       {
         "name": "snapshot_source_id",
-        "description": "O ID da fonte do snapshot, para criar um objeto de snapshot a partir de um momento de snapshot. É obrigatório quando o ID do volume não está definido e não é possível definir simultaneamente o ID do volume e o ID da fonte do snapshot.",
-        "original_description": "The ID of the snapshot source, for creating a snapshot object from a snaphot instant. Is required when volume ID is not set and both volume ID and snapshot source ID cannot be set at the same time.",
+        "description": "O ID da fonte do snapshot, para criar um objeto de snapshot a partir de um instante de snapshot. É obrigatório quando o ID do volume não está definido e não é possível definir simultaneamente o ID do volume e o ID da fonte do snapshot.",
+        "original_description": "The ID of the snapshot source, for creating a snapshot object from a snapshot instant. Is required when volume ID is not set and both volume ID and snapshot source ID cannot be set at the same time.",
         "type": "string",
         "required": false,
         "read_only": false,
@@ -9754,7 +10650,7 @@
     "import": "terraform import mgc_dbaas_parameter_groups.example \"parameter-group-id\""
   },
   "resource.dbaas_parameters": {
-    "command": "# Customize a paramater in a parameter group\nresource \"mgc_dbaas_parameters\" \"example\" {\n  parameter_group_id = \"parameter-group-id\"\n  name               = \"max_connections\"\n  value              = \"300\"\n}",
+    "command": "# Customize a parameter in a parameter group\nresource \"mgc_dbaas_parameters\" \"example\" {\n  parameter_group_id = \"parameter-group-id\"\n  name               = \"max_connections\"\n  value              = \"300\"\n}",
     "attributes": [
       {
         "name": "name",
@@ -9997,7 +10893,7 @@
     "import": "terraform import mgc_kubernetes_cluster.cluster 123"
   },
   "resource.kubernetes_nodepool": {
-    "command": "resource \"mgc_kubernetes_nodepool\" \"nodepool\" {\n  name         = \"gandalf\"\n  cluster_id   = mgc_kubernetes_cluster.cluster_with_nodepool.id\n  flavor_name  = kubernetes_flavor.flavors[0].name\n  replicas     = 1\n  min_replicas = 1\n  max_replicas = 5\n  version      = mgc_kubernetes_cluster.cluster_with_nodepool.version\n}",
+    "command": "resource \"mgc_kubernetes_nodepool\" \"nodepool\" {\n  name         = \"gandalf\"\n  cluster_id   = mgc_kubernetes_cluster.cluster_with_nodepool.id\n  flavor_name  = kubernetes_flavor.flavors[0].name\n  replicas     = 1\n  min_replicas = 1\n  max_replicas = 5\n  version      = mgc_kubernetes_cluster.cluster_with_nodepool.version\n\n  # Optional labels, set only at creation. Changing them recreates the node pool.\n  # To remove every label, set `labels = {}`. Deleting the block keeps the labels\n  # already in state.\n  labels = {\n    environment = \"staging\"\n    team        = \"devX\"\n    tier        = \"backend\"\n  }\n}",
     "attributes": [
       {
         "name": "cluster_id",
@@ -10040,6 +10936,15 @@
         "description": "A lista de zonas de disponibilidade onde o node pool está implantado está **obsoleta**; use os subnet_ids em vez disso.",
         "original_description": "List of availability zones where the node pool is deployed is **deprecated**, use subnet_ids instead.",
         "type": "set(string)",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "labels",
+        "description": "Mapa de rótulos a serem associados ao conjunto de nós, na forma de pares chave/valor personalizáveis. Opcional e utilizado apenas na criação; alterá-lo após o conjunto de nós já existir força a criação de um novo conjunto de nós. Para remover todas as etiquetas, defina `labels = {}` explicitamente: remover o atributo da configuração mantém as etiquetas já registradas no estado, pois o valor é calculado sempre que não estiver configurado.",
+        "original_description": "Map of labels to attach to the node pool, as customizable key/value pairs. Optional and only used at creation; changing it after the node pool exists forces a new node pool. To remove every label, set `labels = {}` explicitly: removing the attribute from the configuration keeps the labels already recorded in state, because the value is computed whenever it is not configured.",
+        "type": "map(string)",
         "required": false,
         "read_only": false,
         "default_value": null
@@ -10141,15 +11046,6 @@
         "description": "UUID do node pool.",
         "original_description": "Node pool's UUID.",
         "type": "string",
-        "required": false,
-        "read_only": true,
-        "default_value": null
-      },
-      {
-        "name": "labels",
-        "description": "Mapa de rótulos para o node pool.",
-        "original_description": "Map of labels for the node pool.",
-        "type": "map(string)",
         "required": false,
         "read_only": true,
         "default_value": null
@@ -11102,22 +11998,91 @@
     ],
     "import": "terraform import mgc_network_vpcs_interfaces.example 123"
   },
-  "resource.network_vpcs_route": {
-    "command": "resource \"mgc_network_vpcs_route\" \"example\" {\n  vpc_id           = \"your-vpc-id\"\n  port_id          = \"your-port-id\"\n  cidr_destination = \"xxx.xxx.xxx.xxx/xx\"\n  description      = \"Route example\"\n}",
+  "resource.network_vpcs_peering": {
+    "command": "resource \"mgc_network_vpcs_peering\" \"example\" {\n  name             = \"peering-prod-to-db\"\n  description      = \"Peering between the production VPC and the database VPC\"\n  requester_vpc_id = \"your-requester-vpc-id\"\n  accepter_vpc_id  = \"your-accepter-vpc-id\"\n}",
     "attributes": [
       {
-        "name": "cidr_destination",
-        "description": "Bloco CIDR de destino que define o tráfego correspondente a esta rota.",
-        "original_description": "Destination CIDR block that defines the traffic matched by this route.",
+        "name": "accepter_vpc_id",
+        "description": "ID da VPC no lado do aceitador. `requester` e `accepter` são apenas rótulos; não há nenhum convite a ser aceito.",
+        "original_description": "ID of the VPC on the accepter side. `requester` and `accepter` are only labels; there is no invitation to accept.",
         "type": "string",
         "required": true,
         "read_only": false,
         "default_value": null
       },
       {
-        "name": "port_id",
-        "description": "ID da porta usada como próximo salto para esta rota.",
-        "original_description": "ID of the port used as the next hop for this route.",
+        "name": "name",
+        "description": "O nome do acordo de peering. Caracteres alfanuméricos e hífens, até 50 caracteres.",
+        "original_description": "The name of the peering. Alphanumeric characters and hyphens, up to 50 characters.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "requester_vpc_id",
+        "description": "ID da VPC do lado do solicitante. `requester` e `accepter` são apenas rótulos para os dois lados; o peering é bidirecional e não requer aprovação.",
+        "original_description": "ID of the VPC on the requester side. `requester` and `accepter` are only labels for the two sides; the peering is bidirectional and needs no approval.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "A descrição que ajuda a identificar o peering.",
+        "original_description": "The description to help identify the peering.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data e hora da criação do acordo de peering.",
+        "original_description": "Timestamp of the peering creation.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "O ID do peering. Também é o ID usado para importar o recurso.",
+        "original_description": "The ID of the peering. Also the ID used to import the resource.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "status",
+        "description": "Status atual do peering. Assume o valor `concluído` assim que estiver totalmente configurado; as rotas que têm esse peering como destino só funcionam a partir desse momento.",
+        "original_description": "Current status of the peering. Reaches `completed` once fully provisioned; routes that target this peering only work after that.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data e hora da última atualização de peering.",
+        "original_description": "Timestamp of the last peering update.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ],
+    "import": "terraform import mgc_network_vpcs_peering.example ac9709ae-b298-41c6-bc58-92a6b8b92d8b"
+  },
+  "resource.network_vpcs_route": {
+    "command": "# A route points to exactly one target: either a port or a VPC peering.\n\n# Route through a port.\nresource \"mgc_network_vpcs_route\" \"through_port\" {\n  vpc_id           = \"your-vpc-id\"\n  port_id          = \"your-port-id\"\n  cidr_destination = \"xxx.xxx.xxx.xxx/xx\"\n  description      = \"Route example\"\n}\n\n# Route through a VPC peering.\nresource \"mgc_network_vpcs_peering\" \"peering\" {\n  name             = \"peering_name\"\n  description      = \"peering_description\"\n  requester_vpc_id = mgc_network_vpcs.requester.id\n  accepter_vpc_id  = mgc_network_vpcs.accepter.id\n}\n\nresource \"mgc_network_vpcs_route\" \"route_r\" {\n  vpc_id           = mgc_network_vpcs.requester.id\n  peering_id       = mgc_network_vpcs_peering.peering.id\n  cidr_destination = mgc_network_vpcs_subnets.subnet_accepter.cidr_block\n  description      = \"Route vpcs peering requester\"\n}\n\nresource \"mgc_network_vpcs_route\" \"route_a\" {\n  vpc_id           = mgc_network_vpcs.accepter.id\n  peering_id       = mgc_network_vpcs_peering.peering.id\n  cidr_destination = mgc_network_vpcs_subnets.subnet_requester.cidr_block\n  description      = \"Route vpcs peering accepter\"\n}",
+    "attributes": [
+      {
+        "name": "cidr_destination",
+        "description": "Bloco CIDR de destino correspondente a esta rota. Para uma rota de peering, utilize o CIDR de uma sub-rede na outra VPC.",
+        "original_description": "Destination CIDR block matched by this route. For a peering route, use the CIDR of a subnet in the other VPC.",
         "type": "string",
         "required": true,
         "read_only": false,
@@ -11125,8 +12090,8 @@
       },
       {
         "name": "vpc_id",
-        "description": "ID da VPC à qual esta rota está associada.",
-        "original_description": "ID of the VPC where this route is associated.",
+        "description": "ID da VPC que está sendo configurada (o lado de origem), cuja tabela de rotas recebe essa rota.",
+        "original_description": "ID of the VPC being configured (the source side) whose route table receives this route.",
         "type": "string",
         "required": true,
         "read_only": false,
@@ -11136,6 +12101,24 @@
         "name": "description",
         "description": "A descrição para ajudar a identificar a rota.",
         "original_description": "The description to help identify the route.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "peering_id",
+        "description": "ID do peering da VPC usado como próximo salto para esta rota. É necessário definir exatamente um dos seguintes: `port_id` ou `peering_id`.",
+        "original_description": "ID of the VPC peering used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "port_id",
+        "description": "ID da porta utilizada como próximo salto para esta rota. É necessário definir exatamente um dos seguintes: `port_id` ou `peering_id`.",
+        "original_description": "ID of the port used as the next hop for this route. Exactly one of `port_id` or `peering_id` must be set.",
         "type": "string",
         "required": false,
         "read_only": false,
@@ -11152,8 +12135,8 @@
       },
       {
         "name": "next_hop",
-        "description": "Próximo salto da rota, determinado a partir da porta associada.",
-        "original_description": "Resolved next hop for the route, derived from the associated port.",
+        "description": "Próximo salto da rota, determinado a partir do destino.",
+        "original_description": "Resolved next hop for the route, derived from the target.",
         "type": "string",
         "required": false,
         "read_only": true,
@@ -11423,8 +12406,8 @@
       },
       {
         "name": "object_lock_retain_until_date",
-        "description": "A data de validade do bloqueio de objeto no formato RFC3339 (por exemplo, 2025-12-31T23:59:59Z). Os bloqueios de objeto criados por meio do Terraform e do mgccli são aplicados no modo COMPLIANCE. Portanto, uma vez configurados, eles não podem ser removidos ou revertidos.",
-        "original_description": "The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z). Object locks created through terraform and mgccli are applied in COMPLIANCE mode. Therefore, once configured, they cannot be removed or reverted.",
+        "description": "A data de validade do bloqueio de objeto no formato RFC3339 (por exemplo, 2025-12-31T23:59:59Z). Os bloqueios de objeto criados por meio do Terraform e da CLI do MGC são aplicados no modo COMPLIANCE. Portanto, uma vez configurados, eles não podem ser removidos nem revertidos.",
+        "original_description": "The retain-until-date for object lock in RFC3339 format (e.g., 2025-12-31T23:59:59Z). Object locks created through Terraform and MGC CLI are applied in COMPLIANCE mode. Therefore, once configured, they cannot be removed or reverted.",
         "type": "string",
         "required": false,
         "read_only": false,
@@ -11502,8 +12485,188 @@
     ],
     "import": "terraform import mgc_ssh_keys.my_key 123"
   },
+  "resource.tag": {
+    "command": "resource \"mgc_tag\" \"environment\" {\n  name        = \"environment\"\n  description = \"Group resources by environment\"\n  color       = \"0086ff\"\n  kinds       = [\"finops\"]\n}",
+    "attributes": [
+      {
+        "name": "name",
+        "description": "Nome da tag. Único no locatário. Distingue maiúsculas de minúsculas. De 1 a 255 caracteres: letras, dígitos, espaços e `_-[]().:`. Ao alterá-lo, a tag é renomeada no local, mantendo seus valores e anexos.",
+        "original_description": "Name of the tag. Unique in the tenant. Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. Changing it renames the tag in place and keeps its values and attachments.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "color",
+        "description": "Cor da etiqueta, como um código hexadecimal de 6 dígitos sem o símbolo `#`, como `0086ff`. Não diferencia maiúsculas de minúsculas. É atribuída automaticamente quando omitida. Ao removê-la, a cor atual é mantida.",
+        "original_description": "Color of the tag, as a 6-digit hex code without `#`, such as `0086ff`. Case insensitive. Assigned automatically when omitted. Removing it keeps the current color.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "Descrição da tag. Até 500 caracteres.",
+        "original_description": "Description of the tag. Up to 500 characters.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "kinds",
+        "description": "Tipos de tag, como `finops` para relatórios de custos.",
+        "original_description": "Kinds of the tag, such as `finops` for cost reporting.",
+        "type": "set(string)",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data de criação da tag.",
+        "original_description": "Creation date of the tag.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "Igual a `name`.",
+        "original_description": "Same as `name`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data da última atualização da tag. Nulo se nunca tiver sido atualizada.",
+        "original_description": "Last update date of the tag. Null if never updated.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ],
+    "import": "# Tags are imported by name, which is also their id.\nterraform import mgc_tag.environment environment"
+  },
+  "resource.tag_attachment": {
+    "command": "resource \"mgc_tag\" \"environment\" {\n  name  = \"environment\"\n  kinds = [\"finops\"]\n}\n\nresource \"mgc_tag_value\" \"production\" {\n  tag_name = mgc_tag.environment.name\n  name     = \"production\"\n}\n\nresource \"mgc_network_vpcs\" \"main\" {\n  name = \"vpc-example\"\n}\n\nresource \"mgc_tag_attachment\" \"vpc\" {\n  resource_id = mgc_network_vpcs.main.id\n\n  # The parentheses turn the key into an expression.\n  tags = {\n    (mgc_tag.environment.name) = mgc_tag_value.production.name\n  }\n}",
+    "attributes": [
+      {
+        "name": "resource_id",
+        "description": "ID do recurso a ser marcado, como o ID de uma VPC ou de um cluster. A fonte de dados `mgc_tag_resource_types` lista os tipos que aceitam tags.",
+        "original_description": "ID of the resource to tag, such as a VPC or cluster ID. The `mgc_tag_resource_types` data source lists the types that accept tags.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "tags",
+        "description": "Mapa que associa o nome da tag ao valor, com pelo menos uma entrada. Para remover todas as tags, exclua este recurso. Indique a tag e o valor, para que o Terraform os crie primeiro: `(mgc_tag.env.name) = mgc_tag_value.prod.name`. Os parênteses transformam a chave em uma expressão.",
+        "original_description": "Map of tag name to value, with at least one entry. To remove every tag, delete this resource. Reference the tag and the value, so Terraform creates them first: `(mgc_tag.env.name) = mgc_tag_value.prod.name`. The parentheses make the key an expression.",
+        "type": "map(string)",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "É igual a `resource_id`.",
+        "original_description": "Same as `resource_id`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "region",
+        "description": "Região do recurso.",
+        "original_description": "Region of the resource.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "resource_type",
+        "description": "Tipo do recurso, como `net.vpc`.",
+        "original_description": "Type of the resource, such as `net.vpc`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ],
+    "import": "# Attachments are imported by the id of the tagged resource, and the import\n# brings in every tag the resource carries.\nterraform import mgc_tag_attachment.vpc d4138294-2cc6-4c39-afcc-54ebadf0f9db"
+  },
+  "resource.tag_value": {
+    "command": "resource \"mgc_tag\" \"environment\" {\n  name  = \"environment\"\n  kinds = [\"finops\"]\n}\n\nresource \"mgc_tag_value\" \"production\" {\n  tag_name    = mgc_tag.environment.name\n  name        = \"production\"\n  description = \"Resources of the production environment\"\n}",
+    "attributes": [
+      {
+        "name": "name",
+        "description": "Nome do valor. Deve ser único na tag. Distingue maiúsculas de minúsculas. De 1 a 255 caracteres: letras, dígitos, espaços e `_-[]().:`. Ao alterá-lo, o valor é renomeado no local e mantém seus anexos.",
+        "original_description": "Name of the value. Unique in the tag. Case sensitive. 1 to 255 characters: letters, digits, spaces and `_-[]().:`. Changing it renames the value in place and keeps its attachments.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "tag_name",
+        "description": "Nome da tag à qual o valor pertence. Use a referência `mgc_tag.<nome>.name` para acompanhar as renomeações de tags. Não é possível transferir o valor para outra tag.",
+        "original_description": "Name of the tag that owns the value. Reference `mgc_tag.<name>.name` to follow tag renames. Moving the value to another tag is not supported.",
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "description",
+        "description": "Descrição do valor. Até 500 caracteres.",
+        "original_description": "Description of the value. Up to 500 characters.",
+        "type": "string",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "created_at",
+        "description": "Data de criação do valor.",
+        "original_description": "Creation date of the value.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "id",
+        "description": "Identificador no formato `<nome_da_tag>,<nome>`.",
+        "original_description": "Identifier in the form `<tag_name>,<name>`.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      },
+      {
+        "name": "updated_at",
+        "description": "Data da última atualização do valor. Nulo se nunca tiver sido atualizado.",
+        "original_description": "Last update date of the value. Null if never updated.",
+        "type": "string",
+        "required": false,
+        "read_only": true,
+        "default_value": null
+      }
+    ],
+    "import": "# Tag values are imported as <tag_name>,<value_name>.\nterraform import mgc_tag_value.production environment,production"
+  },
   "resource.virtual_machine_instances": {
-    "command": "resource \"mgc_virtual_machine_instances\" \"basic_instance\" {\n  name         = \"basic-instance-name\"\n  machine_type = \"BV1-1-40\"\n  image        = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name = \"your-ssh-key-name\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_az\" {\n  name              = \"instance-with-az\"\n  availability_zone = \"br-ne1-a\"\n  machine_type      = \"BV4-8-100\"\n  image             = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name      = \"your-ssh-key-name\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_usardata\" {\n  name         = \"instance-with-userdata\"\n  machine_type = \"BV4-8-100\"\n  image        = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name = \"your-ssh-key-name\"\n  user_data    = base64encode(\"#!/bin/bash\\necho 'Hello, World!'\")\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_windows\" {\n  name         = \"instance-with-windows\"\n  machine_type = \"BV4-8-100\"\n  image        = \"windows-server-2022\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_public_ipv4\" {\n  name                 = \"instance-with-public-ipv4\"\n  machine_type         = \"BV2-4-10\"\n  image                = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name         = \"your-ssh-key-name\"\n  allocate_public_ipv4 = true\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_security_groups\" {\n  name                     = \"instance-with-security-groups\"\n  machine_type             = \"BV2-4-10\"\n  image                    = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name             = \"your-ssh-key-name\"\n  creation_security_groups = [mgc_network_security_groups.security_group.id]\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_security_groups_and_public_ipv4\" {\n  name                     = \"instance_with_security_groups_and_public_ipv4\"\n  machine_type             = \"BV2-4-10\"\n  image                    = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name             = \"your-ssh-key-name\"\n  allocate_public_ipv4     = true\n  creation_security_groups = [mgc_network_security_groups.security_group.id]\n}",
+    "command": "resource \"mgc_virtual_machine_instances\" \"basic_instance\" {\n  name         = \"basic-instance-name\"\n  machine_type = \"BV1-1-40\"\n  image        = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name = \"your-ssh-key-name\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_az\" {\n  name              = \"instance-with-az\"\n  availability_zone = \"br-ne1-a\"\n  machine_type      = \"BV4-8-100\"\n  image             = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name      = \"your-ssh-key-name\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_userdata\" {\n  name         = \"instance-with-userdata\"\n  machine_type = \"BV4-8-100\"\n  image        = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name = \"your-ssh-key-name\"\n  user_data    = base64encode(\"#!/bin/bash\\necho 'Hello, World!'\")\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_windows\" {\n  name         = \"instance-with-windows\"\n  machine_type = \"BV4-8-100\"\n  image        = \"windows-server-2022\"\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_public_ipv4\" {\n  name                 = \"instance-with-public-ipv4\"\n  machine_type         = \"BV2-4-10\"\n  image                = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name         = \"your-ssh-key-name\"\n  allocate_public_ipv4 = true\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_security_groups\" {\n  name                     = \"instance-with-security-groups\"\n  machine_type             = \"BV2-4-10\"\n  image                    = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name             = \"your-ssh-key-name\"\n  creation_security_groups = [mgc_network_security_groups.security_group.id]\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_security_groups_and_public_ipv4\" {\n  name                     = \"instance_with_security_groups_and_public_ipv4\"\n  machine_type             = \"BV2-4-10\"\n  image                    = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name             = \"your-ssh-key-name\"\n  allocate_public_ipv4     = true\n  creation_security_groups = [mgc_network_security_groups.security_group.id]\n}\n\nresource \"mgc_virtual_machine_instances\" \"instance_with_subnet\" {\n  name         = \"instance-with-subnet\"\n  machine_type = \"BV2-4-10\"\n  image        = \"cloud-ubuntu-24.04 LTS\"\n  ssh_key_name = \"your-ssh-key-name\"\n\n  # The subnet must belong to the same VPC as the instance, and can only be\n  # chosen at creation: changing it replaces the instance.\n  creation_subnets = [mgc_network_vpcs_subnets.subnet.id]\n  vpc_id = mgc_network_vpc.vpc.id\n\n}",
     "attributes": [
       {
         "name": "machine_type",
@@ -11545,6 +12708,15 @@
         "name": "creation_security_groups",
         "description": "Lista de IDs de grupos de segurança a serem associados à interface de rede principal no momento da criação. Se não for especificado, será utilizado o grupo de segurança padrão da VPC. Para gerenciar grupos de segurança após a criação da instância, utilize os recursos de rede. Saiba mais nos guias da documentação. Este atributo só pode ser usado quando \"network_interface_id\" não estiver definido.",
         "original_description": "List of security group IDs to be associated with the primary network interface on creation. If not specified, the default security group of the VPC will be used. For manage security groups after the instance creation, use the network resources. Find out more in the documentation guides. This attribute can only be used when \"network_interface_id\" is not set.",
+        "type": "array(string)",
+        "required": false,
+        "read_only": false,
+        "default_value": null
+      },
+      {
+        "name": "creation_subnets",
+        "description": "A sub-rede na qual a interface de rede primária será criada, indicada como uma lista contendo um único ID de sub-rede. A sub-rede deve pertencer à mesma VPC que a instância; essa condição só é validada no momento da criação da instância. Se não for especificada, a sub-rede é escolhida pela plataforma e informada aqui. Alterar esse valor substitui a instância, já que uma sub-rede só pode ser escolhida no momento da criação. Esse atributo só pode ser usado quando “network_interface_id” não estiver definido.",
+        "original_description": "The subnet in which the primary network interface will be created, given as a list with a single subnet ID. The subnet must belong to the same VPC as the instance; this is only validated when the instance is created. If not specified, the subnet is chosen by the platform and reported back here. Changing this value replaces the instance, since a subnet can only be chosen at creation. This attribute can only be used when \"network_interface_id\" is not set.",
         "type": "array(string)",
         "required": false,
         "read_only": false,
