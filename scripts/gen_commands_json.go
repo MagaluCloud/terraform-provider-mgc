@@ -338,9 +338,10 @@ func processDir(dir, prefix string, output map[string]Entry) error {
 	}
 	for _, filename := range files {
 		name := strings.TrimSuffix(filename, ".md")
-		raw, err := os.ReadFile(filepath.Join(dir, filename))
+		path := filepath.Join(dir, filename)
+		raw, err := os.ReadFile(path)
 		if err != nil {
-			continue
+			return fmt.Errorf("reading %s: %w", path, err)
 		}
 		content := string(raw)
 		entry := Entry{
@@ -390,6 +391,10 @@ func translateChunk(texts []string, apiKey string) ([]string, error) {
 		return nil, err
 	}
 
+	if len(result.Translations) != len(texts) {
+		return nil, fmt.Errorf("deepl returned %d translations for %d texts", len(result.Translations), len(texts))
+	}
+
 	translated := make([]string, len(result.Translations))
 	for i, tr := range result.Translations {
 		translated[i] = tr.Text
@@ -422,8 +427,9 @@ func prepareTranslations(output map[string]Entry, existing map[string]Entry) []s
 		for i := range newAttrs {
 			attr := byName[newAttrs[i].Name]
 			orig := newAttrs[i].OriginalDescription
+			hasTranslation := attr.Description != "" && attr.Description != attr.OriginalDescription
 
-			if attr.OriginalDescription == orig {
+			if attr.OriginalDescription == orig && hasTranslation {
 				newAttrs[i].Description = attr.Description
 			} else if orig != "" && !seen[orig] {
 				seen[orig] = true

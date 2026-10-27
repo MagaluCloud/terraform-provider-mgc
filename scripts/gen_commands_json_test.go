@@ -1,8 +1,14 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -547,6 +553,73 @@ func TestParseImport(t *testing.T) {
 	}
 }
 
+func TestProcessDir(t *testing.T) {
+	const docContent = "## Example Usage\n\n```terraform\nresource \"mgc_vm\" \"x\" {}\n```\n\n## Schema\n\n### Required\n\n- `name` (String) Name of instance\n"
+
+	tests := []struct {
+		name        string
+		files       map[string]string
+		unreadable  string
+		wantKeys    []string
+		wantErr     bool
+		wantErrFile string
+	}{
+		{
+			name:     "readable files produce one entry per file",
+			files:    map[string]string{"virtual_machine_instances.md": docContent, "network_vpc.md": docContent},
+			wantKeys: []string{"resource.network_vpc", "resource.virtual_machine_instances"},
+		},
+		{
+			name:        "unreadable file aborts with an error naming the file",
+			files:       map[string]string{"virtual_machine_instances.md": docContent, "network_vpc.md": docContent},
+			unreadable:  "network_vpc.md",
+			wantErr:     true,
+			wantErrFile: "network_vpc.md",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for filename, content := range tt.files {
+				if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tt.unreadable != "" {
+				unreadablePath := filepath.Join(dir, tt.unreadable)
+				if err := os.Chmod(unreadablePath, 0o000); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { os.Chmod(unreadablePath, 0o644) })
+			}
+
+			output := make(map[string]Entry)
+			err := processDir(dir, "resource.", output)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("got nil error, want error")
+				}
+				if !strings.Contains(err.Error(), tt.wantErrFile) {
+					t.Errorf("error %q does not name %q", err.Error(), tt.wantErrFile)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("got error %v, want nil", err)
+			}
+			var gotKeys []string
+			for key := range output {
+				gotKeys = append(gotKeys, key)
+			}
+			sort.Strings(gotKeys)
+			if !reflect.DeepEqual(gotKeys, tt.wantKeys) {
+				t.Errorf("keys: got %v, want %v", gotKeys, tt.wantKeys)
+			}
+		})
+	}
+}
+
 func TestDeeplURL(t *testing.T) {
 	tests := []struct {
 		apiKey string
@@ -562,6 +635,93 @@ func TestDeeplURL(t *testing.T) {
 			got := deeplURL(tt.apiKey)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+type rewriteHostTransport struct {
+	host string
+}
+
+func (rt rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	clone := req.Clone(req.Context())
+	clone.URL.Scheme = "http"
+	clone.URL.Host = rt.host
+	return http.DefaultTransport.RoundTrip(clone)
+}
+
+// redirectDeepl points the hardcoded DeepL endpoint at a local test server.
+func redirectDeepl(t *testing.T, serverURL string) {
+	t.Helper()
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := http.DefaultClient.Transport
+	http.DefaultClient.Transport = rewriteHostTransport{host: parsed.Host}
+	t.Cleanup(func() { http.DefaultClient.Transport = previous })
+}
+
+func TestTranslateChunk(t *testing.T) {
+	tests := []struct {
+		name     string
+		texts    []string
+		status   int
+		response string
+		want     []string
+		wantErr  bool
+	}{
+		{
+			name:     "one translation per text returns translations",
+			texts:    []string{"Name of instance", "IP address"},
+			status:   http.StatusOK,
+			response: `{"translations":[{"text":"Nome da instância"},{"text":"Endereço IP"}]}`,
+			want:     []string{"Nome da instância", "Endereço IP"},
+		},
+		{
+			name:     "fewer translations than texts returns error",
+			texts:    []string{"Name of instance", "IP address"},
+			status:   http.StatusOK,
+			response: `{"translations":[{"text":"Nome da instância"}]}`,
+			wantErr:  true,
+		},
+		{
+			name:     "more translations than texts returns error",
+			texts:    []string{"Name of instance"},
+			status:   http.StatusOK,
+			response: `{"translations":[{"text":"Nome da instância"},{"text":"Endereço IP"}]}`,
+			wantErr:  true,
+		},
+		{
+			name:     "non 200 status returns error",
+			texts:    []string{"Name of instance"},
+			status:   http.StatusTooManyRequests,
+			response: "quota exceeded",
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.response))
+			}))
+			defer srv.Close()
+			redirectDeepl(t, srv.URL)
+
+			got, err := translateChunk(tt.texts, "test-key")
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("got nil error, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("got error %v, want nil", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -676,6 +836,59 @@ func TestPrepareTranslations(t *testing.T) {
 						Name: "interfaces", Description: "Interfaces de rede", OriginalDescription: "Network interfaces",
 						NestedAttributes: []Attribute{
 							{Name: "ip", Description: "Endereço IP", OriginalDescription: "IP address"},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name: "description still equal to original is queued again",
+			output: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{Name: "name", Description: "Name of instance", OriginalDescription: "Name of instance"},
+				}},
+			},
+			existing: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{Name: "name", Description: "Name of instance", OriginalDescription: "Name of instance"},
+				}},
+			},
+			wantPending: []string{"Name of instance"},
+			wantOutput: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{Name: "name", Description: "Name of instance", OriginalDescription: "Name of instance"},
+				}},
+			},
+		},
+		{
+			name: "nested description still equal to original is queued again",
+			output: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{
+						Name: "interfaces", Description: "Network interfaces", OriginalDescription: "Network interfaces",
+						NestedAttributes: []Attribute{
+							{Name: "ip", Description: "IP address", OriginalDescription: "IP address"},
+						},
+					},
+				}},
+			},
+			existing: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{
+						Name: "interfaces", Description: "Interfaces de rede", OriginalDescription: "Network interfaces",
+						NestedAttributes: []Attribute{
+							{Name: "ip", Description: "IP address", OriginalDescription: "IP address"},
+						},
+					},
+				}},
+			},
+			wantPending: []string{"IP address"},
+			wantOutput: map[string]Entry{
+				"resource.vm": {Attributes: []Attribute{
+					{
+						Name: "interfaces", Description: "Interfaces de rede", OriginalDescription: "Network interfaces",
+						NestedAttributes: []Attribute{
+							{Name: "ip", Description: "IP address", OriginalDescription: "IP address"},
 						},
 					},
 				}},
