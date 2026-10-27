@@ -110,6 +110,8 @@ For complete usage documentation and examples, visit:
 - Install [Terraform](https://www.terraform.io/downloads)
 - Install [Make](https://www.gnu.org/software/make/)
 - Install [Git](https://git-scm.com/downloads)
+- Install [jq](https://jqlang.github.io/jq/)
+- Install [Docker](https://docs.docker.com/get-docker/)
 
 3. Run `make build` to build the provider locally
 
