@@ -37,6 +37,6 @@ output "route_example" {
 - `description` (String) The description to help identify the route.
 - `next_hop` (String) Resolved next hop for the route, derived from the target.
 - `peering_id` (String) ID of the VPC peering used as the next hop for the route, when the target is a VPC peering.
-- `port_id` (String) ID of the port used as the next hop for the route, when the target is a port.
+- `port_id` (String) ID of the virtual network port (network interface) used as the next hop for the route, when the target is a port. Not a TCP/UDP port number.
 - `status` (String) Current status of the route.
 - `type` (String) Type of the route, as defined by the networking service.
