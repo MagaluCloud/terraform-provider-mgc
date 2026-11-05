@@ -2,6 +2,7 @@ package virtualmachines
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -407,6 +408,11 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 	getResult, err := r.vmInstances.Get(ctx, data.ID.ValueString(), imageExpands)
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
