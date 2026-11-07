@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -30,6 +31,7 @@ type VMInstancesItemModel struct {
 
 type VMInstancesModel struct {
 	Instances []VMInstancesItemModel `tfsdk:"instances"`
+	ProjectID types.String           `tfsdk:"project_id"`
 }
 
 func NewDataSourceVmInstances() datasource.DataSource {
@@ -56,6 +58,7 @@ func (r *DataSourceVmInstances) Configure(ctx context.Context, req datasource.Co
 func (r *DataSourceVmInstances) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"instances": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "List of available VM instances.",
@@ -108,9 +111,9 @@ func (r *DataSourceVmInstances) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	instances, err := r.vmInstance.ListAll(ctx, vmSDK.InstanceFilterOptions{})
+	instances, err := r.vmInstance.ListAll(ctx, project.CallOptions(data.ProjectID), vmSDK.InstanceFilterOptions{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

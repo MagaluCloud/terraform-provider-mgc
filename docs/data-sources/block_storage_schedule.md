@@ -25,6 +25,10 @@ data "mgc_block_storage_schedule" "example" {
 
 - `id` (String) The unique identifier of the snapshot schedule.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `created_at` (String) The timestamp when the schedule was created.

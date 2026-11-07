@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -44,6 +45,7 @@ type bsVolumeResourceModel struct {
 	AttachedInstanceId   types.String `tfsdk:"attached_instance_id"`
 	AttachedInstanceName types.String `tfsdk:"attached_instance_name"`
 	Encrypted            types.Bool   `tfsdk:"encrypted"`
+	ProjectID            types.String `tfsdk:"project_id"`
 }
 
 func (r *DataSourceBsVolume) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -64,6 +66,7 @@ func (r *DataSourceBsVolume) Schema(_ context.Context, req datasource.SchemaRequ
 	resp.Schema = schema.Schema{
 		Description: "Block storage volume",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the volume snapshot.",
 				Required:    true,
@@ -143,9 +146,9 @@ func (r *DataSourceBsVolume) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	sdkOutput, err := r.bsVolume.Get(ctx, data.ID.ValueString(), []string{"volume_type", "attachment"})
+	sdkOutput, err := r.bsVolume.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []string{"volume_type", "attachment"})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

@@ -31,6 +31,7 @@ resource "mgc_block_storage_snapshots" "snapshot_example" {
 
 ### Optional
 
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
 - `snapshot_source_id` (String) The ID of the snapshot source, for creating a snapshot object from a snapshot instant. Is required when volume ID is not set and both volume ID and snapshot source ID cannot be set at the same time.
 - `type` (String) The type of the snapshot.
 - `volume_id` (String) ID of block storage volume. Is required when snapshot source is not set and both volume ID and snapshot source ID cannot be set at the same time.

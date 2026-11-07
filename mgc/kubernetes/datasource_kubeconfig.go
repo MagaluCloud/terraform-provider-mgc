@@ -4,6 +4,7 @@ import (
 	"context"
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -24,6 +25,7 @@ type DataSourceKubernetesClusterKubeConfig struct {
 type DataSourceKubernetesClusterKubeConfigModel struct {
 	ClusterID types.String `tfsdk:"cluster_id"`
 	RawConfig types.String `tfsdk:"kubeconfig"`
+	ProjectID types.String `tfsdk:"project_id"`
 }
 
 func (d *DataSourceKubernetesClusterKubeConfig) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -33,6 +35,7 @@ func (d *DataSourceKubernetesClusterKubeConfig) Metadata(ctx context.Context, re
 func (d *DataSourceKubernetesClusterKubeConfig) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"cluster_id": schema.StringAttribute{
 				Required:    true,
 				Description: "The unique identifier of the Kubernetes cluster.",
@@ -51,15 +54,15 @@ func (d *DataSourceKubernetesClusterKubeConfig) Read(ctx context.Context, req da
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	sdkOutput, err := d.sdkClient.GetKubeConfig(ctx, data.ClusterID.ValueString())
+	sdkOutput, err := d.sdkClient.GetKubeConfig(ctx, project.CallOptions(data.ProjectID), data.ClusterID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
 	rawConfig, err := yaml.Marshal(sdkOutput)
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

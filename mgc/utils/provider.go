@@ -43,11 +43,12 @@ func (d *DataConfig) CoreFor(service string) *sdk.CoreClient {
 		return &d.CoreConfig
 	}
 	cfg := d.CoreConfig.GetConfig()
-	return sdk.NewMgcClient(
+	opts := []sdk.Option{
 		sdk.WithAPIKey(cfg.APIKey),
 		sdk.WithBaseURL(sdk.MgcUrl(url)),
 		sdk.WithUserAgent(cfg.UserAgent),
 		sdk.WithHTTPClient(cfg.HTTPClient),
+		sdk.WithLogger(cfg.Logger),
 		sdk.WithTimeout(cfg.Timeout),
 		sdk.WithRetryConfig(
 			cfg.RetryConfig.MaxAttempts,
@@ -55,7 +56,14 @@ func (d *DataConfig) CoreFor(service string) *sdk.CoreClient {
 			cfg.RetryConfig.MaxInterval,
 			cfg.RetryConfig.BackoffFactor,
 		),
-	)
+	}
+	if cfg.JWToken != "" {
+		opts = append(opts, sdk.WithJWToken(cfg.JWToken))
+	}
+	for k, v := range cfg.CustomHeaders {
+		opts = append(opts, sdk.WithCustomHeader(k, v))
+	}
+	return sdk.NewMgcClient(opts...)
 }
 
 // EndpointFor returns the custom base URL configured for the given service and

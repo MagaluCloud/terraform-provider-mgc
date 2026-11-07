@@ -4,6 +4,7 @@ import (
 	"context"
 
 	sdkK8s "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -37,6 +38,7 @@ type KubernetesCluster struct {
 	ClusterIPv4CIDR            types.String   `tfsdk:"cluster_ipv4_cidr"`
 	MachineTypesSource         types.String   `tfsdk:"machine_types_source"`
 	PlatformVersion            types.String   `tfsdk:"platform_version"`
+	ProjectID                  types.String   `tfsdk:"project_id"`
 }
 
 type Controlplane struct {
@@ -92,6 +94,7 @@ func (d *DataSourceKubernetesCluster) Schema(ctx context.Context, req datasource
 	resp.Schema = schema.Schema{
 		Description: "Data source for Kubernetes cluster in MGC",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "Cluster's UUID.",
 				Required:    true,
@@ -375,12 +378,13 @@ func (d *DataSourceKubernetesCluster) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	cluster, err := d.sdkClient.Get(ctx, data.ID.ValueString())
+	cluster, err := d.sdkClient.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 	converted := convertToKubernetesCluster(cluster, d.region)
+	converted.ProjectID = data.ProjectID
 	resp.Diagnostics.Append(resp.State.Set(ctx, &converted)...)
 }
 

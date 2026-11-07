@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
@@ -20,12 +21,12 @@ type MockSchedulerService struct {
 	mock.Mock
 }
 
-func (m *MockSchedulerService) List(ctx context.Context, opts storageSDK.SchedulerListOptions) (*storageSDK.SchedulerListResponse, error) {
+func (m *MockSchedulerService) List(ctx context.Context, _ clientSDK.CallOptions, opts storageSDK.SchedulerListOptions) (*storageSDK.SchedulerListResponse, error) {
 	args := m.Called(ctx, opts)
 	return args.Get(0).(*storageSDK.SchedulerListResponse), args.Error(1)
 }
 
-func (m *MockSchedulerService) ListAll(ctx context.Context, filter storageSDK.SchedulerFilterOptions) ([]storageSDK.SchedulerResponse, error) {
+func (m *MockSchedulerService) ListAll(ctx context.Context, _ clientSDK.CallOptions, filter storageSDK.SchedulerFilterOptions) ([]storageSDK.SchedulerResponse, error) {
 	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -33,12 +34,12 @@ func (m *MockSchedulerService) ListAll(ctx context.Context, filter storageSDK.Sc
 	return args.Get(0).([]storageSDK.SchedulerResponse), args.Error(1)
 }
 
-func (m *MockSchedulerService) Create(ctx context.Context, req storageSDK.SchedulerPayload) (string, error) {
+func (m *MockSchedulerService) Create(ctx context.Context, _ clientSDK.CallOptions, req storageSDK.SchedulerPayload) (string, error) {
 	args := m.Called(ctx, req)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockSchedulerService) Get(ctx context.Context, id string, expand []storageSDK.ExpandSchedulers) (*storageSDK.SchedulerResponse, error) {
+func (m *MockSchedulerService) Get(ctx context.Context, _ clientSDK.CallOptions, id string, expand []storageSDK.ExpandSchedulers) (*storageSDK.SchedulerResponse, error) {
 	args := m.Called(ctx, id, expand)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -46,17 +47,17 @@ func (m *MockSchedulerService) Get(ctx context.Context, id string, expand []stor
 	return args.Get(0).(*storageSDK.SchedulerResponse), args.Error(1)
 }
 
-func (m *MockSchedulerService) Delete(ctx context.Context, id string) error {
+func (m *MockSchedulerService) Delete(ctx context.Context, _ clientSDK.CallOptions, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockSchedulerService) AttachVolume(ctx context.Context, id string, req storageSDK.SchedulerVolumeIdentifierPayload) error {
+func (m *MockSchedulerService) AttachVolume(ctx context.Context, _ clientSDK.CallOptions, id string, req storageSDK.SchedulerVolumeIdentifierPayload) error {
 	args := m.Called(ctx, id, req)
 	return args.Error(0)
 }
 
-func (m *MockSchedulerService) DetachVolume(ctx context.Context, id string, req storageSDK.SchedulerVolumeIdentifierPayload) error {
+func (m *MockSchedulerService) DetachVolume(ctx context.Context, _ clientSDK.CallOptions, id string, req storageSDK.SchedulerVolumeIdentifierPayload) error {
 	args := m.Called(ctx, id, req)
 	return args.Error(0)
 }
@@ -207,7 +208,7 @@ func TestScheduleAttachResource_Read(t *testing.T) {
 
 			// We can't easily test the full request/response cycle without terraform framework,
 			// so we'll test the core logic directly
-			get, err := r.bsScheduler.Get(context.Background(), data.ScheduleID.ValueString(), []storageSDK.ExpandSchedulers{})
+			get, err := r.bsScheduler.Get(context.Background(), clientSDK.CallOptions{}, data.ScheduleID.ValueString(), []storageSDK.ExpandSchedulers{})
 
 			if err != nil {
 				if tt.expectError {
@@ -341,7 +342,7 @@ func TestScheduleAttachResource_AttachVolume(t *testing.T) {
 
 			mockScheduler.On("AttachVolume", mock.Anything, tt.scheduleID, expectedPayload).Return(tt.attachError)
 
-			err := r.bsScheduler.AttachVolume(context.Background(), tt.scheduleID, expectedPayload)
+			err := r.bsScheduler.AttachVolume(context.Background(), clientSDK.CallOptions{}, tt.scheduleID, expectedPayload)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -395,7 +396,7 @@ func TestScheduleAttachResource_DetachVolume(t *testing.T) {
 
 			mockScheduler.On("DetachVolume", mock.Anything, tt.scheduleID, expectedPayload).Return(tt.detachError)
 
-			err := r.bsScheduler.DetachVolume(context.Background(), tt.scheduleID, expectedPayload)
+			err := r.bsScheduler.DetachVolume(context.Background(), clientSDK.CallOptions{}, tt.scheduleID, expectedPayload)
 
 			if tt.expectError {
 				assert.Error(t, err)

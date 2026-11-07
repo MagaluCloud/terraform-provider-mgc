@@ -13,6 +13,7 @@ import (
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -44,6 +45,7 @@ type KubernetesClusterCreateResourceModel struct {
 	MachineTypesSource types.String   `tfsdk:"machine_types_source"`
 	PlatformVersion    types.String   `tfsdk:"platform_version"`
 	SubnetIDs          types.Set      `tfsdk:"subnet_ids"`
+	ProjectID          types.String   `tfsdk:"project_id"`
 }
 
 type k8sClusterResource struct {
@@ -143,6 +145,7 @@ func (r *k8sClusterResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"project_id": project.ResourceAttribute(),
 			"cluster_ipv4_cidr": schema.StringAttribute{
 				Description: "The IP address range of the Kubernetes cluster.",
 				Optional:    true,
@@ -190,14 +193,16 @@ func (r *k8sClusterResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	cluster, err := r.k8sCluster.Get(ctx, data.ID.ValueString())
+	cluster, err := r.k8sCluster.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
 	out := convertSDKCreateResultToTerraformCreateClusterModel(cluster)
+	out.ProjectID = data.ProjectID
 	resp.Diagnostics.Append(resp.State.Set(ctx, &out)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, out.ID, out.ProjectID)...)
 }
 
 func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -211,7 +216,8 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 		data.EnabledServerGroup = types.BoolValue(true)
 	}
 
-	cluster, err := r.k8sCluster.Create(ctx, k8sSDK.ClusterRequest{
+	callOpts := project.CallOptions(data.ProjectID)
+	cluster, err := r.k8sCluster.Create(ctx, callOpts, k8sSDK.ClusterRequest{
 		AllowedCIDRs:       createAllowedCidrs(data.AllowedCidrs),
 		Description:        data.Description.ValueStringPointer(),
 		Name:               data.Name.ValueString(),
@@ -228,24 +234,27 @@ func (r *k8sClusterResource) Create(ctx context.Context, req resource.CreateRequ
 
 	data.EnabledServerGroup = types.BoolNull()
 
-	createdCluster, err := r.GetClusterPooling(ctx, cluster.ID, "", "running", "provisioned")
+	createdCluster, err := r.GetClusterPooling(ctx, callOpts, cluster.ID, "", "running", "provisioned")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		data.ID = types.StringValue(cluster.ID)
 		resp.State.Set(ctx, &data)
+		resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, data.ID, data.ProjectID)...)
 		return
 	}
 
 	newState := convertSDKCreateResultToTerraformCreateClusterModel(&createdCluster)
+	newState.ProjectID = data.ProjectID
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, newState.ID, newState.ProjectID)...)
 }
 
-func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, clusterId, expectedVersion string, states ...string) (k8sSDK.Cluster, error) {
+func (r *k8sClusterResource) GetClusterPooling(ctx context.Context, callOpts clientSDK.CallOptions, clusterId, expectedVersion string, states ...string) (k8sSDK.Cluster, error) {
 	var result *k8sSDK.Cluster
 	var err error
 	for startTime := time.Now(); time.Since(startTime) < ClusterPoolingTimeout; {
 		time.Sleep(1 * time.Minute)
-		result, err = r.k8sCluster.Get(ctx, clusterId)
+		result, err = r.k8sCluster.Get(ctx, callOpts, clusterId)
 		if err != nil {
 			return k8sSDK.Cluster{}, err
 		}
@@ -279,7 +288,8 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	patch := buildPatchClusterRequest(state, plan)
 
-	_, err := r.k8sCluster.Update(ctx, state.ID.ValueString(), patch)
+	callOpts := project.CallOptions(state.ProjectID)
+	_, err := r.k8sCluster.Update(ctx, callOpts, state.ID.ValueString(), patch)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -293,12 +303,13 @@ func (r *k8sClusterResource) Update(ctx context.Context, req resource.UpdateRequ
 		expectedVersion = plan.Version.ValueString()
 	}
 
-	upgraded, err := r.GetClusterPooling(ctx, state.ID.ValueString(), expectedVersion, "running")
+	upgraded, err := r.GetClusterPooling(ctx, callOpts, state.ID.ValueString(), expectedVersion, "running")
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 	newState := convertSDKCreateResultToTerraformCreateClusterModel(&upgraded)
+	newState.ProjectID = state.ProjectID
 	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 }
 
@@ -309,13 +320,14 @@ func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.k8sCluster.Delete(ctx, data.ID.ValueString())
+	callOpts := project.CallOptions(data.ProjectID)
+	err := r.k8sCluster.Delete(ctx, callOpts, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	if _, err := r.GetClusterPooling(ctx, data.ID.ValueString(), "", "deleted"); err != nil {
+	if _, err := r.GetClusterPooling(ctx, callOpts, data.ID.ValueString(), "", "deleted"); err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
 			if e.StatusCode == http.StatusNotFound {
@@ -328,13 +340,20 @@ func (r *k8sClusterResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 }
 
+func (r *k8sClusterResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = project.IdentitySchema()
+}
+
 func (r *k8sClusterResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if req.ID == "" {
-		resp.Diagnostics.AddError("Invalid import ID", "The ID must be provided")
+	target, diags := project.ResolveImport(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), target.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), target.ProjectID)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, target.ID, target.ProjectID)...)
 }
 
 func createAllowedCidrs(data []types.String) *[]string {

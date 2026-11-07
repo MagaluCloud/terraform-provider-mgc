@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	vmSDK "github.com/MagaluCloud/mgc-sdk-go/compute"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -42,6 +43,7 @@ func (r *DataSourceVmInstance) Configure(ctx context.Context, req datasource.Con
 func (r *DataSourceVmInstance) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"id": schema.StringAttribute{
 				Required:    true,
 				Description: "ID of machine-type.",
@@ -207,6 +209,7 @@ type VMInstanceModel struct {
 	ErrorSlug        types.String            `tfsdk:"error_slug"`
 	Labels           []types.String          `tfsdk:"labels"`
 	Interfaces       []NetworkInterfaceModel `tfsdk:"interfaces"`
+	ProjectID        types.String            `tfsdk:"project_id"`
 }
 
 func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -216,9 +219,9 @@ func (r *DataSourceVmInstance) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	instance, err := r.vmInstance.Get(ctx, data.ID.ValueString(), []vmSDK.InstanceExpand{vmSDK.InstanceNetworkExpand, vmSDK.InstanceImageExpand, vmSDK.InstanceMachineTypeExpand})
+	instance, err := r.vmInstance.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []vmSDK.InstanceExpand{vmSDK.InstanceNetworkExpand, vmSDK.InstanceImageExpand, vmSDK.InstanceMachineTypeExpand})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

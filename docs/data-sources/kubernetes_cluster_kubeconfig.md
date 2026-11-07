@@ -29,6 +29,10 @@ output "cluster" {
 
 - `cluster_id` (String) The unique identifier of the Kubernetes cluster.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `kubeconfig` (String) The full contents of the Kubernetes cluster's kubeconfig yaml file.

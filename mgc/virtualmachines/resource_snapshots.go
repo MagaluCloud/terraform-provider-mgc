@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -12,6 +13,7 @@ import (
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -52,6 +54,7 @@ type vmSnapshotsResourceModel struct {
 	VirtualMachineID types.String `tfsdk:"virtual_machine_id"`
 	UpdatedAt        types.String `tfsdk:"updated_at"`
 	CreatedAt        types.String `tfsdk:"created_at"`
+	ProjectID        types.String `tfsdk:"project_id"`
 }
 
 func (r *vmSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -60,6 +63,7 @@ func (r *vmSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description:         description,
 		MarkdownDescription: description,
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description:   "The ID of the snapshot.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -89,8 +93,8 @@ func (r *vmSnapshots) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	}
 }
 
-func (r *vmSnapshots) getVmSnapshot(ctx context.Context, id string) (*computeSdk.Snapshot, error) {
-	getResult, err := r.vmSnapshots.Get(ctx, id, []computeSdk.SnapshotExpand{})
+func (r *vmSnapshots) getVmSnapshot(ctx context.Context, callOpts clientSDK.CallOptions, id string) (*computeSdk.Snapshot, error) {
+	getResult, err := r.vmSnapshots.Get(ctx, callOpts, id, []computeSdk.SnapshotExpand{})
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +105,9 @@ func (r *vmSnapshots) Read(ctx context.Context, req resource.ReadRequest, resp *
 	data := &vmSnapshotsResourceModel{}
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	getResult, err := r.getVmSnapshot(ctx, data.ID.ValueString())
+	getResult, err := r.getVmSnapshot(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
@@ -129,7 +133,7 @@ func (r *vmSnapshots) Create(ctx context.Context, req resource.CreateRequest, re
 		},
 	}
 
-	result, err := r.vmSnapshots.Create(ctx, createParams)
+	result, err := r.vmSnapshots.Create(ctx, project.CallOptions(plan.ProjectID), createParams)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -155,7 +159,7 @@ func (r *vmSnapshots) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	err := r.vmSnapshots.Delete(ctx, data.ID.ValueString())
+	err := r.vmSnapshots.Delete(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return

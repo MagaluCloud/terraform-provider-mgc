@@ -26,3 +26,7 @@ resource "mgc_virtual_machine_interface_attach" "attach_vm" {
 
 - `instance_id` (String) ID of the VM instance to attach the interface to.
 - `interface_id` (String) ID of the network interface to attach.
+
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.

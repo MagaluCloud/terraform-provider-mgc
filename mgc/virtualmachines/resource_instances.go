@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -22,10 +23,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
-
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -174,6 +174,7 @@ type vmInstancesResourceModel struct {
 	IPv6                   types.String `tfsdk:"ipv6"`
 	IPv4                   types.String `tfsdk:"ipv4"`
 	SnapshotID             types.String `tfsdk:"snapshot_id"`
+	ProjectID              types.String `tfsdk:"project_id"`
 }
 
 type VmInstancesNetworkInterfaceModel struct {
@@ -191,6 +192,7 @@ func (r *vmInstances) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description:         description,
 		MarkdownDescription: description,
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the virtual machine instance.",
 				Computed:    true,
@@ -405,13 +407,14 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	getResult, err := r.vmInstances.Get(ctx, data.ID.ValueString(), imageExpands)
+	getResult, err := r.vmInstances.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), imageExpands)
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 	convertedData := r.toTerraformModel(ctx, getResult, data)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedData)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, convertedData.ID, convertedData.ProjectID)...)
 }
 
 func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -456,11 +459,12 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 		}
 	}
 
+	callOpts := project.CallOptions(state.ProjectID)
 	var createdID string
 	var err error
 
 	if state.SnapshotID.ValueString() != "" {
-		createdID, err = r.vmSnapshots.Restore(ctx, state.SnapshotID.ValueString(), computeSdk.RestoreSnapshotRequest{
+		createdID, err = r.vmSnapshots.Restore(ctx, callOpts, state.SnapshotID.ValueString(), computeSdk.RestoreSnapshotRequest{
 			Name: state.Name.ValueString(),
 			MachineType: computeSdk.IDOrName{
 				Name: state.MachineType.ValueStringPointer(),
@@ -495,14 +499,14 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 			Network:          &createNetwork,
 		}
 
-		createdID, err = r.vmInstances.Create(ctx, createParams)
+		createdID, err = r.vmInstances.Create(ctx, callOpts, createParams)
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
 		}
 	}
 
-	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdID, StatusCompleted)
+	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, callOpts, createdID, StatusCompleted)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -510,6 +514,7 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 
 	convertedResult := r.toTerraformModel(ctx, getResponse, state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &convertedResult)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, convertedResult.ID, convertedResult.ProjectID)...)
 }
 
 func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -521,8 +526,10 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
+	callOpts := project.CallOptions(state.ProjectID)
+
 	if state.Name.ValueString() != plan.Name.ValueString() {
-		err := r.vmInstances.Rename(ctx, plan.ID.ValueString(), plan.Name.ValueString())
+		err := r.vmInstances.Rename(ctx, callOpts, plan.ID.ValueString(), plan.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(utils.ParseSDKError(err))
 			return
@@ -530,7 +537,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if state.MachineType.ValueString() != plan.MachineType.ValueString() {
-		err := r.vmInstances.Retype(ctx, plan.ID.ValueString(), computeSdk.RetypeRequest{
+		err := r.vmInstances.Retype(ctx, callOpts, plan.ID.ValueString(), computeSdk.RetypeRequest{
 			MachineType: computeSdk.IDOrName{
 				Name: plan.MachineType.ValueStringPointer(),
 			},
@@ -541,7 +548,7 @@ func (r *vmInstances) Update(ctx context.Context, req resource.UpdateRequest, re
 		}
 	}
 
-	getResult, err := r.waitUntilInstanceStatusMatches(ctx, plan.ID.ValueString(), StatusCompleted)
+	getResult, err := r.waitUntilInstanceStatusMatches(ctx, callOpts, plan.ID.ValueString(), StatusCompleted)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading VM", err.Error())
 		return
@@ -560,13 +567,14 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 
 	//false = not remove public ip
-	err := r.vmInstances.Delete(ctx, data.ID.ValueString(), false)
+	callOpts := project.CallOptions(data.ProjectID)
+	err := r.vmInstances.Delete(ctx, callOpts, data.ID.ValueString(), false)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 
-	_, err = r.waitUntilInstanceStatusMatches(ctx, data.ID.ValueString(), StatusDeleted)
+	_, err = r.waitUntilInstanceStatusMatches(ctx, callOpts, data.ID.ValueString(), StatusDeleted)
 	if err != nil {
 		switch e := err.(type) {
 		case *clientSDK.HTTPError:
@@ -580,9 +588,20 @@ func (r *vmInstances) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 }
 
+func (r *vmInstances) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = project.IdentitySchema()
+}
+
 func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	target, diags := project.ResolveImport(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	model := vmInstancesResourceModel{
-		ID:                     types.StringValue(req.ID),
+		ID:                     target.ID,
+		ProjectID:              target.ProjectID,
 		Name:                   types.StringUnknown(),
 		CreatedAt:              types.StringUnknown(),
 		SshKeyName:             types.StringUnknown(),
@@ -602,6 +621,7 @@ func (r *vmInstances) ImportState(ctx context.Context, req resource.ImportStateR
 		SnapshotID:             types.StringUnknown(),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, target.ID, target.ProjectID)...)
 }
 
 func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.Instance, tfData vmInstancesResourceModel) *vmInstancesResourceModel {
@@ -653,6 +673,7 @@ func (r *vmInstances) toTerraformModel(ctx context.Context, server *computeSdk.I
 	data.CreationSecurityGroups = types.ListNull(types.StringType)
 	data.CreationSubnets = r.resolveCreationSubnets(ctx, server, tfData.CreationSubnets)
 	data.SnapshotID = types.StringNull()
+	data.ProjectID = tfData.ProjectID
 
 	return &data
 }
@@ -708,7 +729,7 @@ func isIPv4(addr string) bool {
 	return ip != nil && ip.To4() != nil
 }
 
-func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
+func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, callOpts clientSDK.CallOptions, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, VmInstanceStatusTimeout)
 	defer cancel()
 
@@ -717,7 +738,7 @@ func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instan
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
 		case <-time.After(10 * time.Second):
-			instance, err := r.vmInstances.Get(ctx, instanceID, imageExpands)
+			instance, err := r.vmInstances.Get(ctx, callOpts, instanceID, imageExpands)
 			if err != nil {
 				return nil, err
 			}

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	bsSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -38,6 +39,7 @@ type bsSnapshotDataSourceModel struct {
 	Size              types.Int64  `tfsdk:"size"`
 	Type              types.String `tfsdk:"type"`
 	AvailabilityZones types.List   `tfsdk:"availability_zones"`
+	ProjectID         types.String `tfsdk:"project_id"`
 }
 
 func (r *DataSourceBsSnapshotDatasource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -108,10 +110,12 @@ func GetBsSnapshotAttributes(idRequired bool) map[string]schema.Attribute {
 
 func (r *DataSourceBsSnapshotDatasource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	description := "Block storage snapshots"
+	attributes := GetBsSnapshotAttributes(true)
+	attributes["project_id"] = project.DataSourceAttribute()
 	resp.Schema = schema.Schema{
 		Description:         description,
 		MarkdownDescription: description,
-		Attributes:          GetBsSnapshotAttributes(true),
+		Attributes:          attributes,
 	}
 }
 
@@ -122,9 +126,9 @@ func (r *DataSourceBsSnapshotDatasource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	sdkOutput, err := r.bsSnapshotService.Get(ctx, data.ID.ValueString(), []string{})
+	sdkOutput, err := r.bsSnapshotService.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []string{})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

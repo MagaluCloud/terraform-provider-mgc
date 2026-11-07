@@ -27,6 +27,10 @@ resource "mgc_virtual_machine_snapshots" "basic_snapshot" {
 - `name` (String) The name of the snapshot.
 - `virtual_machine_id` (String) The ID of the virtual machine.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
+
 ### Read-Only
 
 - `created_at` (String) The timestamp when the snapshot was created.

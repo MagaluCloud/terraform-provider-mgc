@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -36,6 +37,13 @@ type bsScheduleDataSourceModel struct {
 	State                 types.String `tfsdk:"state"`
 	CreatedAt             types.String `tfsdk:"created_at"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
+}
+
+// bsScheduleDataSourceReadModel keeps project_id off bsScheduleDataSourceModel,
+// which is also the item type of the schedules list.
+type bsScheduleDataSourceReadModel struct {
+	bsScheduleDataSourceModel
+	ProjectID types.String `tfsdk:"project_id"`
 }
 
 func (r *DataSourceBsSchedule) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -102,23 +110,25 @@ func GetBsScheduleAttributes(idRequired bool) map[string]schema.Attribute {
 
 func (r *DataSourceBsSchedule) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	description := "Block storage snapshot schedule"
+	attributes := GetBsScheduleAttributes(true)
+	attributes["project_id"] = project.DataSourceAttribute()
 	resp.Schema = schema.Schema{
 		Description:         description,
 		MarkdownDescription: description,
-		Attributes:          GetBsScheduleAttributes(true),
+		Attributes:          attributes,
 	}
 }
 
 func (r *DataSourceBsSchedule) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data bsScheduleDataSourceModel
+	var data bsScheduleDataSourceReadModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	get, err := r.bsScheduler.Get(ctx, data.ID.ValueString(), []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
+	get, err := r.bsScheduler.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 

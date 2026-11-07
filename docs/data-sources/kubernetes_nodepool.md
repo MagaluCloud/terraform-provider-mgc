@@ -33,6 +33,7 @@ output "nodepool" {
 
 ### Optional
 
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
 - `subnet_ids` (Set of String) List of subnet ids.
 
 ### Read-Only

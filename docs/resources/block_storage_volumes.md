@@ -34,6 +34,7 @@ resource "mgc_block_storage_volumes" "example_volume" {
 
 - `availability_zone` (String) The availability zones where the volume is available.
 - `encrypted` (Boolean) Indicates if the volume is encrypted.
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
 - `snapshot_id` (String) Create a volume from a snapshot.
 
 ### Read-Only
@@ -48,5 +49,9 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
+# Volume in the default project
 terraform import mgc_block_storage_volumes.example_volume 123
+
+# Volume in a project
+terraform import mgc_block_storage_volumes.example_volume project/550e8400-e29b-41d4-a716-446655440000/resource/123
 ```

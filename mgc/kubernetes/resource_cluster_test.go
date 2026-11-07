@@ -2,10 +2,15 @@ package kubernetes
 
 import (
 	"context"
+	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	k8sSDK "github.com/MagaluCloud/mgc-sdk-go/kubernetes"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -377,4 +382,172 @@ func TestTimeConversionEdgeCases(t *testing.T) {
 		assert.Equal(t, expectedTime, tfModel.CreatedAt)
 		assert.Equal(t, expectedTime, tfModel.UpdatedAt)
 	})
+}
+
+const clusterTestProjectID = "550e8400-e29b-41d4-a716-446655440000"
+
+type mockClusterService struct {
+	k8sSDK.ClusterService
+	gotCallOpts clientSDK.CallOptions
+	cluster     *k8sSDK.Cluster
+	err         error
+}
+
+func (m *mockClusterService) Get(_ context.Context, callOpts clientSDK.CallOptions, _ string) (*k8sSDK.Cluster, error) {
+	m.gotCallOpts = callOpts
+	return m.cluster, m.err
+}
+
+func TestClusterImportStateWithProject(t *testing.T) {
+	ctx := context.Background()
+	r := &k8sClusterResource{}
+	s := testutils.GetResourceTestSchema(t, r)
+	i := testutils.GetResourceTestIdentitySchema(t, r)
+
+	newResp := func() *resource.ImportStateResponse {
+		return &resource.ImportStateResponse{
+			State:    tfsdk.State{Schema: s.Schema, Raw: tftypes.NewValue(s.Schema.Type().TerraformType(ctx), nil)},
+			Identity: &tfsdk.ResourceIdentity{Schema: i.IdentitySchema, Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), nil)},
+		}
+	}
+
+	testCases := []struct {
+		name            string
+		req             resource.ImportStateRequest
+		expectedProject types.String
+	}{
+		{
+			name:            "Import ID with project",
+			req:             resource.ImportStateRequest{ID: "project/" + clusterTestProjectID + "/resource/cluster-uuid"},
+			expectedProject: types.StringValue(clusterTestProjectID),
+		},
+		{
+			name:            "Import ID in the default project",
+			req:             resource.ImportStateRequest{ID: "cluster-uuid"},
+			expectedProject: types.StringNull(),
+		},
+		{
+			name: "Identity with project",
+			req: resource.ImportStateRequest{Identity: &tfsdk.ResourceIdentity{
+				Schema: i.IdentitySchema,
+				Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), map[string]tftypes.Value{
+					"id":         tftypes.NewValue(tftypes.String, "cluster-uuid"),
+					"project_id": tftypes.NewValue(tftypes.String, clusterTestProjectID),
+				}),
+			}},
+			expectedProject: types.StringValue(clusterTestProjectID),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := newResp()
+			r.ImportState(ctx, tc.req, resp)
+			assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+
+			var state KubernetesClusterCreateResourceModel
+			assert.False(t, resp.State.Get(ctx, &state).HasError())
+			assert.Equal(t, types.StringValue("cluster-uuid"), state.ID)
+			assert.Equal(t, tc.expectedProject, state.ProjectID)
+
+			var identity project.IdentityModel
+			assert.False(t, resp.Identity.Get(ctx, &identity).HasError())
+			assert.Equal(t, types.StringValue("cluster-uuid"), identity.ID)
+			assert.Equal(t, tc.expectedProject, identity.ProjectID)
+		})
+	}
+
+	t.Run("Unknown namespace is rejected", func(t *testing.T) {
+		resp := newResp()
+		r.ImportState(ctx, resource.ImportStateRequest{ID: "region/br-ne1/cluster-uuid"}, resp)
+		assert.True(t, resp.Diagnostics.HasError())
+	})
+}
+
+func TestClusterReadKeepsProject(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name             string
+		projectID        types.String
+		expectedCallOpts clientSDK.CallOptions
+	}{
+		{
+			name:             "Project is sent and kept in state",
+			projectID:        types.StringValue(clusterTestProjectID),
+			expectedCallOpts: clientSDK.CallOptions{ProjectID: clusterTestProjectID},
+		},
+		{
+			name:             "Default project sends no scope",
+			projectID:        types.StringNull(),
+			expectedCallOpts: clientSDK.CallOptions{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock := &mockClusterService{cluster: &k8sSDK.Cluster{ID: "cluster-uuid", Name: "c", Version: "v1.30.0"}}
+			r := &k8sClusterResource{k8sCluster: mock}
+			s := testutils.GetResourceTestSchema(t, r)
+			i := testutils.GetResourceTestIdentitySchema(t, r)
+
+			current := tfsdk.State{Schema: s.Schema, Raw: tftypes.NewValue(s.Schema.Type().TerraformType(ctx), nil)}
+			assert.False(t, current.Set(ctx, &KubernetesClusterCreateResourceModel{
+				ID:        types.StringValue("cluster-uuid"),
+				ProjectID: tc.projectID,
+				SubnetIDs: types.SetNull(types.StringType),
+			}).HasError())
+
+			resp := &resource.ReadResponse{
+				State:    current,
+				Identity: &tfsdk.ResourceIdentity{Schema: i.IdentitySchema, Raw: tftypes.NewValue(i.IdentitySchema.Type().TerraformType(ctx), nil)},
+			}
+			r.Read(ctx, resource.ReadRequest{State: current}, resp)
+			assert.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+
+			assert.Equal(t, tc.expectedCallOpts, mock.gotCallOpts)
+
+			var state KubernetesClusterCreateResourceModel
+			assert.False(t, resp.State.Get(ctx, &state).HasError())
+			assert.Equal(t, tc.projectID, state.ProjectID)
+
+			var identity project.IdentityModel
+			assert.False(t, resp.Identity.Get(ctx, &identity).HasError())
+			assert.Equal(t, tc.projectID, identity.ProjectID)
+		})
+	}
+
+	t.Run("Not found hints at the project scope", func(t *testing.T) {
+		mock := &mockClusterService{err: &clientSDK.HTTPError{
+			StatusCode: http.StatusNotFound,
+			Status:     "404 Not Found",
+			Response:   &http.Response{Request: &http.Request{URL: &url.URL{Path: "/v0/clusters/cluster-uuid"}}, Header: http.Header{}},
+		}}
+		r := &k8sClusterResource{k8sCluster: mock}
+		s := testutils.GetResourceTestSchema(t, r)
+
+		current := tfsdk.State{Schema: s.Schema, Raw: tftypes.NewValue(s.Schema.Type().TerraformType(ctx), nil)}
+		assert.False(t, current.Set(ctx, &KubernetesClusterCreateResourceModel{
+			ID:        types.StringValue("cluster-uuid"),
+			ProjectID: types.StringNull(),
+			SubnetIDs: types.SetNull(types.StringType),
+		}).HasError())
+
+		resp := &resource.ReadResponse{State: current}
+		r.Read(ctx, resource.ReadRequest{State: current}, resp)
+
+		assert.True(t, resp.Diagnostics.HasError())
+		assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "project/{project_id}/resource/{id}")
+	})
+}
+
+func TestClusterSchemaHasProjectID(t *testing.T) {
+	r := &k8sClusterResource{}
+	s := testutils.GetResourceTestSchema(t, r)
+	i := testutils.GetResourceTestIdentitySchema(t, r)
+
+	_, ok := s.Schema.Attributes["project_id"]
+	assert.True(t, ok)
+	_, ok = i.IdentitySchema.Attributes["project_id"]
+	assert.True(t, ok)
 }

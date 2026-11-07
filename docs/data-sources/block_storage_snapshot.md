@@ -29,6 +29,10 @@ output "snapshot" {
 
 - `id` (String) The unique identifier of the volume snapshot.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `availability_zones` (List of String) The availability zones of the snapshot.

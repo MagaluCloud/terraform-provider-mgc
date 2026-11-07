@@ -72,6 +72,10 @@ resource "mgc_block_storage_schedule_attach" "multi_schedule_attach" {
 - `schedule_id` (String) The ID of the snapshot schedule to attach the volume to.
 - `volume_id` (String) The ID of the block storage volume to attach to the schedule.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used. Changing it forces a new resource; removing it keeps the current project.
+
 ## Import
 
 Import is supported using the following syntax:
@@ -80,8 +84,11 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import a block storage schedule attach resource
-# The import ID format is: schedule_id,volume_id
+# The import ID format is: [project/{project_id}/resource/]schedule_id,volume_id
 
 # Example: Import an existing schedule-volume attachment
 terraform import mgc_block_storage_schedule_attach.example_attach "schedule-123,volume-456"
+
+# Attachment in a project
+terraform import mgc_block_storage_schedule_attach.example_attach "project/550e8400-e29b-41d4-a716-446655440000/resource/schedule-123,volume-456"
 ```

@@ -31,6 +31,10 @@ output "node" {
 - `cluster_id` (String) ID of the cluster.
 - `nodepool_id` (String) ID of the node pool.
 
+### Optional
+
+- `project_id` (String) ID of the project the resource belongs to. When omitted, the tenant's default project is used.
+
 ### Read-Only
 
 - `nodes` (Attributes List) List of nodes in the cluster. (see [below for nested schema](#nestedatt--nodes))

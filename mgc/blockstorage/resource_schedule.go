@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -57,12 +58,14 @@ type bsScheduleResourceModel struct {
 	State                 types.String `tfsdk:"state"`
 	CreatedAt             types.String `tfsdk:"created_at"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
+	ProjectID             types.String `tfsdk:"project_id"`
 }
 
 func (r *bsSchedule) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "The block storage schedule resource allows you to manage automatic snapshot schedules in the Magalu Cloud.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.ResourceAttribute(),
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the snapshot schedule.",
 				PlanModifiers: []planmodifier.String{
@@ -158,12 +161,15 @@ func (r *bsSchedule) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	get, err := r.bsScheduler.Get(ctx, data.ID.ValueString(), []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
+	get, err := r.bsScheduler.Get(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString(), []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, SchedulerResponseToModel(get))...)
+	model := SchedulerResponseToModel(get)
+	model.ProjectID = data.ProjectID
+	resp.Diagnostics.Append(resp.State.Set(ctx, model)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, model.ID, model.ProjectID)...)
 }
 
 func (r *bsSchedule) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -173,7 +179,8 @@ func (r *bsSchedule) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	created, err := r.bsScheduler.Create(ctx, storageSDK.SchedulerPayload{
+	callOpts := project.CallOptions(plan.ProjectID)
+	created, err := r.bsScheduler.Create(ctx, callOpts, storageSDK.SchedulerPayload{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueStringPointer(),
 		Snapshot: storageSDK.SnapshotConfig{
@@ -193,12 +200,15 @@ func (r *bsSchedule) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	get, err := r.bsScheduler.Get(ctx, created, []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
+	get, err := r.bsScheduler.Get(ctx, callOpts, created, []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, SchedulerResponseToModel(get))...)
+	model := SchedulerResponseToModel(get)
+	model.ProjectID = plan.ProjectID
+	resp.Diagnostics.Append(resp.State.Set(ctx, model)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, model.ID, model.ProjectID)...)
 }
 
 func SchedulerResponseToModel(get *storageSDK.SchedulerResponse) *bsScheduleResourceModel {
@@ -227,12 +237,24 @@ func (r *bsSchedule) Delete(ctx context.Context, req resource.DeleteRequest, res
 		return
 	}
 
-	if err := r.bsScheduler.Delete(ctx, data.ID.ValueString()); err != nil {
+	if err := r.bsScheduler.Delete(ctx, project.CallOptions(data.ProjectID), data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
 }
 
+func (r *bsSchedule) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = project.IdentitySchema()
+}
+
 func (r *bsSchedule) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	target, diags := project.ResolveImport(ctx, req)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), target.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), target.ProjectID)...)
+	resp.Diagnostics.Append(project.SetIdentity(ctx, resp.Identity, target.ID, target.ProjectID)...)
 }

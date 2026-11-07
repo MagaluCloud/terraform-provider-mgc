@@ -5,8 +5,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/project"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 )
 
@@ -26,6 +28,7 @@ func (r *DataSourceBsSchedules) Metadata(_ context.Context, req datasource.Metad
 
 type bsSchedulesDataSourceModel struct {
 	Schedules []bsScheduleDataSourceModel `tfsdk:"schedules"`
+	ProjectID types.String                `tfsdk:"project_id"`
 }
 
 func (r *DataSourceBsSchedules) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -49,6 +52,7 @@ func (r *DataSourceBsSchedules) Schema(_ context.Context, req datasource.SchemaR
 		Description:         description,
 		MarkdownDescription: description,
 		Attributes: map[string]schema.Attribute{
+			"project_id": project.DataSourceAttribute(),
 			"schedules": schema.ListNestedAttribute{
 				Description: "List of snapshot schedules.",
 				Computed:    true,
@@ -67,11 +71,11 @@ func (r *DataSourceBsSchedules) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	schedulesResponse, err := r.bsScheduler.ListAll(ctx, storageSDK.SchedulerFilterOptions{
+	schedulesResponse, err := r.bsScheduler.ListAll(ctx, project.CallOptions(data.ProjectID), storageSDK.SchedulerFilterOptions{
 		Expand: []storageSDK.ExpandSchedulers{storageSDK.ExpandSchedulersVolume},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.AddError(project.ParseSDKError(err, data.ProjectID))
 		return
 	}
 
