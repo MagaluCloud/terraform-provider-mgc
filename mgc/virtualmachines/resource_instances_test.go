@@ -531,7 +531,9 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 		status        InstanceStatus
 		instanceError *computeSdk.Error
 		snapshotID    string
+		pollInterval  time.Duration
 		statusTimeout time.Duration
+		expectPoll    bool
 		wantDetail    []string
 	}{
 		{
@@ -539,14 +541,18 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 			instanceID:    "vm-orphan-1",
 			status:        StatusCreatingErrorQuotaNetwork,
 			instanceError: quotaError,
+			pollInterval:  time.Millisecond,
 			statusTimeout: time.Second,
+			expectPoll:    true,
 			wantDetail:    []string{"No available public IP addresses", "terraform destroy"},
 		},
 		{
 			name:          "wait reaches its timeout",
 			instanceID:    "vm-stuck-1",
 			status:        StatusCreating,
-			statusTimeout: 20 * time.Millisecond,
+			pollInterval:  time.Second,
+			statusTimeout: time.Millisecond,
+			expectPoll:    false,
 			wantDetail:    []string{"terraform destroy"},
 		},
 		{
@@ -555,8 +561,10 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 			status:        StatusCreatingErrorQuotaNetwork,
 			instanceError: quotaError,
 			snapshotID:    "snap-1",
+			pollInterval:  time.Millisecond,
 			statusTimeout: time.Second,
-			wantDetail:    []string{"terraform destroy"},
+			expectPoll:    true,
+			wantDetail:    []string{"No available public IP addresses", "terraform destroy"},
 		},
 	}
 
@@ -570,7 +578,9 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 			instance.Error = tt.instanceError
 
 			mockInst := &mockInstanceService{}
-			mockInst.On("Get", mock.Anything, tt.instanceID, imageExpands).Return(instance, nil)
+			if tt.expectPoll {
+				mockInst.On("Get", mock.Anything, tt.instanceID, imageExpands).Return(instance, nil)
+			}
 
 			mockSnap := &mockSnapshotService{}
 			if tt.snapshotID != "" {
@@ -583,7 +593,7 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 			r := &vmInstances{
 				vmInstances:        mockInst,
 				vmSnapshots:        mockSnap,
-				statusPollInterval: time.Millisecond,
+				statusPollInterval: tt.pollInterval,
 				statusTimeout:      tt.statusTimeout,
 			}
 
