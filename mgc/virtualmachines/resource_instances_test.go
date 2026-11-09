@@ -423,6 +423,8 @@ func TestVirtualMachineInstancesResource_Delete_ErrorPropagation(t *testing.T) {
 }
 
 func TestVirtualMachineInstancesResource_WaitUntilInstanceStatusMatches_ErrorStatus(t *testing.T) {
+	t.Parallel()
+
 	mockInst := &mockInstanceService{}
 
 	// Instance in error state should be detected
@@ -430,9 +432,17 @@ func TestVirtualMachineInstancesResource_WaitUntilInstanceStatusMatches_ErrorSta
 	inst.Error = &computeSdk.Error{Message: "quota exceeded", Slug: "quota"}
 	mockInst.On("Get", mock.Anything, "vm-err", imageExpands).Return(inst, nil)
 
-	// This will timeout after 60min or return error on error status
-	// We skip actual execution due to wait time
-	t.Skip("Skipping wait-based test to avoid long timeout")
+	r := &vmInstances{
+		vmInstances:        mockInst,
+		statusPollInterval: time.Millisecond,
+		statusTimeout:      time.Second,
+	}
+
+	_, err := r.waitUntilInstanceStatusMatches(context.Background(), "vm-err", StatusCompleted)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "quota exceeded")
+	mockInst.AssertExpectations(t)
 }
 
 func TestInstanceStatusList_ContainsExpectedErrors(t *testing.T) {
@@ -507,79 +517,127 @@ func TestVirtualMachineInstancesResource_StatusConstants(t *testing.T) {
 	}
 }
 
-func createWaitFailureResource(t *testing.T, instanceID string, errored *computeSdk.Instance) (*vmInstances, *mockInstanceService) {
-	t.Helper()
+func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T) {
+	t.Parallel()
 
-	mockInst := &mockInstanceService{}
-	mockInst.On("Create", mock.Anything, mock.Anything).Return(instanceID, nil)
-	mockInst.On("Get", mock.Anything, instanceID, imageExpands).Return(errored, nil)
-
-	return &vmInstances{
-		vmInstances:        mockInst,
-		statusPollInterval: time.Millisecond,
-		statusTimeout:      time.Second,
-	}, mockInst
-}
-
-func createRequestFor(t *testing.T, ctx context.Context, r *vmInstances, model *vmInstancesResourceModel) (resource.CreateRequest, *resource.CreateResponse) {
-	t.Helper()
-
-	schemaResp := testutils.GetResourceTestSchema(t, r)
-
-	model.NetworkInterfaces = r.toTerraformNetworkInterfacesList(ctx, []VmInstancesNetworkInterfaceModel{})
-	model.CreationSecurityGroups = types.ListNull(types.StringType)
-	model.CreationSubnets = types.ListNull(types.StringType)
-
-	seed := tfsdk.State{Schema: schemaResp.Schema}
-	diags := seed.Set(ctx, model)
-	require.False(t, diags.HasError(), "failed to build the input config: %v", diags)
-
-	req := resource.CreateRequest{
-		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: seed.Raw},
-	}
-	resp := &resource.CreateResponse{
-		State: tfsdk.State{
-			Schema: schemaResp.Schema,
-			Raw:    tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil),
-		},
-	}
-	return req, resp
-}
-
-func TestVirtualMachineInstancesResource_Create_WaitErrorStatusKeepsID(t *testing.T) {
-	ctx := context.Background()
-
-	errored := buildTestInstance("vm-orphan-1", "pr322-n5-replace",
-		StatusCreatingErrorQuotaNetwork.String(), "10.0.0.50", nil, "")
-	errored.Error = &computeSdk.Error{
+	quotaError := &computeSdk.Error{
 		Message: "No available public IP addresses for allocation or network-interface in your account.",
 		Slug:    "quota",
 	}
 
-	r, mockInst := createWaitFailureResource(t, "vm-orphan-1", errored)
-	req, resp := createRequestFor(t, ctx, r, &vmInstancesResourceModel{
-		Name:        types.StringValue("pr322-n5-replace"),
-		MachineType: types.StringValue("c1-small"),
-		Image:       types.StringValue("ubuntu-22-04"),
-	})
-
-	r.Create(ctx, req, resp)
-
-	assert.True(t, resp.Diagnostics.HasError(), "a failed wait has to report the error")
-
-	finalState := vmInstancesResourceModel{}
-	resp.State.Get(ctx, &finalState)
-	assert.Equal(t, "vm-orphan-1", finalState.ID.ValueString(),
-		"the created instance id has to reach state, otherwise destroy needs an import")
-
-	detail := ""
-	for _, d := range resp.Diagnostics.Errors() {
-		detail += d.Detail()
+	tests := []struct {
+		name          string
+		instanceID    string
+		status        InstanceStatus
+		instanceError *computeSdk.Error
+		snapshotID    string
+		statusTimeout time.Duration
+		wantDetail    []string
+	}{
+		{
+			name:          "api reports an error status during the wait",
+			instanceID:    "vm-orphan-1",
+			status:        StatusCreatingErrorQuotaNetwork,
+			instanceError: quotaError,
+			statusTimeout: time.Second,
+			wantDetail:    []string{"No available public IP addresses", "terraform destroy"},
+		},
+		{
+			name:          "wait reaches its timeout",
+			instanceID:    "vm-stuck-1",
+			status:        StatusCreating,
+			statusTimeout: 20 * time.Millisecond,
+			wantDetail:    []string{"terraform destroy"},
+		},
+		{
+			name:          "instance came from a snapshot restore",
+			instanceID:    "vm-restored-1",
+			status:        StatusCreatingErrorQuotaNetwork,
+			instanceError: quotaError,
+			snapshotID:    "snap-1",
+			statusTimeout: time.Second,
+			wantDetail:    []string{"terraform destroy"},
+		},
 	}
-	assert.Contains(t, detail, "No available public IP addresses",
-		"the message the API returned has to survive")
-	assert.Contains(t, detail, "terraform destroy",
-		"the user has to be told the instance is in state and how to remove it")
 
-	mockInst.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+
+			instance := buildTestInstance(tt.instanceID, "pr322-n5-replace",
+				tt.status.String(), "10.0.0.50", nil, "")
+			instance.Error = tt.instanceError
+
+			mockInst := &mockInstanceService{}
+			mockInst.On("Get", mock.Anything, tt.instanceID, imageExpands).Return(instance, nil)
+
+			mockSnap := &mockSnapshotService{}
+			if tt.snapshotID != "" {
+				mockSnap.On("Restore", mock.Anything, tt.snapshotID, mock.Anything).
+					Return(tt.instanceID, nil)
+			} else {
+				mockInst.On("Create", mock.Anything, mock.Anything).Return(tt.instanceID, nil)
+			}
+
+			r := &vmInstances{
+				vmInstances:        mockInst,
+				vmSnapshots:        mockSnap,
+				statusPollInterval: time.Millisecond,
+				statusTimeout:      tt.statusTimeout,
+			}
+
+			schemaResp := testutils.GetResourceTestSchema(t, r)
+
+			inputData := vmInstancesResourceModel{
+				ID:                     types.StringUnknown(),
+				Name:                   types.StringValue("pr322-n5-replace"),
+				MachineType:            types.StringValue("c1-small"),
+				Image:                  types.StringValue("ubuntu-22-04"),
+				SnapshotID:             types.StringNull(),
+				NetworkInterfaces:      r.toTerraformNetworkInterfacesList(ctx, []VmInstancesNetworkInterfaceModel{}),
+				CreationSecurityGroups: types.ListNull(types.StringType),
+				CreationSubnets:        types.ListNull(types.StringType),
+			}
+			if tt.snapshotID != "" {
+				inputData.SnapshotID = types.StringValue(tt.snapshotID)
+				inputData.Image = types.StringNull()
+			}
+
+			plan := tfsdk.Plan{Schema: schemaResp.Schema}
+			diags := plan.Set(ctx, &inputData)
+			require.False(t, diags.HasError(), "failed to set input plan: %v", diags)
+
+			req := resource.CreateRequest{
+				Plan:   plan,
+				Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: plan.Raw},
+			}
+			resp := &resource.CreateResponse{
+				State: tfsdk.State{
+					Schema: schemaResp.Schema,
+					Raw:    tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil),
+				},
+			}
+
+			r.Create(ctx, req, resp)
+
+			assert.True(t, resp.Diagnostics.HasError(), "a failed wait has to report the error")
+
+			var finalState vmInstancesResourceModel
+			resp.State.Get(ctx, &finalState)
+			assert.Equal(t, tt.instanceID, finalState.ID.ValueString(),
+				"the created instance id has to reach state, otherwise destroy needs an import")
+
+			detail := ""
+			for _, d := range resp.Diagnostics.Errors() {
+				detail += d.Detail()
+			}
+			for _, want := range tt.wantDetail {
+				assert.Contains(t, detail, want)
+			}
+
+			mockInst.AssertExpectations(t)
+			mockSnap.AssertExpectations(t)
+		})
+	}
 }
