@@ -8,11 +8,14 @@ import (
 
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -502,4 +505,81 @@ func TestVirtualMachineInstancesResource_StatusConstants(t *testing.T) {
 	for _, s := range statuses {
 		assert.NotEmpty(t, string(s))
 	}
+}
+
+func createWaitFailureResource(t *testing.T, instanceID string, errored *computeSdk.Instance) (*vmInstances, *mockInstanceService) {
+	t.Helper()
+
+	mockInst := &mockInstanceService{}
+	mockInst.On("Create", mock.Anything, mock.Anything).Return(instanceID, nil)
+	mockInst.On("Get", mock.Anything, instanceID, imageExpands).Return(errored, nil)
+
+	return &vmInstances{
+		vmInstances:        mockInst,
+		statusPollInterval: time.Millisecond,
+		statusTimeout:      time.Second,
+	}, mockInst
+}
+
+func createRequestFor(t *testing.T, ctx context.Context, r *vmInstances, model *vmInstancesResourceModel) (resource.CreateRequest, *resource.CreateResponse) {
+	t.Helper()
+
+	schemaResp := testutils.GetResourceTestSchema(t, r)
+
+	model.NetworkInterfaces = r.toTerraformNetworkInterfacesList(ctx, []VmInstancesNetworkInterfaceModel{})
+	model.CreationSecurityGroups = types.ListNull(types.StringType)
+	model.CreationSubnets = types.ListNull(types.StringType)
+
+	seed := tfsdk.State{Schema: schemaResp.Schema}
+	diags := seed.Set(ctx, model)
+	require.False(t, diags.HasError(), "failed to build the input config: %v", diags)
+
+	req := resource.CreateRequest{
+		Config: tfsdk.Config{Schema: schemaResp.Schema, Raw: seed.Raw},
+	}
+	resp := &resource.CreateResponse{
+		State: tfsdk.State{
+			Schema: schemaResp.Schema,
+			Raw:    tftypes.NewValue(schemaResp.Schema.Type().TerraformType(ctx), nil),
+		},
+	}
+	return req, resp
+}
+
+func TestVirtualMachineInstancesResource_Create_WaitErrorStatusKeepsID(t *testing.T) {
+	ctx := context.Background()
+
+	errored := buildTestInstance("vm-orphan-1", "pr322-n5-replace",
+		StatusCreatingErrorQuotaNetwork.String(), "10.0.0.50", nil, "")
+	errored.Error = &computeSdk.Error{
+		Message: "No available public IP addresses for allocation or network-interface in your account.",
+		Slug:    "quota",
+	}
+
+	r, mockInst := createWaitFailureResource(t, "vm-orphan-1", errored)
+	req, resp := createRequestFor(t, ctx, r, &vmInstancesResourceModel{
+		Name:        types.StringValue("pr322-n5-replace"),
+		MachineType: types.StringValue("c1-small"),
+		Image:       types.StringValue("ubuntu-22-04"),
+	})
+
+	r.Create(ctx, req, resp)
+
+	assert.True(t, resp.Diagnostics.HasError(), "a failed wait has to report the error")
+
+	finalState := vmInstancesResourceModel{}
+	resp.State.Get(ctx, &finalState)
+	assert.Equal(t, "vm-orphan-1", finalState.ID.ValueString(),
+		"the created instance id has to reach state, otherwise destroy needs an import")
+
+	detail := ""
+	for _, d := range resp.Diagnostics.Errors() {
+		detail += d.Detail()
+	}
+	assert.Contains(t, detail, "No available public IP addresses",
+		"the message the API returned has to survive")
+	assert.Contains(t, detail, "terraform destroy",
+		"the user has to be told the instance is in state and how to remove it")
+
+	mockInst.AssertExpectations(t)
 }

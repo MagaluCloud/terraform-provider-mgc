@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	VmInstanceStatusTimeout = 60 * time.Minute
+	VmInstanceStatusTimeout      = 60 * time.Minute
+	VmInstanceStatusPollInterval = 10 * time.Second
 )
 
 type InstanceStatus string
@@ -113,6 +114,23 @@ type vmInstances struct {
 	vmInstances  computeSdk.InstanceService
 	vmSnapshots  computeSdk.SnapshotService
 	networkPorts netSDK.PortService
+
+	statusPollInterval time.Duration
+	statusTimeout      time.Duration
+}
+
+func (r *vmInstances) pollInterval() time.Duration {
+	if r.statusPollInterval > 0 {
+		return r.statusPollInterval
+	}
+	return VmInstanceStatusPollInterval
+}
+
+func (r *vmInstances) statusWaitTimeout() time.Duration {
+	if r.statusTimeout > 0 {
+		return r.statusTimeout
+	}
+	return VmInstanceStatusTimeout
 }
 
 func (r *vmInstances) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -504,7 +522,14 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 
 	getResponse, err := r.waitUntilInstanceStatusMatches(ctx, createdID, StatusCompleted)
 	if err != nil {
-		resp.Diagnostics.AddError(utils.ParseSDKError(err))
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), createdID)...)
+
+		msg, detail := utils.ParseSDKError(err)
+		resp.Diagnostics.AddError(msg, fmt.Sprintf(
+			"%s\n\nThe instance %s was created and is recorded in Terraform state. "+
+				"It is still in your account, so remove it with `terraform destroy` "+
+				"if you do not want to keep it.",
+			detail, createdID))
 		return
 	}
 
@@ -709,14 +734,14 @@ func isIPv4(addr string) bool {
 }
 
 func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, VmInstanceStatusTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, r.statusWaitTimeout())
 	defer cancel()
 
 	for {
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
-		case <-time.After(10 * time.Second):
+		case <-time.After(r.pollInterval()):
 			instance, err := r.vmInstances.Get(ctx, instanceID, imageExpands)
 			if err != nil {
 				return nil, err
