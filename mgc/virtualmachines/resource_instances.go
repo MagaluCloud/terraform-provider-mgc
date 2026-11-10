@@ -524,8 +524,8 @@ func (r *vmInstances) Create(ctx context.Context, req resource.CreateRequest, re
 	if err != nil {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), createdID)...)
 
-		msg, detail := utils.ParseSDKError(err)
-		resp.Diagnostics.AddError(msg, fmt.Sprintf(
+		_, detail := utils.ParseSDKError(err)
+		resp.Diagnostics.AddError("Instance created but did not reach status completed", fmt.Sprintf(
 			"%s\n\nThe instance %s was created and is recorded in Terraform state. "+
 				"It is still in your account, so remove it with `terraform destroy` "+
 				"if you do not want to keep it.",
