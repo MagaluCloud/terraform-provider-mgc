@@ -107,7 +107,10 @@ func (s InstanceStatus) IsError() bool {
 }
 
 func NewVirtualMachineInstancesResource() resource.Resource {
-	return &vmInstances{}
+	return &vmInstances{
+		statusPollInterval: VmInstanceStatusPollInterval,
+		statusTimeout:      VmInstanceStatusTimeout,
+	}
 }
 
 type vmInstances struct {
@@ -117,20 +120,6 @@ type vmInstances struct {
 
 	statusPollInterval time.Duration
 	statusTimeout      time.Duration
-}
-
-func (r *vmInstances) pollInterval() time.Duration {
-	if r.statusPollInterval > 0 {
-		return r.statusPollInterval
-	}
-	return VmInstanceStatusPollInterval
-}
-
-func (r *vmInstances) statusWaitTimeout() time.Duration {
-	if r.statusTimeout > 0 {
-		return r.statusTimeout
-	}
-	return VmInstanceStatusTimeout
 }
 
 func (r *vmInstances) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -734,14 +723,14 @@ func isIPv4(addr string) bool {
 }
 
 func (r *vmInstances) waitUntilInstanceStatusMatches(ctx context.Context, instanceID string, status InstanceStatus) (*computeSdk.Instance, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, r.statusWaitTimeout())
+	timeoutCtx, cancel := context.WithTimeout(ctx, r.statusTimeout)
 	defer cancel()
 
 	for {
 		select {
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("timeout waiting for instance %s to reach status %s", instanceID, status)
-		case <-time.After(r.pollInterval()):
+		case <-time.After(r.statusPollInterval):
 			instance, err := r.vmInstances.Get(ctx, instanceID, imageExpands)
 			if err != nil {
 				return nil, err
