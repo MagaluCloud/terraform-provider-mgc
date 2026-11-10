@@ -637,6 +637,8 @@ func TestVirtualMachineInstancesResource_Create_WaitFailureKeepsID(t *testing.T)
 			resp.State.Get(ctx, &finalState)
 			assert.Equal(t, tt.instanceID, finalState.ID.ValueString(),
 				"the created instance id has to reach state, otherwise destroy needs an import")
+			assert.True(t, finalState.Name.IsNull(),
+				"only the id is written on the failure path, never the unconfirmed plan")
 
 			detail := ""
 			for _, d := range resp.Diagnostics.Errors() {
