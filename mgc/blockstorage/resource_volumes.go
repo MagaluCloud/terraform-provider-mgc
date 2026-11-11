@@ -2,7 +2,9 @@ package blockstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 
 	storageSDK "github.com/MagaluCloud/mgc-sdk-go/blockstorage"
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -163,6 +166,11 @@ func (r *bsVolumes) Read(ctx context.Context, req resource.ReadRequest, resp *re
 
 	getResult, err := r.bsVolumes.Get(ctx, plan.ID.ValueString(), []string{storageSDK.VolumeTypeExpand})
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
