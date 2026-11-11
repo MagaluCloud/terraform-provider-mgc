@@ -538,6 +538,8 @@ func TestVirtualMachineInstancesResource_Read_NotFoundRemovesState(t *testing.T)
 	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
 
 	require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+	require.Equal(t, 1, resp.Diagnostics.WarningsCount())
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "vm-gone")
 	assert.True(t, resp.State.Raw.IsNull())
 	mockInst.AssertExpectations(t)
 }

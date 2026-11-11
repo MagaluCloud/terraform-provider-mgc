@@ -410,6 +410,10 @@ func (r *vmInstances) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if err != nil {
 		var httpErr *clientSDK.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				"Virtual machine instance not found",
+				fmt.Sprintf("Virtual machine instance %s was not found and was removed from the state. If it still exists, check that the provider is configured for the region where it was created.", data.ID.ValueString()),
+			)
 			resp.State.RemoveResource(ctx)
 			return
 		}
