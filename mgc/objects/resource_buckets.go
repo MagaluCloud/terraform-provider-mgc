@@ -333,61 +333,81 @@ func (r *objectStorageBuckets) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	lockStatus, err := r.buckets.GetBucketLockStatus(ctx, bucketName)
-	if err != nil {
-		state.Lock = types.BoolValue(false)
-	} else {
+	switch {
+	case err == nil:
 		state.Lock = types.BoolValue(lockStatus)
+	case state.Lock.IsNull() || state.Lock.IsUnknown():
+		// Import has no previous value to preserve. Leaving it null makes every
+		// plan show "lock: null -> false" and the apply call UnlockBucket.
+		state.Lock = types.BoolValue(false)
+	default:
+		resp.Diagnostics.AddWarning(
+			"Could not read object lock configuration",
+			fmt.Sprintf("Keeping the previous value for bucket %s: %s", bucketName, err.Error()),
+		)
 	}
 
 	statePolicy := state.Policy.ValueString()
 	policy, err := r.buckets.GetPolicy(ctx, bucketName)
-	if err != nil {
-		state.Policy = jsontypes.NewNormalizedNull()
-	} else if policy != nil {
-		dropServerInejction(policy, statePolicy)
-		policyJSON, err := json.Marshal(policy)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error serializing bucket policy",
-				fmt.Sprintf("Could not serialize policy for bucket %s: %s", bucketName, err.Error()),
-			)
-			return
+	if err == nil {
+		if policy != nil {
+			dropServerInejction(policy, statePolicy)
+			policyJSON, err := json.Marshal(policy)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error serializing bucket policy",
+					fmt.Sprintf("Could not serialize policy for bucket %s: %s", bucketName, err.Error()),
+				)
+				return
+			}
+			state.Policy = jsontypes.NewNormalizedValue(string(policyJSON))
+		} else {
+			state.Policy = jsontypes.NewNormalizedNull()
 		}
-		state.Policy = jsontypes.NewNormalizedValue(string(policyJSON))
 	} else {
-		state.Policy = jsontypes.NewNormalizedNull()
+		resp.Diagnostics.AddWarning(
+			"Could not read bucket policy",
+			fmt.Sprintf("Keeping the previous value for bucket %s: %s", bucketName, err.Error()),
+		)
 	}
 
 	corsConfig, err := r.buckets.GetCORS(ctx, bucketName)
-	if err != nil || corsConfig == nil || len(corsConfig.CORSRules) == 0 {
-		state.CORS = types.ObjectNull(map[string]attr.Type{
-			"allowed_headers": types.ListType{ElemType: types.StringType},
-			"allowed_methods": types.ListType{ElemType: types.StringType},
-			"allowed_origins": types.ListType{ElemType: types.StringType},
-			"expose_headers":  types.ListType{ElemType: types.StringType},
-			"max_age_seconds": types.Int64Type,
-		})
+	if err == nil {
+		if corsConfig == nil || len(corsConfig.CORSRules) == 0 {
+			state.CORS = types.ObjectNull(map[string]attr.Type{
+				"allowed_headers": types.ListType{ElemType: types.StringType},
+				"allowed_methods": types.ListType{ElemType: types.StringType},
+				"allowed_origins": types.ListType{ElemType: types.StringType},
+				"expose_headers":  types.ListType{ElemType: types.StringType},
+				"max_age_seconds": types.Int64Type,
+			})
+		} else {
+			tfCORS, err := convertFromCORSConfiguration(ctx, corsConfig)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error converting CORS configuration",
+					fmt.Sprintf("Could not convert CORS configuration: %s", err.Error()),
+				)
+				return
+			}
+			corsObj, diag := types.ObjectValueFrom(ctx, map[string]attr.Type{
+				"allowed_headers": types.ListType{ElemType: types.StringType},
+				"allowed_methods": types.ListType{ElemType: types.StringType},
+				"allowed_origins": types.ListType{ElemType: types.StringType},
+				"expose_headers":  types.ListType{ElemType: types.StringType},
+				"max_age_seconds": types.Int64Type,
+			}, tfCORS)
+			if diag.HasError() {
+				resp.Diagnostics.Append(diag...)
+				return
+			}
+			state.CORS = corsObj
+		}
 	} else {
-		tfCORS, err := convertFromCORSConfiguration(ctx, corsConfig)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error converting CORS configuration",
-				fmt.Sprintf("Could not convert CORS configuration: %s", err.Error()),
-			)
-			return
-		}
-		corsObj, diag := types.ObjectValueFrom(ctx, map[string]attr.Type{
-			"allowed_headers": types.ListType{ElemType: types.StringType},
-			"allowed_methods": types.ListType{ElemType: types.StringType},
-			"allowed_origins": types.ListType{ElemType: types.StringType},
-			"expose_headers":  types.ListType{ElemType: types.StringType},
-			"max_age_seconds": types.Int64Type,
-		}, tfCORS)
-		if diag.HasError() {
-			resp.Diagnostics.Append(diag...)
-			return
-		}
-		state.CORS = corsObj
+		resp.Diagnostics.AddWarning(
+			"Could not read CORS configuration",
+			fmt.Sprintf("Keeping the previous value for bucket %s: %s", bucketName, err.Error()),
+		)
 	}
 
 	state.Region = types.StringValue(r.region)
