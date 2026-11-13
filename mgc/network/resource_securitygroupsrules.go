@@ -2,7 +2,11 @@ package network
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -175,6 +179,15 @@ func (r *NetworkSecurityGroupsRulesResource) Read(ctx context.Context, req resou
 
 	rule, err := r.networkRules.Get(ctx, data.Id.ValueString())
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				"Security group rule not found",
+				fmt.Sprintf("Security group rule %s was not found and was removed from the state.", data.Id.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -512,7 +513,7 @@ func TestNetworkSecurityGroupsResource_ErrorHandling(t *testing.T) {
 	}{
 		{
 			name:      "http error",
-			sdkError:  &clientSDK.HTTPError{StatusCode: 404},
+			sdkError:  &clientSDK.HTTPError{StatusCode: 500},
 			operation: "read",
 		},
 		{
@@ -951,4 +952,73 @@ func getTestSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func TestNetworkSecurityGroupsResource_Read_NotFoundRemovesState(t *testing.T) {
+	r, mockSvc := setupTestResource(t)
+	mockSvc.On("Get", mock.Anything, "sg-gone").Return(nil, notFoundError())
+
+	state := createTestState(t, NetworkSecurityGroupsModel{Id: types.StringValue("sg-gone")})
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+	require.Equal(t, 1, resp.Diagnostics.WarningsCount())
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "sg-gone")
+	assert.True(t, resp.State.Raw.IsNull())
+	mockSvc.AssertExpectations(t)
+}
+
+type mockRuleService struct {
+	mock.Mock
+	netSDK.RuleService
+}
+
+func (m *mockRuleService) Get(ctx context.Context, id string) (*netSDK.RuleResponse, error) {
+	args := m.Called(ctx, id)
+	if result := args.Get(0); result != nil {
+		return result.(*netSDK.RuleResponse), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func ruleReadState(t *testing.T, r *NetworkSecurityGroupsRulesResource, id string) tfsdk.State {
+	t.Helper()
+	schemaResp := testutils.GetResourceTestSchema(t, r)
+	state := tfsdk.State{Schema: schemaResp.Schema}
+	diags := state.Set(context.Background(), NetworkSecurityGroupRuleModel{Id: types.StringValue(id)})
+	require.False(t, diags.HasError(), "%v", diags)
+	return state
+}
+
+func TestNetworkSecurityGroupsRulesResource_Read_NotFoundRemovesState(t *testing.T) {
+	mockSvc := &mockRuleService{}
+	mockSvc.On("Get", mock.Anything, "rule-gone").Return(nil, notFoundError())
+	r := &NetworkSecurityGroupsRulesResource{networkRules: mockSvc}
+
+	state := ruleReadState(t, r, "rule-gone")
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+	require.Equal(t, 1, resp.Diagnostics.WarningsCount())
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "rule-gone")
+	assert.True(t, resp.State.Raw.IsNull())
+	mockSvc.AssertExpectations(t)
+}
+
+func TestNetworkSecurityGroupsRulesResource_Read_OtherErrorsKeepState(t *testing.T) {
+	mockSvc := &mockRuleService{}
+	mockSvc.On("Get", mock.Anything, "rule-err").Return(nil, errors.New("api error"))
+	r := &NetworkSecurityGroupsRulesResource{networkRules: mockSvc}
+
+	state := ruleReadState(t, r, "rule-err")
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.False(t, resp.State.Raw.IsNull())
 }

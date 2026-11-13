@@ -2,7 +2,11 @@ package network
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
 
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
@@ -92,6 +96,15 @@ func (r *NetworkSecurityGroupsResource) Read(ctx context.Context, req resource.R
 
 	sc, err := r.networkSecurityGroups.Get(ctx, data.Id.ValueString())
 	if err != nil {
+		var httpErr *clientSDK.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				"Security group not found",
+				fmt.Sprintf("Security group %s was not found and was removed from the state.", data.Id.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
 	}
