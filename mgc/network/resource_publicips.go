@@ -101,7 +101,13 @@ func (r *NetworkPublicIPResource) Create(ctx context.Context, req resource.Creat
 
 	pip, err := r.networkPIP.Get(ctx, createdPIP)
 	if err != nil {
+		// Keep the ID so the public IP that was just created is tracked (and
+		// tainted) instead of being left behind outside the state.
+		data.Id = types.StringValue(createdPIP)
+		data.PublicIP = types.StringNull()
+		resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 		resp.Diagnostics.AddError("Failed to fetch public IP address", err.Error())
+		return
 	}
 
 	data.Id = types.StringPointerValue(pip.ID)
@@ -125,6 +131,9 @@ func (r *NetworkPublicIPResource) Read(ctx context.Context, req resource.ReadReq
 	data.Id = types.StringPointerValue(pip.ID)
 	data.PublicIP = types.StringPointerValue(pip.PublicIP)
 	data.Description = types.StringPointerValue(pip.Description)
+	if pip.VPCID != nil {
+		data.VPCId = types.StringPointerValue(pip.VPCID)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
