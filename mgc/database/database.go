@@ -8,6 +8,8 @@ import (
 func GetDataSources() []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewDBaaSClusterDataSource,
+		NewDBaaSClusterSnapshotDataSource,
+		NewDBaaSClusterSnapshotsDataSource,
 		NewDBaaSClustersDataSource,
 		NewDataSourceDbaasEngines,
 		NewDataSourceDbaasInstance,
@@ -26,6 +28,7 @@ func GetDataSources() []func() datasource.DataSource {
 func GetResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewDBaaSClusterResource,
+		NewDBaaSClusterSnapshotResource,
 		NewDBaaSInstanceResource,
 		NewDBaaSInstanceSnapshotResource,
 		NewDBaaSParameterGroupsResource,

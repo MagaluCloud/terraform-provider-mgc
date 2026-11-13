@@ -137,6 +137,32 @@ resource "mgc_dbaas_parameter_groups" "cluster_pg" {
 #   sensitive = true
 # }
 
+# resource "mgc_dbaas_clusters_snapshots" "test_cluster_snapshot" {
+#   cluster_id  = mgc_dbaas_clusters.test_cluster_with_pg.id
+#   name        = "test-cluster-snapshot-${random_pet.name.id}"
+#   description = "Test cluster snapshot for terraform acceptance tests"
+# }
+
+# output "dbaas_cluster_snapshot_details" {
+#   value = mgc_dbaas_clusters_snapshots.test_cluster_snapshot
+# }
+
+# resource "mgc_dbaas_clusters" "test_cluster_restored" {
+#   name                  = "test-cluster-restored-${random_pet.name.id}"
+#   source_cluster_id     = mgc_dbaas_clusters.test_cluster_with_pg.id
+#   snapshot_id           = mgc_dbaas_clusters_snapshots.test_cluster_snapshot.id
+#   instance_type         = var.instance_type_label_cluster
+#   volume_size           = 100
+#   volume_type           = "CLOUD_NVME15K"
+#   backup_retention_days = 7
+#   backup_start_at       = "03:00:00"
+# }
+
+# output "dbaas_cluster_restored_details" {
+#   value     = mgc_dbaas_clusters.test_cluster_restored
+#   sensitive = true
+# }
+
 
 # ------------------------------
 # Data Sources
@@ -192,6 +218,15 @@ data "mgc_dbaas_replicas" "all_db_replicas" {}
 
 # data "mgc_dbaas_cluster" "specific_test_cluster_no_pg" {
 #   id = mgc_dbaas_clusters.test_cluster_no_pg.id
+# }
+
+# data "mgc_dbaas_clusters_snapshot" "specific_test_cluster_snapshot" {
+#   id         = mgc_dbaas_clusters_snapshots.test_cluster_snapshot.id
+#   cluster_id = mgc_dbaas_clusters.test_cluster_with_pg.id
+# }
+
+# data "mgc_dbaas_clusters_snapshots" "specific_test_cluster_snapshots" {
+#   cluster_id = mgc_dbaas_clusters.test_cluster_with_pg.id
 # }
 
 # ------------------------------
@@ -253,4 +288,12 @@ output "all_db_replicas_data" {
 
 # output "specific_test_cluster_no_pg_data" {
 #   value = data.mgc_dbaas_cluster.specific_test_cluster_no_pg
+# }
+
+# output "specific_test_cluster_snapshot_data" {
+#   value = data.mgc_dbaas_clusters_snapshot.specific_test_cluster_snapshot
+# }
+
+# output "specific_test_cluster_snapshots_data" {
+#   value = data.mgc_dbaas_clusters_snapshots.specific_test_cluster_snapshots
 # }

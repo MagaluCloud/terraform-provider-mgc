@@ -1,0 +1,1 @@
+terraform import mgc_dbaas_clusters_snapshots.example <cluster_id>,<snapshot_id>
