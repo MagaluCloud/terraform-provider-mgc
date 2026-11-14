@@ -17,6 +17,7 @@ type NetworkPublicIPsModel struct {
 
 type NetworkPublicIPsDataSource struct {
 	networkPIP netSDK.PublicIPService
+	networkVpc netSDK.VPCService
 }
 
 func NewDataSourceNetworkPublicIPs() datasource.DataSource {
@@ -37,7 +38,9 @@ func (r *NetworkPublicIPsDataSource) Configure(ctx context.Context, req datasour
 		return
 	}
 
-	r.networkPIP = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).PublicIPs()
+	network := netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork))
+	r.networkPIP = network.PublicIPs()
+	r.networkVpc = network.VPCs()
 }
 
 func (r *NetworkPublicIPsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -78,6 +81,9 @@ func (r *NetworkPublicIPsDataSource) Schema(_ context.Context, _ datasource.Sche
 func (r *NetworkPublicIPsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	data := &NetworkPublicIPsModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	pip, err := r.networkPIP.List(ctx)
 	if err != nil {
@@ -85,13 +91,33 @@ func (r *NetworkPublicIPsDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
+	var missingVPCIDs []string
 	for _, ip := range pip {
 		data.IPs = append(data.IPs, NetworkPublicIPDataSourceModel{
-			Id:       types.StringPointerValue(ip.ID),
-			PublicIP: types.StringPointerValue(ip.PublicIP),
-			VPCId:    types.StringPointerValue(ip.VPCID),
-			PortId:   types.StringPointerValue(ip.PortID),
+			Id:          types.StringPointerValue(ip.ID),
+			Description: types.StringPointerValue(ip.Description),
+			PublicIP:    types.StringPointerValue(ip.PublicIP),
+			VPCId:       types.StringPointerValue(ip.VPCID),
+			PortId:      types.StringPointerValue(ip.PortID),
 		})
+		if !hasPublicIPVPCID(ip.VPCID) && ip.ID != nil {
+			missingVPCIDs = append(missingVPCIDs, *ip.ID)
+		}
+	}
+
+	if len(missingVPCIDs) > 0 {
+		resolved, err := findPublicIPVPCIDs(ctx, r.networkVpc, missingVPCIDs)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resolve public IP VPC IDs", err.Error())
+			return
+		}
+		for i := range data.IPs {
+			if vpcID, ok := resolved[data.IPs[i].Id.ValueString()]; ok {
+				data.IPs[i].VPCId = types.StringValue(vpcID)
+			} else if !hasPublicIPVPCID(pip[i].VPCID) {
+				data.IPs[i].VPCId = types.StringNull()
+			}
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
