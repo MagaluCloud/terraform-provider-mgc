@@ -21,6 +21,7 @@ type NetworkPublicIPDataSourceModel struct {
 
 type NetworkPublicIPDataSource struct {
 	networkPIP netSDK.PublicIPService
+	networkVpc netSDK.VPCService
 }
 
 func NewDataSourceNetworkPublicIP() datasource.DataSource {
@@ -41,7 +42,9 @@ func (r *NetworkPublicIPDataSource) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	r.networkPIP = netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork)).PublicIPs()
+	network := netSDK.New(dataConfig.CoreFor(utils.ServiceNetwork))
+	r.networkPIP = network.PublicIPs()
+	r.networkVpc = network.VPCs()
 }
 
 func (r *NetworkPublicIPDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -75,6 +78,9 @@ func (r *NetworkPublicIPDataSource) Schema(_ context.Context, _ datasource.Schem
 func (r *NetworkPublicIPDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	data := &NetworkPublicIPDataSourceModel{}
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	pip, err := r.networkPIP.Get(ctx, data.Id.ValueString())
 	if err != nil {
@@ -87,6 +93,19 @@ func (r *NetworkPublicIPDataSource) Read(ctx context.Context, req datasource.Rea
 	data.PublicIP = types.StringPointerValue(pip.PublicIP)
 	data.VPCId = types.StringPointerValue(pip.VPCID)
 	data.PortId = types.StringPointerValue(pip.PortID)
+
+	if !hasPublicIPVPCID(pip.VPCID) {
+		resolved, err := findPublicIPVPCIDs(ctx, r.networkVpc, []string{data.Id.ValueString()})
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resolve public IP VPC ID", err.Error())
+			return
+		}
+		if vpcID, ok := resolved[data.Id.ValueString()]; ok {
+			data.VPCId = types.StringValue(vpcID)
+		} else {
+			data.VPCId = types.StringNull()
+		}
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
