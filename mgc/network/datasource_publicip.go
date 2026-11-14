@@ -82,7 +82,8 @@ func (r *NetworkPublicIPDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	pip, err := r.networkPIP.Get(ctx, data.Id.ValueString())
+	publicIPID := data.Id.ValueString()
+	pip, err := r.networkPIP.Get(ctx, publicIPID)
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
 		return
@@ -95,12 +96,12 @@ func (r *NetworkPublicIPDataSource) Read(ctx context.Context, req datasource.Rea
 	data.PortId = types.StringPointerValue(pip.PortID)
 
 	if !hasPublicIPVPCID(pip.VPCID) {
-		resolved, err := findPublicIPVPCIDs(ctx, r.networkVpc, []string{data.Id.ValueString()})
+		resolved, err := findPublicIPVPCIDs(ctx, r.networkVpc, []string{publicIPID})
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to resolve public IP VPC ID", err.Error())
 			return
 		}
-		if vpcID, ok := resolved[data.Id.ValueString()]; ok {
+		if vpcID, ok := resolved[publicIPID]; ok {
 			data.VPCId = types.StringValue(vpcID)
 		} else {
 			data.VPCId = types.StringNull()
