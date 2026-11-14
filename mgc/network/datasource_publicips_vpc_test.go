@@ -36,12 +36,12 @@ func TestFindPublicIPVPCIDs(t *testing.T) {
 
 		service := &fakePublicIPVPCReader{
 			vpcs: []netSDK.VPC{
-				{ID: stringPointer("vpc-1")},
-				{ID: stringPointer("vpc-2")},
+				{ID: publicIPVPCStringPointer("vpc-1")},
+				{ID: publicIPVPCStringPointer("vpc-2")},
 			},
 			publicIPs: map[string][]netSDK.PublicIPDb{
-				"vpc-1": {{ID: stringPointer("ip-1")}},
-				"vpc-2": {{ID: stringPointer("ip-2")}},
+				"vpc-1": {{ID: publicIPVPCStringPointer("ip-1")}},
+				"vpc-2": {{ID: publicIPVPCStringPointer("ip-2")}},
 			},
 		}
 
@@ -71,7 +71,7 @@ func TestFindPublicIPVPCIDs(t *testing.T) {
 		t.Parallel()
 
 		service := &fakePublicIPVPCReader{
-			vpcs: []netSDK.VPC{{ID: stringPointer("vpc-1")}},
+			vpcs: []netSDK.VPC{{ID: publicIPVPCStringPointer("vpc-1")}},
 			publicIPErr: map[string]error{"vpc-1": errors.New("request failed")},
 		}
 		_, err := findPublicIPVPCIDs(context.Background(), service, []string{"ip-1"})
@@ -79,6 +79,6 @@ func TestFindPublicIPVPCIDs(t *testing.T) {
 	})
 }
 
-func stringPointer(value string) *string {
+func publicIPVPCStringPointer(value string) *string {
 	return &value
 }
