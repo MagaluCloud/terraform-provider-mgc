@@ -18,6 +18,7 @@ import (
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/objects"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/platform"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/ssh"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/tags"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/virtualmachines"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -63,6 +64,7 @@ type EndpointsModel struct {
 	Network           types.String `tfsdk:"network"`
 	ObjectStorage     types.String `tfsdk:"object_storage"`
 	SSH               types.String `tfsdk:"ssh"`
+	Tags              types.String `tfsdk:"tags"`
 	VirtualMachine    types.String `tfsdk:"virtual_machine"`
 }
 
@@ -86,6 +88,7 @@ func (p *mgcProvider) Schema(ctx context.Context, req provider.SchemaRequest, re
 					"network":            endpointAttribute("Custom endpoint for the Network service."),
 					"object_storage":     endpointAttribute("Custom endpoint for the Object Storage (S3-compatible) service."),
 					"ssh":                endpointAttribute("Custom endpoint for the SSH Keys service."),
+					"tags":               endpointAttribute("Custom endpoint for the Tags service, which is global."),
 					"virtual_machine":    endpointAttribute("Custom endpoint for the Virtual Machines service."),
 				},
 			},
@@ -168,6 +171,7 @@ func (p *mgcProvider) Resources(ctx context.Context) []func() resource.Resource 
 	resources = append(resources, objects.GetResources()...)
 	resources = append(resources, platform.GetResources()...)
 	resources = append(resources, ssh.GetResources()...)
+	resources = append(resources, tags.GetResources()...)
 	resources = append(resources, virtualmachines.GetResources()...)
 
 	return resources
@@ -185,6 +189,7 @@ func (p *mgcProvider) DataSources(ctx context.Context) []func() datasource.DataS
 	dataSources = append(dataSources, objects.GetDataSources()...)
 	dataSources = append(dataSources, platform.GetDataSources()...)
 	dataSources = append(dataSources, ssh.GetDataSources()...)
+	dataSources = append(dataSources, tags.GetDataSources()...)
 	dataSources = append(dataSources, virtualmachines.GetDataSources()...)
 
 	return dataSources
@@ -221,6 +226,7 @@ func NewConfigData(plan ProviderModel, tfVersion string) utils.DataConfig {
 		setEndpoint(endpoints, utils.ServiceNetwork, plan.Endpoints.Network)
 		setEndpoint(endpoints, utils.ServiceObjectStorage, plan.Endpoints.ObjectStorage)
 		setEndpoint(endpoints, utils.ServiceSSH, plan.Endpoints.SSH)
+		setEndpoint(endpoints, utils.ServiceTags, plan.Endpoints.Tags)
 		setEndpoint(endpoints, utils.ServiceVirtualMachine, plan.Endpoints.VirtualMachine)
 		output.SetServiceEndpoints(endpoints)
 	}

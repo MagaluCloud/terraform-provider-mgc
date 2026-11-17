@@ -3,15 +3,19 @@ package virtualmachines
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
+	clientSDK "github.com/MagaluCloud/mgc-sdk-go/client"
 	computeSdk "github.com/MagaluCloud/mgc-sdk-go/compute"
 	netSDK "github.com/MagaluCloud/mgc-sdk-go/network"
+	"github.com/MagaluCloud/terraform-provider-mgc/mgc/internal/testutils"
 	"github.com/MagaluCloud/terraform-provider-mgc/mgc/utils"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -502,4 +506,54 @@ func TestVirtualMachineInstancesResource_StatusConstants(t *testing.T) {
 	for _, s := range statuses {
 		assert.NotEmpty(t, string(s))
 	}
+}
+
+func vmInstanceReadState(t *testing.T, r *vmInstances, id string) tfsdk.State {
+	t.Helper()
+	schemaResp := testutils.GetResourceTestSchema(t, r)
+	state := tfsdk.State{Schema: schemaResp.Schema}
+	diags := state.Set(context.Background(), vmInstancesResourceModel{
+		ID:                     types.StringValue(id),
+		NetworkInterfaces:      r.toTerraformNetworkInterfacesList(context.Background(), nil),
+		CreationSecurityGroups: types.ListNull(types.StringType),
+		CreationSubnets:        types.ListNull(types.StringType),
+	})
+	require.False(t, diags.HasError(), "%v", diags)
+	return state
+}
+
+func TestVirtualMachineInstancesResource_Read_NotFoundRemovesState(t *testing.T) {
+	mockInst := &mockInstanceService{}
+	mockInst.On("Get", mock.Anything, "vm-gone", imageExpands).Return(nil, &clientSDK.HTTPError{
+		StatusCode: http.StatusNotFound,
+		Status:     "404 Not Found",
+		Body:       []byte(`{"error":"not found"}`),
+		Response:   &http.Response{Header: http.Header{}},
+	})
+
+	r := &vmInstances{vmInstances: mockInst}
+	state := vmInstanceReadState(t, r, "vm-gone")
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
+
+	require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+	require.Equal(t, 1, resp.Diagnostics.WarningsCount())
+	assert.Contains(t, resp.Diagnostics.Warnings()[0].Detail(), "vm-gone")
+	assert.True(t, resp.State.Raw.IsNull())
+	mockInst.AssertExpectations(t)
+}
+
+func TestVirtualMachineInstancesResource_Read_OtherErrorsKeepState(t *testing.T) {
+	mockInst := &mockInstanceService{}
+	mockInst.On("Get", mock.Anything, "vm-err", imageExpands).Return(nil, errors.New("api error"))
+
+	r := &vmInstances{vmInstances: mockInst}
+	state := vmInstanceReadState(t, r, "vm-err")
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), resource.ReadRequest{State: state}, resp)
+
+	require.True(t, resp.Diagnostics.HasError())
+	assert.False(t, resp.State.Raw.IsNull())
 }
