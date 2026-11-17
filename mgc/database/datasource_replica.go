@@ -25,6 +25,7 @@ type DBaaSReplicaGetModel struct {
 	InstanceTypeID         types.String          `tfsdk:"instance_type_id"`
 	VolumeSize             types.Int64           `tfsdk:"volume_size"`
 	VolumeType             types.String          `tfsdk:"volume_type"`
+	AvailabilityZone       types.String          `tfsdk:"availability_zone"`
 	Addresses              []ReplicaAddressModel `tfsdk:"addresses"`
 	Status                 types.String          `tfsdk:"status"`
 	Generation             types.String          `tfsdk:"generation"`
@@ -90,6 +91,10 @@ func (r *DataSourceDbReplica) Schema(_ context.Context, _ datasource.SchemaReque
 			"volume_type": schema.StringAttribute{
 				Computed:    true,
 				Description: "Volume type",
+			},
+			"availability_zone": schema.StringAttribute{
+				Computed:    true,
+				Description: "Availability zone where the replica is placed",
 			},
 			"addresses": schema.ListNestedAttribute{
 				Computed:    true,
@@ -160,6 +165,7 @@ func (r *DataSourceDbReplica) Read(ctx context.Context, req datasource.ReadReque
 	data.InstanceTypeID = types.StringValue(d.InstanceTypeID)
 	data.VolumeSize = types.Int64Value(int64(d.Volume.Size))
 	data.VolumeType = types.StringValue(d.Volume.Type)
+	data.AvailabilityZone = types.StringValue(d.AvailabilityZone)
 	for _, a := range d.Addresses {
 		data.Addresses = append(data.Addresses, ReplicaAddressModel{
 			Access:  types.StringPointerValue(utils.SdkEnumToTFString(&a.Access)),

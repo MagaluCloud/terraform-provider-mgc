@@ -26,13 +26,14 @@ const (
 )
 
 type DBaaSReplicaModel struct {
-	ID           types.String `tfsdk:"id"`
-	SourceID     types.String `tfsdk:"source_id"`
-	Name         types.String `tfsdk:"name"`
-	EngineID     types.String `tfsdk:"engine_id"`
-	InstanceType types.String `tfsdk:"instance_type"`
-	VolumeSize   types.Int64  `tfsdk:"volume_size"`
-	Status       types.String `tfsdk:"status"`
+	ID               types.String `tfsdk:"id"`
+	SourceID         types.String `tfsdk:"source_id"`
+	Name             types.String `tfsdk:"name"`
+	EngineID         types.String `tfsdk:"engine_id"`
+	InstanceType     types.String `tfsdk:"instance_type"`
+	VolumeSize       types.Int64  `tfsdk:"volume_size"`
+	AvailabilityZone types.String `tfsdk:"availability_zone"`
+	Status           types.String `tfsdk:"status"`
 }
 
 type DBaaSReplicaResource struct {
@@ -98,6 +99,18 @@ func (r *DBaaSReplicaResource) Schema(_ context.Context, _ resource.SchemaReques
 					int64validator.Between(10, 50000),
 				},
 			},
+			"availability_zone": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Availability zone where the replica will be placed. Defaults to the source instance's availability zone when not set.",
+				Validators: []validator.String{
+					utils.AvailabilityZoneValidator(),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"engine_id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Engine ID",
@@ -135,10 +148,17 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 		v := instanceTypeID
 		ptrTypeID = &v
 	}
+
+	az := data.AvailabilityZone.ValueStringPointer()
+	if data.AvailabilityZone.ValueString() == "" {
+		az = nil
+	}
+
 	created, err := r.dbaasReplicas.Create(ctx, dbSDK.ReplicaCreateRequest{
-		SourceID:       data.SourceID.ValueString(),
-		Name:           data.Name.ValueString(),
-		InstanceTypeID: ptrTypeID,
+		SourceID:         data.SourceID.ValueString(),
+		Name:             data.Name.ValueString(),
+		InstanceTypeID:   ptrTypeID,
+		AvailabilityZone: az,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(utils.ParseSDKError(err))
@@ -158,6 +178,7 @@ func (r *DBaaSReplicaResource) Create(ctx context.Context, req resource.CreateRe
 	data.Name = types.StringValue(found.Name)
 	data.EngineID = types.StringValue(found.EngineID)
 	data.VolumeSize = types.Int64Value(int64(found.Volume.Size))
+	data.AvailabilityZone = types.StringValue(found.AvailabilityZone)
 
 	instanceTypeName, err := GetInstanceTypeNameByID(ctx, r.dbaasInstanceTypes.Get, found.InstanceTypeID)
 	if err != nil {
@@ -187,6 +208,7 @@ func (r *DBaaSReplicaResource) Read(ctx context.Context, req resource.ReadReques
 	data.Name = types.StringValue(detail.Name)
 	data.EngineID = types.StringValue(detail.EngineID)
 	data.VolumeSize = types.Int64Value(int64(detail.Volume.Size))
+	data.AvailabilityZone = types.StringValue(detail.AvailabilityZone)
 
 	instanceType, err := r.dbaasInstanceTypes.Get(ctx, detail.InstanceTypeID)
 	if err != nil {

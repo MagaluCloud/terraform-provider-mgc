@@ -33,6 +33,15 @@ var regions = map[string]map[string]string{
 		"br-mc1":  buildQAUrl("br-mc1"),
 	},
 }
+
+var availabilityZones = []string{
+	"br-se1-a",
+	"br-se1-b",
+	"br-se1-c",
+	"br-ne1-a",
+	"br-ne1-b",
+}
+
 var s3Regions = map[string]map[string]objSDK.Endpoint{
 	ENV_PROD: {
 		"br-ne1": objSDK.BrNe1,

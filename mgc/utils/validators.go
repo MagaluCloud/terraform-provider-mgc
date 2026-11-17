@@ -5,8 +5,15 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
+
+// AvailabilityZoneValidator restricts an attribute to the availability zones
+// supported by the provider.
+func AvailabilityZoneValidator() validator.String {
+	return stringvalidator.OneOf(availabilityZones...)
+}
 
 type CidrValidator struct{}
 

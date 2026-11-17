@@ -14,8 +14,9 @@ Manages a DBaaS replica
 
 ```terraform
 resource "mgc_dbaas_replicas" "dbaas_replica" {
-  name      = "dbaas-read-replica"
-  source_id = "source-id"
+  name              = "dbaas-read-replica"
+  source_id         = "source-id"
+  availability_zone = "br-se1-a" # optional; defaults to the source instance's availability zone
 }
 ```
 
@@ -29,6 +30,7 @@ resource "mgc_dbaas_replicas" "dbaas_replica" {
 
 ### Optional
 
+- `availability_zone` (String) Availability zone where the replica will be placed. Defaults to the source instance's availability zone when not set.
 - `instance_type` (String) Compute and memory capacity of the replica determined by the instance-type field label (e.g., 'DP2-16-40'). Can be changed to scale the instance.
 - `volume_size` (Number) Size of the storage volume in GB. Can be increased but not decreased after creation.
 
