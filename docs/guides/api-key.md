@@ -56,7 +56,7 @@ When you create an API Key in Magalu Cloud, you actually receive multiple creden
 
 ### Via Console
 
-1. Access the [Magalu ID](https://id.magalu.com/api-keys) (ensure you're authenticated with an account that has the necessary access)
+1. Access the [MGC Auth](https://auth.magalu.cloud/api-keys) (ensure you're authenticated with an account that has the necessary access)
 2. Click on "Create API Key"
 3. Define a name for the API Key
 4. Select the expiration period
